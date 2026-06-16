@@ -1,0 +1,7 @@
+{
+  "protected_refs": ["refs/heads/main"],
+  "expected_new_branch_count": 1,
+  "expected_commits_ahead_of_main": 1,
+  "message_terms_any": ["validation", "input", "request", "schema"],
+  "allow_leftovers_staged": true
+}

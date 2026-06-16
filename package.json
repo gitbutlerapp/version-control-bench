@@ -1,0 +1,16 @@
+{
+  "name": "version-control-bench",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "but:build": "cd /Users/kiril/src/gitbutler && cargo build --release -p but --features packaged-but-distribution",
+    "pilot:fixture": "node scripts/create-pilot-fixture.mjs",
+    "pilot:verify": "node scripts/verify-pilot.mjs",
+    "pilot:check": "node scripts/run-pilot-checks.mjs",
+    "pilot:agent": "node scripts/run-pilot-agent.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
