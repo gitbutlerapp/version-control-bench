@@ -1,0 +1,16 @@
+id = "pilot-1-selective-validation"
+version = "0.1.0"
+category = "selective-commit"
+time_limit_seconds = 900
+network = "none"
+
+[difficulty]
+hops = 2
+width = 1
+scope = "mixed-file-and-hunk"
+history_shape = "new-branch"
+dirty_state = "dirty-worktree-with-untracked"
+
+[tools]
+supports_git = true
+supports_but = true

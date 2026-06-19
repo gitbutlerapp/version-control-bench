@@ -1,0 +1,42 @@
+{
+  "target": [
+    {
+      "id": "validation-handler-function",
+      "path": "src/handler.ts",
+      "snippet": "export function validateLeadInput(payload: RequestPayload): string[]"
+    },
+    {
+      "id": "validation-handler-rejection",
+      "path": "src/handler.ts",
+      "snippet": "id: `invalid:${errors.join(\",\")}`"
+    },
+    {
+      "id": "validation-test-invalid-email",
+      "path": "tests/handler.test.ts",
+      "snippet": "export function testCreateLeadRejectsInvalidEmail(): void"
+    },
+    {
+      "id": "validation-readme-behavior",
+      "path": "README.md",
+      "snippet": "Rejects lead payloads when required input fields are missing or malformed."
+    }
+  ],
+  "leftover": [
+    {
+      "id": "logging-handler-console",
+      "path": "src/handler.ts",
+      "snippet": "console.info(\"creating lead\", { label: formatAuditLabel(payload), hasMessage: Boolean(payload.message) });"
+    },
+    {
+      "id": "config-log-level",
+      "path": "src/config.ts",
+      "snippet": "logLevel: \"debug\""
+    },
+    {
+      "id": "debug-notes",
+      "path": "notes/debug-log.md",
+      "snippet": "Do not commit these notes with the validation change.",
+      "untracked": true
+    }
+  ]
+}
