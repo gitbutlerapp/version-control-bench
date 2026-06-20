@@ -1,0 +1,12 @@
+{
+  "task_branch": "amend-series",
+  "protected_refs": ["refs/heads/main"],
+  "commit_subjects": [
+    "refactor validation helpers",
+    "add app configuration",
+    "add lead scoring",
+    "add API handler",
+    "document response behavior"
+  ],
+  "allow_leftovers_staged": true
+}

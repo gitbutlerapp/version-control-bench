@@ -1,0 +1,16 @@
+id = "pilot-2-multi-amend"
+version = "0.1.0"
+category = "selective-multi-amend"
+time_limit_seconds = 900
+network = "none"
+
+[difficulty]
+hops = 4
+width = 3
+scope = "multi-commit-hunk-routing"
+history_shape = "linear-history-rewrite"
+dirty_state = "dirty-worktree-with-untracked"
+
+[tools]
+supports_git = true
+supports_but = true

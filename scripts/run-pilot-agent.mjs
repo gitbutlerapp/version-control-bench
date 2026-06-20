@@ -7,8 +7,30 @@ import { run } from "./lib/process.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
-const taskDir = path.join(repoRoot, "tasks/pilot-1-selective-validation");
 const DEFAULT_CODEX_MODEL = "gpt-5.5";
+
+const TASK_CONFIGS = {
+  "pilot-1-selective-validation": {
+    id: "pilot-1-selective-validation",
+    taskDir: "tasks/pilot-1-selective-validation",
+    createFixtureScript: "scripts/create-pilot-fixture.mjs",
+    applyStateScript: "scripts/apply-pilot-state.mjs",
+    verifyScript: "scripts/verify-pilot.mjs",
+    gitbutlerPrep: "setup",
+  },
+  "pilot-2-multi-amend": {
+    id: "pilot-2-multi-amend",
+    taskDir: "tasks/pilot-2-multi-amend",
+    createFixtureScript: "scripts/create-pilot2-fixture.mjs",
+    applyStateScript: "scripts/apply-pilot2-state.mjs",
+    verifyScript: "scripts/verify-pilot2.mjs",
+    gitbutlerPrep: "setup-and-apply-branch",
+    applyBranch: "amend-series",
+  },
+};
+
+let taskConfig;
+let taskDir;
 
 const GIT_MUTATIONS = new Set([
   "add",
@@ -286,6 +308,7 @@ The GitButler CLI skill is installed for this benchmark trial:
 - For selected dirty files or hunks, start with \`but diff\`, then commit selected IDs with \`but commit <branch> -c -m "<msg>" --changes <ids>\`. Do not run \`git status\` or \`git diff\` as task preflight in this arm.
 - Pass selected IDs as comma-separated values in one \`--changes\` argument, for example \`--changes a1,b2\`. Do not pass selected IDs as separate space-separated arguments after one \`--changes\`.
 - Do not run \`but status -fv\` as routine preflight for selected dirty-file or hunk commits. Use it when existing branch, stack, commit, conflict, or history state matters.
+- For amend/history-edit tasks with existing commits, inspect with \`but status -fv\` to get commit IDs and dirty file/hunk IDs, then use \`but amend <commit-id> --changes <file-or-hunk-id>,<file-or-hunk-id>\`. Put multiple files/hunks for the same target commit in one amend command, then refresh IDs from the returned state before the next amend.
 - Assume multiple agents may be working in this repository. Do not move, amend, squash, discard, commit, push, or otherwise modify another agent's work unless the user asks.
 - Use a dedicated GitButler branch for each agent session, unless the user asks for a different branch structure. Commit only changes that belong to that session.
 - Do not push or open pull requests unless the user asks.
@@ -309,14 +332,20 @@ The GitButler CLI skill is installed for this benchmark trial:
 function prepareWorkspace(runDir, arm, realBut, skillDir) {
   const workspace = path.join(runDir, "workspace");
   const dirty = arm !== "but+skill";
-  run("node", [path.join(repoRoot, "scripts/create-pilot-fixture.mjs"), "--out", workspace, "--force", "true", "--dirty", String(dirty)], {
+  run("node", [path.join(repoRoot, taskConfig.createFixtureScript), "--out", workspace, "--force", "true", "--dirty", String(dirty)], {
     cwd: repoRoot,
   });
 
   if (arm === "but+skill") {
+    if (taskConfig.gitbutlerPrep === "setup-and-apply-branch") {
+      run("git", ["switch", "main"], { cwd: workspace, stdio: "pipe" });
+    }
     run(realBut, ["setup"], { cwd: workspace, stdio: "pipe" });
+    if (taskConfig.gitbutlerPrep === "setup-and-apply-branch") {
+      run(realBut, ["apply", taskConfig.applyBranch], { cwd: workspace, stdio: "pipe" });
+    }
     const setup = installGitButlerSkill(workspace, skillDir);
-    run("node", [path.join(repoRoot, "scripts/apply-pilot-state.mjs"), "dirty", workspace], { cwd: repoRoot });
+    run("node", [path.join(repoRoot, taskConfig.applyStateScript), "dirty", workspace], { cwd: repoRoot });
     return { workspace, setup };
   }
 
@@ -396,7 +425,7 @@ function parseAgentModel(agentResult) {
 }
 
 function verify(workspace) {
-  const result = run("node", [path.join(repoRoot, "scripts/verify-pilot.mjs"), "--repo", workspace, "--task", taskDir], {
+  const result = run("node", [path.join(repoRoot, taskConfig.verifyScript), "--repo", workspace, "--task", taskDir], {
     cwd: repoRoot,
     check: false,
   });
@@ -945,6 +974,7 @@ function traceMetrics(trace, prompt, agentResult) {
 }
 
 const args = parseArgs(process.argv.slice(2));
+const taskId = args.get("task") ?? "pilot-1-selective-validation";
 const agent = args.get("agent") ?? "codex";
 const arm = args.get("arm") ?? "git";
 const model = args.get("model") ?? (agent === "codex" ? DEFAULT_CODEX_MODEL : "");
@@ -957,8 +987,16 @@ const codexDisablePlugins = agent === "codex" && codexCleanConfig && args.get("c
 const runId = args.get("run-id") ?? `${Date.now()}-${agent}-${arm.replaceAll("+", "-")}`;
 const runDir = path.resolve(args.get("out") ?? path.join("tmp/pilot-runs", runId));
 
+taskConfig = TASK_CONFIGS[taskId];
+if (!taskConfig) {
+  console.error(`Unknown task: ${taskId}`);
+  console.error(`Known tasks: ${Object.keys(TASK_CONFIGS).join(", ")}`);
+  process.exit(2);
+}
+taskDir = path.join(repoRoot, taskConfig.taskDir);
+
 if (!["git", "but+skill"].includes(arm)) {
-  console.error("Usage: node scripts/run-pilot-agent.mjs --agent <codex|claude> --arm <git|but+skill>");
+  console.error("Usage: node scripts/run-pilot-agent.mjs --task <task-id> --agent <codex|claude> --arm <git|but+skill>");
   process.exit(2);
 }
 
@@ -1014,10 +1052,13 @@ const result = {
     codex_auth_copied: codexHome?.auth_copied ?? null,
   },
   workspace,
-  task: "pilot-1-selective-validation",
+  task: taskConfig.id,
   pre_run_setup: {
     fixture_created_clean: arm === "but+skill",
     gitbutler_setup_before_agent: arm === "but+skill",
+    gitbutler_branch_applied_before_agent: arm === "but+skill" && taskConfig.gitbutlerPrep === "setup-and-apply-branch"
+      ? taskConfig.applyBranch
+      : null,
     skill_installed_before_agent: arm === "but+skill",
     agent_instructions_before_agent: true,
     dirty_state_applied_before_agent: true,

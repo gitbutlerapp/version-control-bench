@@ -1,0 +1,76 @@
+{
+  "target": [
+    {
+      "id": "validation-readme-wording",
+      "commit": "refactor validation helpers",
+      "path": "README.md",
+      "snippet": "Requires a contact name and a likely email address before a lead can be accepted."
+    },
+    {
+      "id": "validation-likely-email-helper",
+      "commit": "refactor validation helpers",
+      "path": "src/lead.ts",
+      "snippet": "export function isLikelyEmail(email: string): boolean"
+    },
+    {
+      "id": "validation-likely-email-use",
+      "commit": "refactor validation helpers",
+      "path": "src/lead.ts",
+      "snippet": "return hasContactName(payload) && hasEmail(payload) && isLikelyEmail(payload.email);"
+    },
+    {
+      "id": "validation-malformed-email-test",
+      "commit": "refactor validation helpers",
+      "path": "tests/lead.test.ts",
+      "snippet": "export function testIsValidLeadRejectsMalformedEmail(): void"
+    },
+    {
+      "id": "scoring-enterprise-domain",
+      "commit": "add lead scoring",
+      "path": "src/lead.ts",
+      "snippet": "if (email.endsWith(\"@enterprise.example\"))"
+    },
+    {
+      "id": "scoring-detailed-message-weight",
+      "commit": "add lead scoring",
+      "path": "src/lead.ts",
+      "snippet": "score += 15;"
+    },
+    {
+      "id": "scoring-enterprise-test",
+      "commit": "add lead scoring",
+      "path": "tests/lead.test.ts",
+      "snippet": "export function testScoreLeadRewardsEnterpriseDomain(): void"
+    },
+    {
+      "id": "response-readme-reason",
+      "commit": "document response behavior",
+      "path": "README.md",
+      "snippet": "Rejected responses include a reason that can be shown to operators."
+    },
+    {
+      "id": "response-doc-invalid",
+      "commit": "document response behavior",
+      "path": "docs/response.md",
+      "snippet": "Invalid leads return `accepted: false` with a stable rejection reason."
+    }
+  ],
+  "leftover": [
+    {
+      "id": "config-log-level",
+      "path": "src/config.ts",
+      "snippet": "logLevel: \"debug\""
+    },
+    {
+      "id": "lead-debug-summary",
+      "path": "src/lead.ts",
+      "snippet": "export function debugLeadSummary(payload: LeadPayload): string"
+    },
+    {
+      "id": "investigation-notes",
+      "path": "notes/investigation.md",
+      "snippet": "Do not amend this investigation note into the benchmark commits.",
+      "untracked": true
+    }
+  ]
+}

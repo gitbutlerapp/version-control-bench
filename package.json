@@ -8,7 +8,10 @@
     "pilot:fixture": "node scripts/create-pilot-fixture.mjs",
     "pilot:verify": "node scripts/verify-pilot.mjs",
     "pilot:check": "node scripts/run-pilot-checks.mjs",
-    "pilot:agent": "node scripts/run-pilot-agent.mjs"
+    "pilot:agent": "node scripts/run-pilot-agent.mjs",
+    "pilot2:fixture": "node scripts/create-pilot2-fixture.mjs",
+    "pilot2:verify": "node scripts/verify-pilot2.mjs",
+    "pilot2:check": "node scripts/run-pilot2-checks.mjs"
   },
   "engines": {
     "node": ">=20"
