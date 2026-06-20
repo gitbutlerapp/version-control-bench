@@ -22,6 +22,11 @@ Primary scoring should inspect the final Git-visible repository state: refs, DAG
 - [research-notes.md](research-notes.md): external benchmark research and local `but-bench` findings.
 - [implementation-plan.md](implementation-plan.md): phased plan for building the harness later.
 
+## Results
+
+- [results/pilot-1-current-batch.md](results/pilot-1-current-batch.md): selective commit pilot batch.
+- [results/pilot-2-current-batch.md](results/pilot-2-current-batch.md): selective multi-amend pilot batch.
+
 ## Opinionated Recommendation
 
 Use a Harbor/Terminal-Bench-shaped task package with a custom Git-state verifier.

@@ -8,10 +8,13 @@ Start with [docs/README.md](docs/README.md).
 
 The first vertical slice is `tasks/pilot-1-selective-validation`: a VC-only selective commit task in a tiny TypeScript repo.
 
+The second pilot is `tasks/pilot-2-multi-amend`: a VC-only selective multi-amend task where dirty hunks must be routed into three different existing commits while leftovers remain uncommitted.
+
 Run verifier QA:
 
 ```bash
 npm run pilot:check
+npm run pilot2:check
 ```
 
 Run a real agent trial:
@@ -19,9 +22,11 @@ Run a real agent trial:
 ```bash
 npm run pilot:agent -- --agent codex --arm git
 npm run pilot:agent -- --agent codex --arm 'but+skill'
+npm run pilot:agent -- --task pilot-2-multi-amend --agent codex --arm git
+npm run pilot:agent -- --task pilot-2-multi-amend --agent codex --arm 'but+skill'
 ```
 
-The `but+skill` arm prepares GitButler before the measured agent run: it creates a clean fixture, runs `but setup`, installs the GitButler skill from `/Users/kiril/src/gitbutler/crates/but/skill` into the trial workspace under both `.codex/skills/but` and `.claude/skills/but`, writes local `AGENTS.md` and `CLAUDE.md` files with GitButler's optional baseline agent instructions, then applies the dirty task state. This setup happens before command wrappers, timing, and metrics start.
+The `but+skill` arm prepares GitButler before the measured agent run: it creates a clean fixture, runs `but setup`, performs any task-specific pre-application such as applying the existing `amend-series` branch for pilot 2, installs the GitButler skill from `/Users/kiril/src/gitbutler/crates/but/skill` into the trial workspace under both `.codex/skills/but` and `.claude/skills/but`, writes local `AGENTS.md` and `CLAUDE.md` files with GitButler's optional baseline agent instructions, then applies the dirty task state. This setup happens before command wrappers, timing, and metrics start.
 
 Build and use `but` from the local GitButler checkout:
 
@@ -53,3 +58,5 @@ npm run pilot:agent -- --agent claude --arm git
 Run artifacts are written under `tmp/pilot-runs/` and are ignored by git.
 
 The task prompt is tool-agnostic. The arm-specific version-control policy lives in generated pre-run instruction files, not in the prompt itself. The legacy `metrics` block keeps coarse counters such as `vc_command_count`. The cleaner `measurement` block splits platform probes, task-relevant commands, GitButler internal Git calls, cold and warm-estimated transcript bytes, warning bytes, skill/reference output bytes, and millisecond-level command timing.
+
+Current result summaries live under `docs/results/`.
