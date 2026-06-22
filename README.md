@@ -10,11 +10,14 @@ The first vertical slice is `tasks/pilot-1-selective-validation`: a VC-only sele
 
 The second pilot is `tasks/pilot-2-multi-amend`: a VC-only selective multi-amend task where dirty hunks must be routed into three different existing commits while leftovers remain uncommitted.
 
+The third pilot is `tasks/pilot-3-split-commit`: a VC-only split-commit task where a broad non-top commit must be replaced with three semantic commits while later history stays above it and leftovers become uncommitted.
+
 Run verifier QA:
 
 ```bash
 npm run pilot:check
 npm run pilot2:check
+npm run pilot3:check
 ```
 
 Run a real agent trial:
@@ -24,9 +27,11 @@ npm run pilot:agent -- --agent codex --arm git
 npm run pilot:agent -- --agent codex --arm 'but+skill'
 npm run pilot:agent -- --task pilot-2-multi-amend --agent codex --arm git
 npm run pilot:agent -- --task pilot-2-multi-amend --agent codex --arm 'but+skill'
+npm run pilot:agent -- --task pilot-3-split-commit --agent codex --arm git
+npm run pilot:agent -- --task pilot-3-split-commit --agent codex --arm 'but+skill'
 ```
 
-The `but+skill` arm prepares GitButler before the measured agent run: it creates a clean fixture, runs `but setup`, performs any task-specific pre-application such as applying the existing `amend-series` branch for pilot 2, installs the GitButler skill from `/Users/kiril/src/gitbutler/crates/but/skill` into the trial workspace under both `.codex/skills/but` and `.claude/skills/but`, writes local `AGENTS.md` and `CLAUDE.md` files with GitButler's optional baseline agent instructions, then applies the dirty task state. This setup happens before command wrappers, timing, and metrics start.
+The `but+skill` arm prepares GitButler before the measured agent run: it creates a clean fixture, runs `but setup`, performs any task-specific pre-application such as applying the existing task branch for pilots 2 and 3, installs the GitButler skill from `/Users/kiril/src/gitbutler/crates/but/skill` into the trial workspace under both `.codex/skills/but` and `.claude/skills/but`, writes local `AGENTS.md` and `CLAUDE.md` files with GitButler's optional baseline agent instructions, then applies any task-specific dirty state. This setup happens before command wrappers, timing, and metrics start.
 
 Build and use `but` from the local GitButler checkout:
 

@@ -11,7 +11,10 @@
     "pilot:agent": "node scripts/run-pilot-agent.mjs",
     "pilot2:fixture": "node scripts/create-pilot2-fixture.mjs",
     "pilot2:verify": "node scripts/verify-pilot2.mjs",
-    "pilot2:check": "node scripts/run-pilot2-checks.mjs"
+    "pilot2:check": "node scripts/run-pilot2-checks.mjs",
+    "pilot3:fixture": "node scripts/create-pilot3-fixture.mjs",
+    "pilot3:verify": "node scripts/verify-pilot3.mjs",
+    "pilot3:check": "node scripts/run-pilot3-checks.mjs"
   },
   "engines": {
     "node": ">=20"

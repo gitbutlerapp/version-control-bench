@@ -1,0 +1,14 @@
+{
+  "task_branch": "split-workflow",
+  "protected_refs": ["refs/heads/main"],
+  "broad_commit_subject": "add lead workflow",
+  "commit_subjects": [
+    "add app configuration",
+    "add API handler",
+    "refactor validation helpers",
+    "tune lead scoring",
+    "document lead workflow",
+    "add handler routing metadata"
+  ],
+  "allow_leftovers_staged": true
+}

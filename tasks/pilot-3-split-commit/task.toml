@@ -1,0 +1,16 @@
+id = "pilot-3-split-commit"
+version = "0.1.0"
+category = "split-commit"
+time_limit_seconds = 900
+network = "none"
+
+[difficulty]
+hops = 4
+width = 3
+scope = "committed-hunk-routing"
+history_shape = "non-top-commit-split"
+dirty_state = "committed-leftovers-to-uncommitted"
+
+[tools]
+supports_git = true
+supports_but = true
