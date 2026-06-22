@@ -1,0 +1,17 @@
+id = "pilot-5-squash-commits"
+name = "Squash Commit Groups"
+category = "squash-commits"
+version = "0.1.0"
+
+[repo]
+type = "synthetic"
+language = "typescript"
+fixture = "scripts/create-pilot5-fixture.mjs"
+
+[task]
+scope = "history-squash"
+dirty_state = "clean"
+history_shape = "seven-commit-branch"
+single_turn = true
+diagnostic_mode = false
+semantic_check = "light"

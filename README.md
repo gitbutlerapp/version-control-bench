@@ -14,6 +14,8 @@ The third pilot is `tasks/pilot-3-split-commit`: a VC-only split-commit task whe
 
 The fourth pilot is `tasks/pilot-4-reorder-commits`: a VC-only multi-reorder task where three commits must move in a six-commit branch while preserving commit contents and leaving a clean worktree.
 
+The fifth pilot is `tasks/pilot-5-squash-commits`: a VC-only squash task where two adjacent commit groups in a seven-commit branch must become two semantic commits while preserving file contents and leaving a clean worktree.
+
 Run verifier QA:
 
 ```bash
@@ -21,6 +23,7 @@ npm run pilot:check
 npm run pilot2:check
 npm run pilot3:check
 npm run pilot4:check
+npm run pilot5:check
 ```
 
 Run a real agent trial:
@@ -34,9 +37,11 @@ npm run pilot:agent -- --task pilot-3-split-commit --agent codex --arm git
 npm run pilot:agent -- --task pilot-3-split-commit --agent codex --arm 'but+skill'
 npm run pilot:agent -- --task pilot-4-reorder-commits --agent codex --arm git
 npm run pilot:agent -- --task pilot-4-reorder-commits --agent codex --arm 'but+skill'
+npm run pilot:agent -- --task pilot-5-squash-commits --agent codex --arm git
+npm run pilot:agent -- --task pilot-5-squash-commits --agent codex --arm 'but+skill'
 ```
 
-The `but+skill` arm prepares GitButler before the measured agent run: it creates a clean fixture, runs `but setup`, performs any task-specific pre-application such as applying the existing task branch for pilots 2, 3, and 4, installs the GitButler skill from `/Users/kiril/src/gitbutler/crates/but/skill` into the trial workspace under both `.codex/skills/but` and `.claude/skills/but`, writes local `AGENTS.md` and `CLAUDE.md` files with GitButler's optional baseline agent instructions, then applies any task-specific dirty state. This setup happens before command wrappers, timing, and metrics start.
+The `but+skill` arm prepares GitButler before the measured agent run: it creates a clean fixture, runs `but setup`, performs any task-specific pre-application such as applying the existing task branch for pilots 2, 3, 4, and 5, installs the GitButler skill from `/Users/kiril/src/gitbutler/crates/but/skill` into the trial workspace under both `.codex/skills/but` and `.claude/skills/but`, writes local `AGENTS.md` and `CLAUDE.md` files with GitButler's optional baseline agent instructions, then applies any task-specific dirty state. This setup happens before command wrappers, timing, and metrics start.
 
 Build and use `but` from the local GitButler checkout:
 

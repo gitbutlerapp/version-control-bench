@@ -1,0 +1,24 @@
+{
+  "commits": [
+    {
+      "commit": "add parser token model",
+      "paths": ["src/token.ts", "tests/token.test.ts"],
+      "snippets": ["export interface ParsedToken", "testNormalizeToken"]
+    },
+    {
+      "commit": "add parser pipeline",
+      "paths": ["src/parser.ts", "tests/parser.test.ts"],
+      "snippets": ["splitRecordLine", "parseCustomerRecord", "testParseCustomerRecord"]
+    },
+    {
+      "commit": "add export endpoint",
+      "paths": ["src/exporter.ts", "tests/exporter.test.ts"],
+      "snippets": ["exportRecords", "testExportRecords"]
+    },
+    {
+      "commit": "add retry support",
+      "paths": ["README.md", "docs/retry-options.md", "src/retry.ts", "tests/retry.test.ts"],
+      "snippets": ["parseRetryOption", "testParseRetryOption", "Retry Options"]
+    }
+  ]
+}

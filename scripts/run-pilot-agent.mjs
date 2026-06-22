@@ -48,6 +48,16 @@ const TASK_CONFIGS = {
     fixtureDirty: false,
     applyDirtyState: false,
   },
+  "pilot-5-squash-commits": {
+    id: "pilot-5-squash-commits",
+    taskDir: "tasks/pilot-5-squash-commits",
+    createFixtureScript: "scripts/create-pilot5-fixture.mjs",
+    verifyScript: "scripts/verify-pilot5.mjs",
+    gitbutlerPrep: "setup-and-apply-branch",
+    applyBranch: "squash-series",
+    fixtureDirty: false,
+    applyDirtyState: false,
+  },
 };
 
 let taskConfig;
@@ -335,6 +345,7 @@ The instructions below are complete for this trial. Do not read the installed sk
 - Avoid \`but --help\` probes unless a command fails or required syntax is missing from these instructions.
 - For amend/history-edit tasks with existing commits, inspect with \`but status -fv\` to get commit IDs and dirty file/hunk IDs, then use \`but amend <commit-id> --changes <file-or-hunk-id>,<file-or-hunk-id>\`. Put multiple files/hunks for the same target commit in one amend command, then refresh IDs from the returned state before the next amend.
 - For reorder/history-move tasks with an explicit final order, use this mechanical loop: run compact \`but status\` once to get commit IDs; note that it displays newest/top first; reverse any oldest-to-newest task order into newest-to-oldest; move only out-of-place commits. Use \`but move <source-commit-id> <newer-neighbor-commit-id>\` when the source should sit immediately below that newer neighbor in status/output order. For an adjacent commit block, move the block in one command with comma-separated commit IDs, for example \`but move <oldest-source-id>,<newest-source-id> <newer-neighbor-commit-id>\`. Use \`but move <source-commit-id> <branch-name-or-id>\` when the source should become branch top/newest. Each \`but move\` returns updated status state for fresh IDs. For pure reorders, do not inspect file contents before moving; \`but move\` preserves commit contents unless it reports conflicts.
+- For squash tasks, run compact \`but status\` once to get commit IDs. Use \`but squash <source-commit-id> <target-commit-id> -m "<msg>"\`; all commits except the last argument are squashed into the last. For 3+ commits, list sources first and target/result last: \`but squash <source> <source> <target> -m "<msg>"\`. When squashing multiple independent groups from one status snapshot, handle newer/top groups first when practical because editing lower history rewrites IDs above it. Each squash returns updated status state for fresh IDs; after the final squash, stop if that state shows the requested history. Do not run \`--help\`, \`status\`, or \`status -fv\` only to reconfirm.
 - For split-commit tasks, inspect with \`but status -fv\` when commit or placement context is needed, then use \`but uncommit <commit-id> --diff\` to expose committable file/hunk IDs. Pick replacement contents from that dirty diff, not from the old committed diff. For multiple replacements from the same diff, prefer one batch command, adding \`--before <target>\` or \`--after <target>\` only when placement matters: \`but commit batch <branch> --before <target> -m "<msg>" --changes <file-or-hunk-id>,<file-or-hunk-id> -m "<msg>" --changes <file-or-hunk-id>,<file-or-hunk-id>\`. Each \`-m\` pairs with the \`--changes\` group at the same occurrence index. Order batch entries in history order, oldest to newest; when inserting before a newer anchor, the last batch entry lands nearest that anchor. Commit only selected hunks and leave leftovers uncommitted. If the returned workspace state shows the requested commits and leftovers, stop; do not run \`status\`, \`diff\`, \`show\`, or \`--help\` only to reconfirm.
 - Assume multiple agents may be working in this repository. Do not move, amend, squash, discard, commit, push, or otherwise modify another agent's work unless the user asks.
 - Use a dedicated GitButler branch for each agent session, unless the user asks for a different branch structure. Commit only changes that belong to that session.
@@ -703,10 +714,17 @@ function isMutation(entry) {
 function isCodexPlatformProbe(entry) {
   if (entry.tool !== "git") return false;
   const { command, args } = vcSubcommand(entry);
+  const codexParent = entry.parent === "codex" || entry.parent?.endsWith("/codex") || entry.parent?.includes("/codex/");
+  const fsmonitorProbe = codexParent
+    && command === "config"
+    && args[0] === "--null"
+    && args[1] === "--get"
+    && args[2] === "core.fsmonitor";
   const hasCodexRepoFlags = entry.argv.includes("core.hooksPath=/dev/null") || entry.argv.includes("core.fsmonitor=false");
   const pluginProbe = entry.argv.includes("/.codex/.tmp/plugins")
     || (command === "ls-remote" && /^https:\/\/github\.com\//.test(args[0] ?? ""));
 
+  if (fsmonitorProbe) return true;
   if (pluginProbe) return true;
   if (!hasCodexRepoFlags) return false;
 

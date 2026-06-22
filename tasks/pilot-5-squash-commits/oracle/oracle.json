@@ -1,0 +1,18 @@
+{
+  "task_branch": "squash-series",
+  "base_branch": "main",
+  "commit_subjects": [
+    "add parser token model",
+    "add parser pipeline",
+    "add export endpoint",
+    "add retry support"
+  ],
+  "squashed_source_subjects": [
+    "extract parser helpers",
+    "wire parser helpers",
+    "add retry option",
+    "test retry option",
+    "document retry option"
+  ],
+  "expected_final_commit_count": 4
+}
