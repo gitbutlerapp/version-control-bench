@@ -3,6 +3,7 @@ import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statS
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
+import { parseArgs } from "./lib/args.mjs";
 import { run } from "./lib/process.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -128,16 +129,6 @@ const BUT_MUTATIONS = new Set([
 ]);
 
 const BUT_INSPECTIONS = new Set(["status", "diff", "show", "oplog"]);
-function parseArgs(argv) {
-  const args = new Map();
-  for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i];
-    if (arg.startsWith("--")) {
-      args.set(arg.slice(2), argv[i + 1] && !argv[i + 1].startsWith("--") ? argv[++i] : "true");
-    }
-  }
-  return args;
-}
 
 function shellQuote(value) {
   return `'${String(value).replaceAll("'", "'\\''")}'`;
@@ -342,6 +333,7 @@ The instructions below are complete for this trial. Do not read the installed sk
 - For selected dirty files or hunks, start with \`but diff\`, then commit selected IDs with \`but commit <branch> -c -m "<msg>" --changes <ids>\`. Do not run \`git status\` or \`git diff\` as task preflight in this arm.
 - Pass selected IDs as comma-separated values in one \`--changes\` argument, for example \`--changes a1,b2\`. Do not pass selected IDs as separate space-separated arguments after one \`--changes\`.
 - Do not run \`but status -fv\` as routine preflight. For pure commit ordering, branch/stack placement, or conflict overview, use compact \`but status\`. Use \`but status -fv\` when file/hunk IDs or per-commit file details matter.
+- In \`but status\`, an \`(upstream: ...)\` block above a separator is reference-only; judge requested local history from the applied branch commits below the separator. Symbols like \`●\` and \`◐\` are status decorations, not conflict evidence by themselves.
 - Avoid \`but --help\` probes unless a command fails or required syntax is missing from these instructions.
 - For amend/history-edit tasks with existing commits, inspect with \`but status -fv\` to get commit IDs and dirty file/hunk IDs, then use \`but amend <commit-id> --changes <file-or-hunk-id>,<file-or-hunk-id>\`. Put multiple files/hunks for the same target commit in one amend command, then refresh IDs from the returned state before the next amend.
 - For reorder/history-move tasks with an explicit final order, use this mechanical loop: run compact \`but status\` once to get commit IDs; note that it displays newest/top first; reverse any oldest-to-newest task order into newest-to-oldest; move only out-of-place commits. Use \`but move <source-commit-id> <newer-neighbor-commit-id>\` when the source should sit immediately below that newer neighbor in status/output order. For an adjacent commit block, move the block in one command with comma-separated commit IDs, for example \`but move <oldest-source-id>,<newest-source-id> <newer-neighbor-commit-id>\`. Use \`but move <source-commit-id> <branch-name-or-id>\` when the source should become branch top/newest. Each \`but move\` returns updated status state for fresh IDs. For pure reorders, do not inspect file contents before moving; \`but move\` preserves commit contents unless it reports conflicts.

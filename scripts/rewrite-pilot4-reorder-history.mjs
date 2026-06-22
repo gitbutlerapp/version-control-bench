@@ -1,22 +1,8 @@
 #!/usr/bin/env node
 import path from "node:path";
-import { git } from "./lib/process.mjs";
+import { parseArgs } from "./lib/args.mjs";
+import { git, gitText } from "./lib/process.mjs";
 import { EXPECTED_COMMIT_SUBJECTS, TASK_BRANCH } from "./lib/pilot4-content.mjs";
-
-function parseArgs(argv) {
-  const args = new Map();
-  for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i];
-    if (arg.startsWith("--")) {
-      args.set(arg.slice(2), argv[i + 1] && !argv[i + 1].startsWith("--") ? argv[++i] : "true");
-    }
-  }
-  return args;
-}
-
-function gitText(repoDir, args) {
-  return git(repoDir, args).stdout.trimEnd();
-}
 
 const args = parseArgs(process.argv.slice(2));
 const repoDir = path.resolve(args.get("repo") ?? ".");

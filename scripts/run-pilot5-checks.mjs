@@ -1,7 +1,10 @@
 #!/usr/bin/env node
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { parseArgs } from "./lib/args.mjs";
+import { expectVerification, resetCheckDir, verifyRepo } from "./lib/checks.mjs";
+import { commitStateSeries } from "./lib/fixture.mjs";
 import {
   ALL_KNOWN_PATHS,
   EXPECTED_COMMIT_STATES,
@@ -16,18 +19,8 @@ import { git, run } from "./lib/process.mjs";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
 const taskDir = path.join(repoRoot, "tasks/pilot-5-squash-commits");
+const verifierScript = path.join(repoRoot, "scripts/verify-pilot5.mjs");
 const tmpRoot = path.join(repoRoot, "tmp/pilot5-checks");
-
-function parseArgs(argv) {
-  const args = new Map();
-  for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i];
-    if (arg.startsWith("--")) {
-      args.set(arg.slice(2), argv[i + 1] && !argv[i + 1].startsWith("--") ? argv[++i] : "true");
-    }
-  }
-  return args;
-}
 
 const args = parseArgs(process.argv.slice(2));
 const butBin = args.get("but-bin") ?? process.env.BUT_BIN ?? "but";
@@ -44,71 +37,17 @@ function fixture(name) {
   return out;
 }
 
-function verify(repoDir) {
-  const result = run("node", [path.join(repoRoot, "scripts/verify-pilot5.mjs"), "--repo", repoDir, "--task", taskDir], {
-    cwd: repoRoot,
-    check: false,
-  });
-  let parsed;
-  try {
-    parsed = JSON.parse(result.stdout);
-  } catch {
-    parsed = { passed: false, failure_class: "BAD_VERIFIER_OUTPUT", raw: result.stdout, stderr: result.stderr };
-  }
-  return { ok: result.status === 0, result: parsed };
-}
-
 function expect(name, repoDir, expectedPass, options = {}) {
-  const actual = verify(repoDir);
-  const expectedFailureClass = options.failureClass;
-  const expectedChecks = options.checks ?? {};
-  const failureClassMatches = expectedFailureClass === undefined
-    || actual.result.failure_class === expectedFailureClass;
-  const checksMatch = Object.entries(expectedChecks)
-    .every(([key, value]) => actual.result.checks?.[key] === value);
-  const passed = actual.ok === expectedPass
-    && actual.result.passed === expectedPass
-    && failureClassMatches
-    && checksMatch;
-  const status = passed ? "ok" : "FAIL";
-  const expectedClassText = expectedFailureClass === undefined ? "" : `/${expectedFailureClass}`;
-  console.log(`${status} ${name}: expected ${expectedPass ? "pass" : "fail"}${expectedClassText}, got ${actual.result.passed ? "pass" : "fail"} (${actual.result.failure_class ?? "none"})`);
-  if (!passed) {
-    console.log(JSON.stringify(actual.result, null, 2));
-    process.exitCode = 1;
-  }
-}
-
-function syncCommitState(repoDir, files) {
-  for (const relativePath of ALL_KNOWN_PATHS) {
-    if (!(relativePath in files) || files[relativePath] === undefined) {
-      rmSync(path.join(repoDir, relativePath), { force: true });
-    }
-  }
-  for (const [relativePath, content] of Object.entries(files)) {
-    if (content === undefined) continue;
-    const fullPath = path.join(repoDir, relativePath);
-    mkdirSync(path.dirname(fullPath), { recursive: true });
-    writeFileSync(fullPath, content, "utf8");
-  }
-}
-
-function commitState(repoDir, subject, files) {
-  syncCommitState(repoDir, files);
-  git(repoDir, ["add", "-A"]);
-  git(repoDir, ["commit", "-m", subject]);
+  expectVerification(name, verifyRepo(repoRoot, verifierScript, taskDir, repoDir), expectedPass, options);
 }
 
 function rewriteWithStates(repoDir, states) {
   git(repoDir, ["switch", TASK_BRANCH]);
   git(repoDir, ["reset", "--hard", "main"]);
-  for (const state of states) {
-    commitState(repoDir, state.subject, state.files);
-  }
+  commitStateSeries(repoDir, states, ALL_KNOWN_PATHS);
 }
 
-rmSync(tmpRoot, { recursive: true, force: true });
-mkdirSync(tmpRoot, { recursive: true });
+resetCheckDir(tmpRoot);
 
 {
   const repo = fixture("noop");

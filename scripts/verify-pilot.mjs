@@ -1,46 +1,7 @@
 #!/usr/bin/env node
-import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
-import { git } from "./lib/process.mjs";
-
-function parseArgs(argv) {
-  const args = new Map();
-  for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i];
-    if (arg.startsWith("--")) {
-      args.set(arg.slice(2), argv[i + 1] && !argv[i + 1].startsWith("--") ? argv[++i] : "true");
-    }
-  }
-  return args;
-}
-
-function readJson(filePath) {
-  return JSON.parse(readFileSync(filePath, "utf8"));
-}
-
-function gitMaybe(repoDir, args) {
-  const result = git(repoDir, args, { check: false });
-  return result.status === 0 ? result.stdout : null;
-}
-
-function gitText(repoDir, args) {
-  return git(repoDir, args).stdout.trimEnd();
-}
-
-function gitShow(repoDir, ref, filePath) {
-  return gitMaybe(repoDir, ["show", `${ref}:${filePath}`]);
-}
-
-function fileText(repoDir, filePath) {
-  const fullPath = path.join(repoDir, filePath);
-  return existsSync(fullPath) ? readFileSync(fullPath, "utf8") : null;
-}
-
-function sameSet(actual, expected) {
-  if (actual.length !== expected.length) return false;
-  const expectedSet = new Set(expected);
-  return actual.every((item) => expectedSet.has(item));
-}
+import { parseArgs } from "./lib/args.mjs";
+import { fileText, gitMaybe, gitShow, gitText, readJson, sameSet, weightedScore } from "./lib/verifier.mjs";
 
 function classify(checks) {
   if (!checks.git_repo || !checks.main_exists || !checks.main_has_single_commit) return "ENV_FAILURE";
@@ -71,11 +32,7 @@ function score(checks) {
     no_unresolved_conflicts: 2,
   };
 
-  let total = 0;
-  for (const [key, value] of Object.entries(checks)) {
-    if (value && weights[key]) total += weights[key];
-  }
-  return total;
+  return weightedScore(checks, weights);
 }
 
 const args = parseArgs(process.argv.slice(2));

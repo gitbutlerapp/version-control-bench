@@ -26,3 +26,7 @@ export function run(cmd, args = [], options = {}) {
 export function git(repoDir, args, options = {}) {
   return run("git", args, { ...options, cwd: repoDir });
 }
+
+export function gitText(repoDir, args) {
+  return git(repoDir, args).stdout.trimEnd();
+}
