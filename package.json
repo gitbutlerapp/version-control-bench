@@ -17,7 +17,10 @@
     "pilot3:check": "node scripts/run-pilot3-checks.mjs",
     "pilot4:fixture": "node scripts/create-pilot4-fixture.mjs",
     "pilot4:verify": "node scripts/verify-pilot4.mjs",
-    "pilot4:check": "node scripts/run-pilot4-checks.mjs"
+    "pilot4:check": "node scripts/run-pilot4-checks.mjs",
+    "pilot5:fixture": "node scripts/create-pilot5-fixture.mjs",
+    "pilot5:verify": "node scripts/verify-pilot5.mjs",
+    "pilot5:check": "node scripts/run-pilot5-checks.mjs"
   },
   "engines": {
     "node": ">=20"
