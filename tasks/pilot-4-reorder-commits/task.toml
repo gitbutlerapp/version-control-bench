@@ -1,0 +1,16 @@
+id = "pilot-4-reorder-commits"
+version = "0.1.0"
+category = "reorder-commits"
+time_limit_seconds = 900
+network = "none"
+
+[difficulty]
+hops = 1
+width = 6
+scope = "history-reorder"
+history_shape = "six-commit-branch"
+dirty_state = "clean"
+
+[tools]
+supports_git = true
+supports_but = true

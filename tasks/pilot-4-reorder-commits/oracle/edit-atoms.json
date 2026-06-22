@@ -1,0 +1,34 @@
+{
+  "commits": [
+    {
+      "commit": "add app configuration",
+      "paths": ["src/config.ts"],
+      "snippets": ["export interface AppConfig", "retryLimit: 3"]
+    },
+    {
+      "commit": "add customer model",
+      "paths": ["src/customer.ts", "tests/customer.test.ts"],
+      "snippets": ["export interface Customer", "testCustomerDisplayName"]
+    },
+    {
+      "commit": "add email formatter",
+      "paths": ["src/email.ts", "tests/email.test.ts"],
+      "snippets": ["formatNotificationEmail", "testFormatNotificationEmail"]
+    },
+    {
+      "commit": "add retry policy",
+      "paths": ["src/retry.ts", "tests/retry.test.ts"],
+      "snippets": ["nextRetryDelay", "testNextRetryDelay"]
+    },
+    {
+      "commit": "add notification sender",
+      "paths": ["src/notification.ts", "tests/notification.test.ts"],
+      "snippets": ["buildNotificationPayload", "testBuildNotificationPayload"]
+    },
+    {
+      "commit": "document notification flow",
+      "paths": ["README.md", "docs/notification-flow.md"],
+      "snippets": ["docs/notification-flow.md", "Notification Flow"]
+    }
+  ]
+}
