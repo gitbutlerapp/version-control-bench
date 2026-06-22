@@ -199,3 +199,13 @@ Early development can use TypeScript scenario modules because they are fast to i
 
 My pick: start the new repo with the static package shape even if the first runner is small. It prevents inheriting too much `but-bench` GitButler-specific logic.
 
+## Adding A Pilot
+
+Current pilots still use script fixtures instead of full static packages. Keep new pilots close to this shape:
+
+- Put public task text and oracle data under `tasks/<pilot-id>/`.
+- Put deterministic file contents in `scripts/lib/<pilot>-content.mjs`.
+- Use `scripts/lib/fixture.mjs` for repo setup, file-state syncing, and commit-state sequences.
+- Use `scripts/lib/process.mjs` and `scripts/lib/verifier.mjs` for Git plumbing, JSON reads, patch text, path checks, and scoring helpers.
+- Use `scripts/lib/checks.mjs` for verifier QA cases.
+- Keep scenario-specific `classify()` and score weights in the verifier. Those are part of the scenario contract.

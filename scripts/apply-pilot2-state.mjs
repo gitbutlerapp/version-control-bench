@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import { syncFileState } from "./lib/fixture.mjs";
 import {
   ALL_KNOWN_PATHS,
   AMENDED_COMMIT_STATES,
@@ -25,15 +25,4 @@ if (!states[state]) {
   process.exit(2);
 }
 
-for (const relativePath of ALL_KNOWN_PATHS) {
-  if (!(relativePath in states[state]) || states[state][relativePath] === undefined) {
-    rmSync(path.join(repoDir, relativePath), { force: true });
-  }
-}
-
-for (const [relativePath, content] of Object.entries(states[state])) {
-  if (content === undefined) continue;
-  const fullPath = path.join(repoDir, relativePath);
-  mkdirSync(path.dirname(fullPath), { recursive: true });
-  writeFileSync(fullPath, content, "utf8");
-}
+syncFileState(repoDir, states[state], ALL_KNOWN_PATHS);

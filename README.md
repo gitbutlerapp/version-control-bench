@@ -74,4 +74,4 @@ Run artifacts are written under `tmp/pilot-runs/` and are ignored by git.
 
 The task prompt is tool-agnostic. The arm-specific version-control policy lives in generated pre-run instruction files, not in the prompt itself. The legacy `metrics` block keeps coarse counters such as `vc_command_count`. The cleaner `measurement` block splits platform probes, task-relevant commands, GitButler internal Git calls, cold and warm-estimated transcript bytes, warning bytes, skill/reference output bytes, and millisecond-level command timing.
 
-Current result summaries live under `docs/results/`.
+Current result summaries live under `docs/results/`, including the full five-pilot k=3 matrix at `docs/results/full-k3-2026-06-22.md`.
