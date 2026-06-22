@@ -1,0 +1,82 @@
+{
+  "target": [
+    {
+      "id": "validation-likely-email-helper",
+      "commit": "refactor validation helpers",
+      "path": "src/lead.ts",
+      "snippet": "export function isLikelyEmail(email: string): boolean"
+    },
+    {
+      "id": "validation-likely-email-use",
+      "commit": "refactor validation helpers",
+      "path": "src/lead.ts",
+      "snippet": "return hasContactName(payload) && hasEmail(payload) && isLikelyEmail(payload.email);"
+    },
+    {
+      "id": "validation-malformed-email-test",
+      "commit": "refactor validation helpers",
+      "path": "tests/lead.test.ts",
+      "snippet": "export function testIsValidLeadRejectsMalformedEmail(): void"
+    },
+    {
+      "id": "scoring-enterprise-domain",
+      "commit": "tune lead scoring",
+      "path": "src/lead.ts",
+      "snippet": "if (email.endsWith(\"@enterprise.example\"))"
+    },
+    {
+      "id": "scoring-detailed-message-weight",
+      "commit": "tune lead scoring",
+      "path": "src/lead.ts",
+      "snippet": "score += 15;"
+    },
+    {
+      "id": "scoring-enterprise-test",
+      "commit": "tune lead scoring",
+      "path": "tests/lead.test.ts",
+      "snippet": "export function testScoreLeadRewardsEnterpriseDomain(): void"
+    },
+    {
+      "id": "workflow-readme-doc-pointer",
+      "commit": "document lead workflow",
+      "path": "README.md",
+      "snippet": "Workflow details live in docs/lead-workflow.md."
+    },
+    {
+      "id": "workflow-doc",
+      "commit": "document lead workflow",
+      "path": "docs/lead-workflow.md",
+      "snippet": "Enterprise email domains receive an extra score boost."
+    },
+    {
+      "id": "handler-routing-key",
+      "commit": "add handler routing metadata",
+      "path": "src/handler.ts",
+      "snippet": "routingKey: string;"
+    },
+    {
+      "id": "handler-routing-metadata-test",
+      "commit": "add handler routing metadata",
+      "path": "tests/handler.test.ts",
+      "snippet": "export function testHandleLeadIncludesRoutingMetadata(): void"
+    }
+  ],
+  "leftover": [
+    {
+      "id": "config-log-level",
+      "path": "src/config.ts",
+      "snippet": "logLevel: \"debug\""
+    },
+    {
+      "id": "lead-debug-summary",
+      "path": "src/lead.ts",
+      "snippet": "export function debugLeadSummary(payload: LeadPayload): string"
+    },
+    {
+      "id": "investigation-notes",
+      "path": "notes/investigation.md",
+      "snippet": "Do not keep this investigation note in the split commits.",
+      "untracked": true
+    }
+  ]
+}

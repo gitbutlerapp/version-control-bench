@@ -27,6 +27,17 @@ const TASK_CONFIGS = {
     gitbutlerPrep: "setup-and-apply-branch",
     applyBranch: "amend-series",
   },
+  "pilot-3-split-commit": {
+    id: "pilot-3-split-commit",
+    taskDir: "tasks/pilot-3-split-commit",
+    createFixtureScript: "scripts/create-pilot3-fixture.mjs",
+    applyStateScript: "scripts/apply-pilot3-state.mjs",
+    verifyScript: "scripts/verify-pilot3.mjs",
+    gitbutlerPrep: "setup-and-apply-branch",
+    applyBranch: "split-workflow",
+    fixtureDirty: false,
+    applyDirtyState: false,
+  },
 };
 
 let taskConfig;
@@ -297,18 +308,23 @@ function installGitButlerSkill(workspace, skillDir) {
 
 ## Local skill
 
-The GitButler CLI skill is installed for this benchmark trial:
+The GitButler CLI skill is installed for this benchmark trial at:
 
-- but: Commit, branch, inspect, and manage version control with GitButler. Use it for task-level version-control inspection and write operations. (file: ${codexSkillPath})
-- but: Commit, branch, inspect, and manage version control with GitButler. Use it for task-level version-control inspection and write operations. (file: ${claudeSkillPath})
+- ${codexSkillPath}
+- ${claudeSkillPath}
+
+The instructions below are complete for this trial. Do not read the installed skill or reference files unless a \`but\` command fails or required syntax is missing.
 
 ## Version control
 
 - Use GitButler (\`but\`) for task-level version-control inspection and write operations, including status, diffs, branching, committing, pushing, and history edits.
+- In non-interactive version-control workflows, do not narrate progress between routine commands. Execute the needed commands and keep the final response concise.
 - For selected dirty files or hunks, start with \`but diff\`, then commit selected IDs with \`but commit <branch> -c -m "<msg>" --changes <ids>\`. Do not run \`git status\` or \`git diff\` as task preflight in this arm.
 - Pass selected IDs as comma-separated values in one \`--changes\` argument, for example \`--changes a1,b2\`. Do not pass selected IDs as separate space-separated arguments after one \`--changes\`.
 - Do not run \`but status -fv\` as routine preflight for selected dirty-file or hunk commits. Use it when existing branch, stack, commit, conflict, or history state matters.
+- Avoid \`but --help\` probes unless a command fails or required syntax is missing from these instructions.
 - For amend/history-edit tasks with existing commits, inspect with \`but status -fv\` to get commit IDs and dirty file/hunk IDs, then use \`but amend <commit-id> --changes <file-or-hunk-id>,<file-or-hunk-id>\`. Put multiple files/hunks for the same target commit in one amend command, then refresh IDs from the returned state before the next amend.
+- For split-commit tasks, inspect with \`but status -fv\` when commit or placement context is needed, then use \`but uncommit <commit-id> --diff\` to expose committable file/hunk IDs. Pick replacement contents from that dirty diff, not from the old committed diff. For multiple replacements from the same diff, prefer one batch command, adding \`--before <target>\` or \`--after <target>\` only when placement matters: \`but commit batch <branch> --before <target> -m "<msg>" --changes <file-or-hunk-id>,<file-or-hunk-id> -m "<msg>" --changes <file-or-hunk-id>,<file-or-hunk-id>\`. Each \`-m\` pairs with the \`--changes\` group at the same occurrence index. Order batch entries in history order, oldest to newest; when inserting before a newer anchor, the last batch entry lands nearest that anchor. Commit only selected hunks and leave leftovers uncommitted. If the returned workspace state shows the requested commits and leftovers, stop; do not run \`status\`, \`diff\`, \`show\`, or \`--help\` only to reconfirm.
 - Assume multiple agents may be working in this repository. Do not move, amend, squash, discard, commit, push, or otherwise modify another agent's work unless the user asks.
 - Use a dedicated GitButler branch for each agent session, unless the user asks for a different branch structure. Commit only changes that belong to that session.
 - Do not push or open pull requests unless the user asks.
@@ -331,7 +347,7 @@ The GitButler CLI skill is installed for this benchmark trial:
 
 function prepareWorkspace(runDir, arm, realBut, skillDir) {
   const workspace = path.join(runDir, "workspace");
-  const dirty = arm !== "but+skill";
+  const dirty = arm !== "but+skill" && taskConfig.fixtureDirty !== false;
   run("node", [path.join(repoRoot, taskConfig.createFixtureScript), "--out", workspace, "--force", "true", "--dirty", String(dirty)], {
     cwd: repoRoot,
   });
@@ -345,7 +361,9 @@ function prepareWorkspace(runDir, arm, realBut, skillDir) {
       run(realBut, ["apply", taskConfig.applyBranch], { cwd: workspace, stdio: "pipe" });
     }
     const setup = installGitButlerSkill(workspace, skillDir);
-    run("node", [path.join(repoRoot, taskConfig.applyStateScript), "dirty", workspace], { cwd: repoRoot });
+    if (taskConfig.applyDirtyState !== false) {
+      run("node", [path.join(repoRoot, taskConfig.applyStateScript), "dirty", workspace], { cwd: repoRoot });
+    }
     return { workspace, setup };
   }
 
@@ -1061,7 +1079,7 @@ const result = {
       : null,
     skill_installed_before_agent: arm === "but+skill",
     agent_instructions_before_agent: true,
-    dirty_state_applied_before_agent: true,
+    dirty_state_applied_before_agent: taskConfig.applyDirtyState !== false || taskConfig.fixtureDirty !== false,
     included_in_agent_duration_or_metrics: false,
   },
   agent_instructions: setup.instructions,
