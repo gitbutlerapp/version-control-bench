@@ -1,0 +1,20 @@
+{
+  "task_branch": "reorder-series",
+  "protected_refs": ["refs/heads/main"],
+  "commit_subjects": [
+    "add app configuration",
+    "add retry policy",
+    "add notification sender",
+    "add customer model",
+    "add email formatter",
+    "document notification flow"
+  ],
+  "initial_commit_subjects": [
+    "add app configuration",
+    "add customer model",
+    "add email formatter",
+    "add retry policy",
+    "add notification sender",
+    "document notification flow"
+  ]
+}

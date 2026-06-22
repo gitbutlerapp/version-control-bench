@@ -38,6 +38,16 @@ const TASK_CONFIGS = {
     fixtureDirty: false,
     applyDirtyState: false,
   },
+  "pilot-4-reorder-commits": {
+    id: "pilot-4-reorder-commits",
+    taskDir: "tasks/pilot-4-reorder-commits",
+    createFixtureScript: "scripts/create-pilot4-fixture.mjs",
+    verifyScript: "scripts/verify-pilot4.mjs",
+    gitbutlerPrep: "setup-and-apply-branch",
+    applyBranch: "reorder-series",
+    fixtureDirty: false,
+    applyDirtyState: false,
+  },
 };
 
 let taskConfig;
@@ -321,9 +331,10 @@ The instructions below are complete for this trial. Do not read the installed sk
 - In non-interactive version-control workflows, do not narrate progress between routine commands. Execute the needed commands and keep the final response concise.
 - For selected dirty files or hunks, start with \`but diff\`, then commit selected IDs with \`but commit <branch> -c -m "<msg>" --changes <ids>\`. Do not run \`git status\` or \`git diff\` as task preflight in this arm.
 - Pass selected IDs as comma-separated values in one \`--changes\` argument, for example \`--changes a1,b2\`. Do not pass selected IDs as separate space-separated arguments after one \`--changes\`.
-- Do not run \`but status -fv\` as routine preflight for selected dirty-file or hunk commits. Use it when existing branch, stack, commit, conflict, or history state matters.
+- Do not run \`but status -fv\` as routine preflight. For pure commit ordering, branch/stack placement, or conflict overview, use compact \`but status\`. Use \`but status -fv\` when file/hunk IDs or per-commit file details matter.
 - Avoid \`but --help\` probes unless a command fails or required syntax is missing from these instructions.
 - For amend/history-edit tasks with existing commits, inspect with \`but status -fv\` to get commit IDs and dirty file/hunk IDs, then use \`but amend <commit-id> --changes <file-or-hunk-id>,<file-or-hunk-id>\`. Put multiple files/hunks for the same target commit in one amend command, then refresh IDs from the returned state before the next amend.
+- For reorder/history-move tasks with an explicit final order, use this mechanical loop: run compact \`but status\` once to get commit IDs; note that it displays newest/top first; reverse any oldest-to-newest task order into newest-to-oldest; move only out-of-place commits. Use \`but move <source-commit-id> <newer-neighbor-commit-id>\` when the source should sit immediately below that newer neighbor in status/output order. For an adjacent commit block, move the block in one command with comma-separated commit IDs, for example \`but move <oldest-source-id>,<newest-source-id> <newer-neighbor-commit-id>\`. Use \`but move <source-commit-id> <branch-name-or-id>\` when the source should become branch top/newest. Each \`but move\` returns updated status state for fresh IDs. For pure reorders, do not inspect file contents before moving; \`but move\` preserves commit contents unless it reports conflicts.
 - For split-commit tasks, inspect with \`but status -fv\` when commit or placement context is needed, then use \`but uncommit <commit-id> --diff\` to expose committable file/hunk IDs. Pick replacement contents from that dirty diff, not from the old committed diff. For multiple replacements from the same diff, prefer one batch command, adding \`--before <target>\` or \`--after <target>\` only when placement matters: \`but commit batch <branch> --before <target> -m "<msg>" --changes <file-or-hunk-id>,<file-or-hunk-id> -m "<msg>" --changes <file-or-hunk-id>,<file-or-hunk-id>\`. Each \`-m\` pairs with the \`--changes\` group at the same occurrence index. Order batch entries in history order, oldest to newest; when inserting before a newer anchor, the last batch entry lands nearest that anchor. Commit only selected hunks and leave leftovers uncommitted. If the returned workspace state shows the requested commits and leftovers, stop; do not run \`status\`, \`diff\`, \`show\`, or \`--help\` only to reconfirm.
 - Assume multiple agents may be working in this repository. Do not move, amend, squash, discard, commit, push, or otherwise modify another agent's work unless the user asks.
 - Use a dedicated GitButler branch for each agent session, unless the user asks for a different branch structure. Commit only changes that belong to that session.
