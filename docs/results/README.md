@@ -17,6 +17,25 @@ Scope: all five pilot scenarios, `k=3` per `(scenario, agent, arm)` group, Codex
 
 Median wall time was lower for `but+skill` in all 10 scenario/agent pairs. Mean wall time was lower in 9 of 10 pairs; the exception was one Claude squash outlier, and the documented follow-up rerun restored the expected shape.
 
+## Warm Output Burden
+
+The current batch does not expose a strict VC-output-only byte counter from command stdout/stderr. The closest checked-in proxy is warm-estimated transcript bytes: prompt plus agent stdout/stderr after subtracting visible skill/reference reads. Treat this as a within-agent output-burden metric, not as comparable token accounting across Codex and Claude.
+
+| Agent | Warm output with `git` | Warm output with `but+skill` | Delta | Reduction |
+| --- | ---: | ---: | ---: | ---: |
+| Codex | 21.5 KB | 11.3 KB | -10.2 KB | 47.3% |
+| Claude | 1.7 KB | 1.4 KB | -0.3 KB | 17.0% |
+
+By scenario, `but+skill` had lower warm output in 8 of 10 scenario/agent pairs. The two exceptions were squash runs, where `but+skill` still used far fewer task VC commands but printed slightly more warm transcript.
+
+| # | Scenario | Codex warm output | Claude warm output |
+| ---: | --- | ---: | ---: |
+| 1 | [Selective Validation Commit](../scenarios.md#1-selective-validation-commit) | 11.1 -> 6.9 KB (-37.6%) | 1.2 -> 0.9 KB (-26.3%) |
+| 2 | [Selective Multi-Amend](../scenarios.md#2-selective-multi-amend) | 58.8 -> 24.5 KB (-58.4%) | 2.1 -> 1.5 KB (-30.0%) |
+| 3 | [Split Broad Commit](../scenarios.md#3-split-broad-commit) | 24.9 -> 13.1 KB (-47.5%) | 2.2 -> 1.7 KB (-19.1%) |
+| 4 | [Reorder Existing Commits](../scenarios.md#4-reorder-existing-commits) | 7.1 -> 5.0 KB (-29.6%) | 1.5 -> 1.3 KB (-11.2%) |
+| 5 | [Squash Commit Groups](../scenarios.md#5-squash-commit-groups) | 5.5 -> 7.1 KB (+30.2%) | 1.5 -> 1.6 KB (+6.0%) |
+
 ## Scenario Results
 
 Each scenario name links to the plain-English scenario guide.
