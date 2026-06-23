@@ -25,6 +25,7 @@ Primary scoring should inspect the final Git-visible repository state: refs, DAG
 
 ## Results
 
+- [results/README.md](results/README.md): human-facing current results overview, with scenario links and `git` vs `but+skill` deltas.
 - [results/full-k3-2026-06-22.md](results/full-k3-2026-06-22.md): full five-pilot k=3 matrix for Codex and Claude across `git` and `but+skill`.
 - [results/pilot-1-current-batch.md](results/pilot-1-current-batch.md): selective commit pilot batch.
 - [results/pilot-2-current-batch.md](results/pilot-2-current-batch.md): selective multi-amend pilot batch.

@@ -14,7 +14,7 @@ Start with [docs/README.md](docs/README.md) for the full design notes. This root
 - Reference `git` and `but` solutions in each task directory.
 - An agent runner for Codex and Claude: `scripts/run-pilot-agent.mjs`.
 - Tool-policy wrappers that block the wrong write tool per arm and split measurements into task, platform, and GitButler-internal commands.
-- Checked-in result summaries under [docs/results/](docs/results/).
+- Checked-in result summaries under [docs/results/](docs/results/), starting with the [results overview](docs/results/README.md).
 
 ## Scenario Guide
 
@@ -122,9 +122,11 @@ The useful measurement block is `measurement`, not the older coarse `metrics` bl
 
 ## Current Results
 
-The current full matrix is [docs/results/full-k3-2026-06-22.md](docs/results/full-k3-2026-06-22.md): all five pilots, `k=3`, Codex and Claude, `git` and `but+skill`, 60 runs total.
+The current human-facing results page is [docs/results/README.md](docs/results/README.md). It links each scenario to the plain-English [scenario guide](docs/scenarios.md) and shows the `git` vs `but+skill` deltas by agent.
 
-Headline from that batch: all 60 runs passed. `but+skill` used fewer task-relevant VC commands in every task/agent pair, had lower median wall time in all 10 pairs, and lower mean wall time in 9 of 10. The one mean-wall exception was a Claude squash outlier; the follow-up rerun in the same results file restored the expected shape.
+Latest full matrix: [docs/results/full-k3-2026-06-22.md](docs/results/full-k3-2026-06-22.md), all five pilots, `k=3`, Codex and Claude, `git` and `but+skill`, 60 runs total.
+
+Headline from that batch: all 60 runs passed. `but+skill` cut mean wall time by 52% for Codex and 72% for Claude, while cutting task-relevant version-control commands by 79% and 85%. It used fewer task-relevant VC commands in every scenario/agent pair, had lower median wall time in all 10 pairs, and lower mean wall time in 9 of 10. The one mean-wall exception was a Claude squash outlier; the follow-up rerun in the same results file restored the expected shape.
 
 ## Docs
 
