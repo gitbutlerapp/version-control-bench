@@ -1,5 +1,20 @@
 # Pilot 2: Selective Multi-Amend
 
+## At a Glance
+
+Plain English: several uncommitted fixes already exist, and each one belongs inside a different older commit.
+
+Real-world shape: review feedback produced validation, scoring, and docs fixups. Instead of adding a vague "fix review comments" commit, the agent must fold each fixup into the commit that introduced that topic.
+
+```text
+dirty fixes
+  validation fix  -> old commit: refactor validation helpers
+  scoring fix     -> old commit: add lead scoring
+  docs fix        -> old commit: document response behavior
+
+left over: debug/config/investigation work stays uncommitted
+```
+
 This pilot starts from a tiny TypeScript repo with a checked-out `amend-series` branch containing five existing commits ahead of `main`.
 
 The agent must amend selected dirty hunks into three different pre-existing commits:

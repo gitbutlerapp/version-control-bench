@@ -1,5 +1,20 @@
 # Pilot 5: Squash Commit Groups
 
+## At a Glance
+
+Plain English: the branch has noisy step-by-step commits that should be compressed into a smaller set of meaningful commits.
+
+Real-world shape: helper extraction and retry support were committed in tiny pieces while building. Before review, the history should say what changed, not every intermediate step.
+
+```text
+before:
+  A token model -> B extract helpers -> C wire helpers -> D export
+  -> E retry code -> F retry tests -> G retry docs
+
+after:
+  A token model -> [B+C parser pipeline] -> D export -> [E+F+G retry support]
+```
+
 This pilot starts from a tiny TypeScript repo with a checked-out `squash-series` branch containing seven existing commits ahead of `main`.
 
 The agent must squash two adjacent groups of commits into two semantic commits while preserving the unrelated commits, final file contents, and a clean worktree.
