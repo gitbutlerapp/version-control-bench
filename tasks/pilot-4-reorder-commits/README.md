@@ -1,5 +1,19 @@
 # Pilot 4: Reorder Existing Commits
 
+## At a Glance
+
+Plain English: all commits are already correct, but two related commits are in the wrong place.
+
+Real-world shape: the branch works, but the story is awkward. Moving retry and notification work earlier makes the history read in the order the feature is built.
+
+```text
+before:
+  A config -> B customer -> C email -> D retry -> E sender -> F docs
+
+after:
+  A config -> D retry -> E sender -> B customer -> C email -> F docs
+```
+
 This pilot starts from a tiny TypeScript repo with a checked-out `reorder-series` branch containing six existing commits ahead of `main`.
 
 The agent must move an adjacent delivery-related commit block earlier in the branch while preserving every commit's content and message. No file contents should change, no new functional commits should be introduced, and the final worktree should be clean.

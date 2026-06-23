@@ -1,5 +1,20 @@
 # Pilot 1: Selective Validation Commit
 
+## At a Glance
+
+Plain English: pick one useful topic out of a messy uncommitted worktree and commit only that topic on a new branch.
+
+Real-world shape: you fixed input validation while also poking at logging, config, and notes. The validation work should become a clean commit; the other work should stay as local leftovers.
+
+```text
+messy worktree
+  validation + logging + config + notes
+        |
+        v
+new branch: [validation commit]
+left over:  logging, config, notes stay uncommitted
+```
+
 This pilot starts from a tiny TypeScript repo on `main` with dirty changes already applied.
 
 The agent must create a new branch and commit only the input validation work. The logging cleanup, config cleanup, and debug notes must remain uncommitted.

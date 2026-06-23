@@ -1,5 +1,22 @@
 # Pilot 3: Split Broad Commit
 
+## At a Glance
+
+Plain English: one older commit is doing too much, so it needs to become several clean commits.
+
+Real-world shape: a broad workflow commit mixes validation, scoring, docs, and stray debug work. The branch should read as three reviewable commits, with the stray work pushed back out to the worktree.
+
+```text
+before:
+  main - [big mixed commit] - [later routing commit]
+
+after:
+  main - [validation] - [scoring] - [docs] - [later routing commit]
+
+left over:
+  debug/config/investigation work becomes uncommitted
+```
+
 This pilot starts from a tiny TypeScript repo with a checked-out `split-workflow` branch containing four existing commits ahead of `main`.
 
 The non-top commit `add lead workflow` is intentionally too broad. It contains validation changes, scoring changes, workflow documentation, and unrelated leftover/debug changes. The existing top commit, `add handler routing metadata`, must stay above the replacement commits.

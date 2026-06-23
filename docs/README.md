@@ -14,6 +14,7 @@ Primary scoring should inspect the final Git-visible repository state: refs, DAG
 
 ## Docs
 
+- [scenarios.md](scenarios.md): plain-English guide to the five pilot scenarios, with quick sketches.
 - [benchmark-design.md](benchmark-design.md): requirements, comparison model, architecture, task lifecycle.
 - [task-format.md](task-format.md): proposed task package format and fixture rules.
 - [scoring-and-validation.md](scoring-and-validation.md): deterministic oracles, semantic edit atoms, metrics.
