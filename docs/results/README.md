@@ -63,6 +63,13 @@ The speedup mostly comes from replacing low-level history choreography with one 
 ## Evidence
 
 - Full batch report: [full-k3-2026-06-22.md](full-k3-2026-06-22.md)
+- Latest Codex/Claude `but+skill` pilot 1 reruns: [pilot-1-but-latest-2026-06-25.md](pilot-1-but-latest-2026-06-25.md)
+- Latest Codex `but+skill` pilot 2 rerun: [pilot-2-codex-but-latest-2026-06-25.md](pilot-2-codex-but-latest-2026-06-25.md)
+- Latest Claude `but+skill` pilot 2 rerun: [pilot-2-claude-but-latest-2026-06-25.md](pilot-2-claude-but-latest-2026-06-25.md)
+- Claude `but+skill` pilot 3 config-isolation rerun: [pilot-3-claude-but-clean-config-2026-06-25.md](pilot-3-claude-but-clean-config-2026-06-25.md)
+- Scenario 4 reorder guidance fix: [pilot-4-reorder-guidance-fix-2026-06-25.md](pilot-4-reorder-guidance-fix-2026-06-25.md)
+- Latest Codex `but+skill` pilot 5 rerun: [pilot-5-codex-but-latest-2026-06-25.md](pilot-5-codex-but-latest-2026-06-25.md)
+- Latest Claude `but+skill` pilot 5 rerun: [pilot-5-claude-but-latest-2026-06-25.md](pilot-5-claude-but-latest-2026-06-25.md)
 - Plain-English scenarios: [../scenarios.md](../scenarios.md)
 - Raw aggregate: `tmp/pilot-runs/full-k3-20260622-224850/aggregate.json`
 - Raw run manifest: `tmp/pilot-runs/full-k3-20260622-224850/manifest.tsv`
