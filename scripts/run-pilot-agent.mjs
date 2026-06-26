@@ -162,6 +162,26 @@ function prepareCodexHome(runDir, enabled) {
   };
 }
 
+function prepareClaudeSettings(runDir, enabled, effortLevel) {
+  if (!enabled) return null;
+
+  const settingsPath = path.join(runDir, "claude-settings.json");
+  const settings = {
+    permissions: {
+      defaultMode: "bypassPermissions",
+    },
+    enabledPlugins: {},
+  };
+  if (effortLevel) {
+    settings.effortLevel = effortLevel;
+  }
+  writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
+  return {
+    path: settingsPath,
+    settings,
+  };
+}
+
 function writeWrapper(binDir, tool, realPath, tracePath, arm) {
   const wrapperPath = path.join(binDir, tool);
   const blockGitWrites = tool === "git" && arm === "but+skill";
@@ -330,13 +350,13 @@ The instructions below are complete for this trial. Do not read the installed sk
 
 - Use GitButler (\`but\`) for task-level version-control inspection and write operations, including status, diffs, branching, committing, pushing, and history edits.
 - In non-interactive version-control workflows, do not narrate progress between routine commands. Execute the needed commands and keep the final response concise.
-- For selected dirty files or hunks, start with \`but diff\`, then commit selected IDs with \`but commit <branch> -c -m "<msg>" --changes <ids>\`. Do not run \`git status\` or \`git diff\` as task preflight in this arm.
+- For selected dirty files or hunks, start with \`but diff\`; it prints the file and hunk IDs needed by \`--changes\`. Do not run \`but status\` or \`but status -fv\` as routine preflight for selected dirty-file or hunk commits. For a new branch, commit in one command with \`but commit <branch> -c -m "<msg>" --changes <ids>\`; do not pre-create it with \`but branch new\`.
 - Pass selected IDs as comma-separated values in one \`--changes\` argument, for example \`--changes a1,b2\`. Do not pass selected IDs as separate space-separated arguments after one \`--changes\`.
-- Do not run \`but status -fv\` as routine preflight. For pure commit ordering, branch/stack placement, or conflict overview, use compact \`but status\`. Use \`but status -fv\` when file/hunk IDs or per-commit file details matter.
+- Do not run \`but status -fv\` just to get uncommitted dirty file/hunk IDs. For pure commit ordering, branch/stack placement, or conflict overview, use compact \`but status\`. Use \`but status -fv\` for per-commit file details or when compact status/diff output lacks details needed for the task.
 - In \`but status\`, an \`(upstream: ...)\` block above a separator is reference-only; judge requested local history from the applied branch commits below the separator. Symbols like \`●\` and \`◐\` are status decorations, not conflict evidence by themselves.
 - Avoid \`but --help\` probes unless a command fails or required syntax is missing from these instructions.
 - For amend/history-edit tasks with existing commits, inspect with \`but status -fv\` to get commit IDs and dirty file/hunk IDs, then use \`but amend <commit-id> --changes <file-or-hunk-id>,<file-or-hunk-id>\`. Put multiple files/hunks for the same target commit in one amend command, then refresh IDs from the returned state before the next amend.
-- For reorder/history-move tasks with an explicit final order, use this mechanical loop: run compact \`but status\` once to get commit IDs; note that it displays newest/top first; reverse any oldest-to-newest task order into newest-to-oldest; move only out-of-place commits. Use \`but move <source-commit-id> <newer-neighbor-commit-id>\` when the source should sit immediately below that newer neighbor in status/output order. For an adjacent commit block, move the block in one command with comma-separated commit IDs, for example \`but move <oldest-source-id>,<newest-source-id> <newer-neighbor-commit-id>\`. Use \`but move <source-commit-id> <branch-name-or-id>\` when the source should become branch top/newest. Each \`but move\` returns updated status state for fresh IDs. For pure reorders, do not inspect file contents before moving; \`but move\` preserves commit contents unless it reports conflicts.
+- For reorder/history-move tasks with an explicit final order, run compact \`but status\` once to get commit IDs. If the task names an adjacent commit block, do not sort the whole branch or move block members one by one: preserve the block's internal oldest-to-newest order, find the commit that should immediately follow the block in the requested oldest-to-newest order, then run one block move: \`but move <oldest-block-id>,<newest-block-id> <following-commit-id>\`. After a successful block move, stop if the returned status shows the requested order; do not move the anchor or any member of that block again. For other explicit reorders, note that \`but status\` displays newest/top first, reverse any oldest-to-newest task order into newest-to-oldest, and move only out-of-place commits. Use \`but move <source-commit-id> <newer-neighbor-commit-id>\` when the source should sit immediately below that newer neighbor in status/output order. Use \`but move <source-commit-id> <branch-name-or-id>\` when the source should become branch top/newest. Each \`but move\` returns updated status state for fresh IDs. For pure reorders, do not inspect file contents before moving; \`but move\` preserves commit contents unless it reports conflicts.
 - For squash tasks, run compact \`but status\` once to get commit IDs. Use \`but squash <source-commit-id> <target-commit-id> -m "<msg>"\`; all commits except the last argument are squashed into the last. For 3+ commits, list sources first and target/result last: \`but squash <source> <source> <target> -m "<msg>"\`. When squashing multiple independent groups from one status snapshot, handle newer/top groups first when practical because editing lower history rewrites IDs above it. Each squash returns updated status state for fresh IDs; after the final squash, stop if that state shows the requested history. Do not run \`--help\`, \`status\`, or \`status -fv\` only to reconfirm.
 - For split-commit tasks, inspect with \`but status -fv\` when commit or placement context is needed, then use \`but uncommit <commit-id> --diff\` to expose committable file/hunk IDs. Pick replacement contents from that dirty diff, not from the old committed diff. For multiple replacements from the same diff, prefer one batch command, adding \`--before <target>\` or \`--after <target>\` only when placement matters: \`but commit batch <branch> --before <target> -m "<msg>" --changes <file-or-hunk-id>,<file-or-hunk-id> -m "<msg>" --changes <file-or-hunk-id>,<file-or-hunk-id>\`. Each \`-m\` pairs with the \`--changes\` group at the same occurrence index. Order batch entries in history order, oldest to newest; when inserting before a newer anchor, the last batch entry lands nearest that anchor. Commit only selected hunks and leave leftovers uncommitted. If the returned workspace state shows the requested commits and leftovers, stop; do not run \`status\`, \`diff\`, \`show\`, or \`--help\` only to reconfirm.
 - Assume multiple agents may be working in this repository. Do not move, amend, squash, discard, commit, push, or otherwise modify another agent's work unless the user asks.
@@ -422,6 +442,9 @@ function runAgent(agent, workspace, prompt, env, model, timeoutMs) {
   } else if (agent === "claude") {
     cmd = "claude";
     args = ["-p", "--permission-mode", "bypassPermissions", "--output-format", "text"];
+    if (env.VCB_CLAUDE_CLEAN_CONFIG === "true" && env.VCB_CLAUDE_SETTINGS) {
+      args.push("--settings", env.VCB_CLAUDE_SETTINGS, "--strict-mcp-config");
+    }
     if (model) args.push("--model", model);
     args.push(prompt);
   } else {
@@ -542,7 +565,9 @@ function markImplicitToolInternal(trace) {
     const overlapsButMutation = butMutations.some((butEntry) => {
       const butStart = entryStartMs(butEntry);
       const butEnd = entryEndMs(butEntry);
-      return start !== null && end !== null && butStart !== null && butEnd !== null && start >= butStart && end <= butEnd;
+      const overlaps = start !== null && end !== null && butStart !== null && butEnd !== null && start >= butStart && end <= butEnd;
+      const immediatelyPrecedes = end !== null && butStart !== null && end <= butStart && butStart - end <= 250;
+      return overlaps || immediatelyPrecedes;
     });
 
     if (overlapsButMutation) entry.internal = true;
@@ -726,16 +751,58 @@ function isCodexPlatformProbe(entry) {
   return false;
 }
 
+function processNameMatches(name, processName) {
+  return name === processName || name?.endsWith(`/${processName}`);
+}
+
+function isClaudeCodeProbeProcess(entry) {
+  const parentIsClaude = processNameMatches(entry.parent, "claude");
+  const parentIsNode = processNameMatches(entry.parent, "node");
+  const grandparentIsNode = processNameMatches(entry.grandparent, "node");
+
+  return (parentIsClaude && grandparentIsNode) || (parentIsNode && grandparentIsNode);
+}
+
+function isClaudeShellProbeProcess(entry) {
+  return isShellParent(entry.parent) && processNameMatches(entry.grandparent, "claude");
+}
+
+function isClaudeHistoryScan(command, args, entry) {
+  if (
+    command === "log"
+    && args.includes("-n")
+    && args.includes("1000")
+    && args.includes("--pretty=format:")
+    && args.includes("--name-only")
+    && args.includes("--diff-filter=M")
+  ) return true;
+
+  return command === "log" && args.includes("--since=7.days") && entry.argv.includes(".claude/skills .claude/commands");
+}
+
 function isClaudePlatformProbe(entry) {
   if (entry.tool !== "git") return false;
-  if (entry.parent !== "claude" && !entry.parent?.endsWith("/claude")) return false;
   const { command, args } = vcSubcommand(entry);
+  const shellEmailProbe = command === "config"
+    && args.join(" ") === "user.email"
+    && isShellParent(entry.parent)
+    && isShellParent(entry.grandparent);
+  if (shellEmailProbe) return true;
+
+  if (isClaudeShellProbeProcess(entry) && isClaudeHistoryScan(command, args, entry)) return true;
+  if (!isClaudeCodeProbeProcess(entry)) return false;
 
   if (command === "config" && args[0] === "user.name") return true;
+  if (command === "config" && args[0] === "user.email") return true;
   if (command === "config" && args[0] === "--get" && ["user.email", "remote.origin.url"].includes(args[1])) return true;
+  if (command === "rev-parse" && args.join(" ") === "--show-toplevel") return true;
+  if (command === "rev-parse" && args.join(" ") === "--is-inside-work-tree") return true;
+  if (command === "rev-parse" && args.join(" ") === "--abbrev-ref HEAD") return true;
+  if (command === "rev-parse" && args.join(" ") === "--abbrev-ref origin/HEAD") return true;
+  if (command === "branch" && args.join(" ") === "--show-current") return true;
   if (command === "status" && args.includes("--short")) return true;
   if (command === "log" && args.includes("--oneline") && args.includes("-n") && args.includes("5")) return true;
-  if (command === "log" && args.includes("--since=7.days") && entry.argv.includes(".claude/skills .claude/commands")) return true;
+  if (isClaudeHistoryScan(command, args, entry)) return true;
   return false;
 }
 
@@ -744,6 +811,79 @@ function traceBucket(entry) {
   if (isCodexPlatformProbe(entry)) return "platform";
   if (isClaudePlatformProbe(entry)) return "platform";
   return "task";
+}
+
+function runMetricsSelfTest() {
+  const base = {
+    schema: "v2",
+    start_ms: 0,
+    end_ms: 1,
+    duration_ms: 1,
+    ts: 0,
+    tool: "git",
+    status: 0,
+    cwd: "/tmp/repo",
+    parent: "claude",
+    grandparent: "node",
+    internal: false,
+  };
+
+  const cases = [
+    ["platform", { ...base, argv: "rev-parse --show-toplevel", parent: "node", grandparent: "node" }],
+    ["platform", { ...base, argv: "rev-parse --is-inside-work-tree" }],
+    ["platform", { ...base, status: 42, argv: "branch --show-current" }],
+    ["platform", { ...base, status: 128, argv: "rev-parse --abbrev-ref origin/HEAD" }],
+    ["platform", { ...base, argv: "rev-parse --abbrev-ref HEAD" }],
+    ["platform", { ...base, parent: "/bin/sh", grandparent: "/bin/sh", argv: "config user.email" }],
+    ["platform", { ...base, parent: "/bin/sh", grandparent: "claude", argv: "log -n 1000 --pretty=format: --name-only --diff-filter=M --author=bench@example.com" }],
+    ["platform", { ...base, parent: "/bin/sh", grandparent: "claude", argv: "log -n 1000 --pretty=format: --name-only --diff-filter=M" }],
+    ["task", { ...base, parent: "/bin/sh", grandparent: "claude", argv: "status --short" }],
+    ["task", { ...base, parent: "/bin/sh", grandparent: "claude", argv: "rev-parse --abbrev-ref HEAD" }],
+    ["task", { ...base, parent: "/bin/sh", grandparent: "claude", argv: "diff -- src/handler.ts" }],
+    ["task", { ...base, tool: "but", parent: "/bin/zsh", grandparent: "claude", argv: "diff" }],
+  ];
+
+  const failures = cases
+    .map(([expected, entry], index) => ({ index, expected, actual: traceBucket(entry), entry }))
+    .filter((result) => result.actual !== result.expected);
+
+  const implicitTrace = markImplicitToolInternal([
+    {
+      ...base,
+      start_ms: 100,
+      end_ms: 130,
+      duration_ms: 30,
+      parent: "/bin/sh",
+      grandparent: "/bin/sh",
+      argv: "symbolic-ref --short HEAD",
+    },
+    {
+      ...base,
+      tool: "but",
+      start_ms: 250,
+      end_ms: 500,
+      duration_ms: 250,
+      parent: "/bin/zsh",
+      grandparent: "claude",
+      argv: "commit input-validation -c -m Add --changes a1",
+    },
+  ]);
+
+  if (!implicitTrace[0].internal) {
+    failures.push({
+      index: "implicit-symbolic-ref",
+      expected: "tool_internal",
+      actual: traceBucket(implicitTrace[0]),
+      entry: implicitTrace[0],
+    });
+  }
+
+  if (failures.length) {
+    console.error(JSON.stringify({ passed: false, failures }, null, 2));
+    process.exit(1);
+  }
+
+  console.log(JSON.stringify({ passed: true, cases: cases.length + 1 }, null, 2));
 }
 
 function summarizeCommands(entries) {
@@ -1013,6 +1153,11 @@ function traceMetrics(trace, prompt, agentResult) {
 }
 
 const args = parseArgs(process.argv.slice(2));
+if (args.get("self-test-metrics") === "true") {
+  runMetricsSelfTest();
+  process.exit(0);
+}
+
 const taskId = args.get("task") ?? "pilot-1-selective-validation";
 const agent = args.get("agent") ?? "codex";
 const arm = args.get("arm") ?? "git";
@@ -1023,6 +1168,8 @@ const skillDir = path.resolve(args.get("skill-dir") ?? "/Users/kiril/src/gitbutl
 const codexCleanConfig = agent === "codex" ? args.get("codex-clean-config") !== "false" : false;
 const codexIsolatedHome = agent === "codex" && codexCleanConfig && args.get("codex-isolated-home") !== "false";
 const codexDisablePlugins = agent === "codex" && codexCleanConfig && args.get("codex-disable-plugins") !== "false";
+const claudeCleanConfig = agent === "claude" ? args.get("claude-clean-config") !== "false" : false;
+const claudeEffortLevel = agent === "claude" && claudeCleanConfig ? (args.get("claude-effort-level") ?? "medium") : null;
 const runId = args.get("run-id") ?? `${Date.now()}-${agent}-${arm.replaceAll("+", "-")}`;
 const runDir = path.resolve(args.get("out") ?? path.join("tmp/pilot-runs", runId));
 
@@ -1045,6 +1192,7 @@ mkdirSync(runDir, { recursive: true });
 const { workspace, setup } = prepareWorkspace(runDir, arm, realBut, skillDir);
 const { binDir, tracePath } = createWrappers(runDir, arm, realBut);
 const codexHome = prepareCodexHome(runDir, codexIsolatedHome);
+const claudeSettings = prepareClaudeSettings(runDir, claudeCleanConfig, claudeEffortLevel);
 const prompt = buildPrompt();
 writeFileSync(path.join(runDir, "prompt.txt"), prompt);
 
@@ -1054,9 +1202,13 @@ const env = {
   VCB_TRACE: tracePath,
   VCB_CODEX_CLEAN_CONFIG: String(codexCleanConfig),
   VCB_CODEX_DISABLE_PLUGINS: String(codexDisablePlugins),
+  VCB_CLAUDE_CLEAN_CONFIG: String(claudeCleanConfig),
 };
 if (codexHome) {
   env.CODEX_HOME = codexHome.path;
+}
+if (claudeSettings) {
+  env.VCB_CLAUDE_SETTINGS = claudeSettings.path;
 }
 
 const agentResult = runAgent(agent, workspace, prompt, env, model, timeoutMs);
@@ -1089,6 +1241,11 @@ const result = {
     codex_disable_plugins: agent === "codex" ? codexDisablePlugins : null,
     codex_home: codexHome?.path ?? null,
     codex_auth_copied: codexHome?.auth_copied ?? null,
+    claude_clean_config: agent === "claude" ? claudeCleanConfig : null,
+    claude_settings: claudeSettings?.path ?? null,
+    claude_enabled_plugins: claudeSettings?.settings.enabledPlugins ?? null,
+    claude_effort_level: claudeSettings?.settings.effortLevel ?? null,
+    claude_strict_mcp_config: agent === "claude" ? claudeCleanConfig : null,
   },
   workspace,
   task: taskConfig.id,
