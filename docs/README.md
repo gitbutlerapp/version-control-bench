@@ -26,16 +26,18 @@ Primary scoring should inspect the final Git-visible repository state: refs, DAG
 ## Results
 
 - [results/README.md](results/README.md): human-facing current results overview, with scenario links and `git` vs `but+skill` deltas.
+- [results/full-k5-2026-06-26.md](results/full-k5-2026-06-26.md): latest full five-pilot k=5 matrix for Codex and Claude across `git` and `but+skill`.
 - [results/full-k3-2026-06-22.md](results/full-k3-2026-06-22.md): full five-pilot k=3 matrix for Codex and Claude across `git` and `but+skill`.
-- [results/pilot-1-but-latest-2026-06-25.md](results/pilot-1-but-latest-2026-06-25.md): Codex and Claude `but+skill` selective-commit reruns with latest local GitButler skill and binary.
-- [results/pilot-1-current-batch.md](results/pilot-1-current-batch.md): selective commit pilot batch.
-- [results/pilot-2-current-batch.md](results/pilot-2-current-batch.md): selective multi-amend pilot batch.
-- [results/pilot-2-codex-but-latest-2026-06-25.md](results/pilot-2-codex-but-latest-2026-06-25.md): Codex `but+skill` multi-amend rerun with latest local GitButler skill and binary.
-- [results/pilot-2-claude-but-latest-2026-06-25.md](results/pilot-2-claude-but-latest-2026-06-25.md): Claude `but+skill` multi-amend rerun with latest local GitButler skill and binary.
-- [results/pilot-3-claude-but-clean-config-2026-06-25.md](results/pilot-3-claude-but-clean-config-2026-06-25.md): Claude `but+skill` split-commit regression debug showing local Claude config, not the new binary or skill, caused the odd slowdown.
-- [results/pilot-4-reorder-guidance-fix-2026-06-25.md](results/pilot-4-reorder-guidance-fix-2026-06-25.md): Scenario 4 reorder regression fix; adjacent commit blocks now use one generic block move recipe.
-- [results/pilot-5-codex-but-latest-2026-06-25.md](results/pilot-5-codex-but-latest-2026-06-25.md): Codex `but+skill` squash rerun with latest local GitButler skill and binary.
-- [results/pilot-5-claude-but-latest-2026-06-25.md](results/pilot-5-claude-but-latest-2026-06-25.md): Claude `but+skill` squash rerun with latest local GitButler skill and binary.
+- [results/pilot-1-but-latest-2026-06-25.md](results/pilot-1-but-latest-2026-06-25.md): historical Codex and Claude `but+skill` selective-commit reruns.
+- [results/pilot-1-codex-but-clean-harness-2026-06-25.md](results/pilot-1-codex-but-clean-harness-2026-06-25.md): historical clean-harness selective-commit reruns after removing benchmark-local GitButler recipes from generated agent instructions.
+- [results/pilot-1-current-batch.md](results/pilot-1-current-batch.md): historical selective commit pilot batch.
+- [results/pilot-2-current-batch.md](results/pilot-2-current-batch.md): historical selective multi-amend pilot batch.
+- [results/pilot-2-codex-but-latest-2026-06-25.md](results/pilot-2-codex-but-latest-2026-06-25.md): historical Codex `but+skill` multi-amend reruns.
+- [results/pilot-2-claude-but-latest-2026-06-25.md](results/pilot-2-claude-but-latest-2026-06-25.md): historical Claude `but+skill` multi-amend rerun.
+- [results/pilot-3-claude-but-clean-config-2026-06-25.md](results/pilot-3-claude-but-clean-config-2026-06-25.md): historical Claude `but+skill` split-commit config-isolation debug.
+- [results/pilot-4-reorder-guidance-fix-2026-06-25.md](results/pilot-4-reorder-guidance-fix-2026-06-25.md): historical scenario 4 reorder guidance fix.
+- [results/pilot-5-codex-but-latest-2026-06-25.md](results/pilot-5-codex-but-latest-2026-06-25.md): historical Codex `but+skill` squash rerun.
+- [results/pilot-5-claude-but-latest-2026-06-25.md](results/pilot-5-claude-but-latest-2026-06-25.md): historical Claude `but+skill` squash rerun.
 
 ## Opinionated Recommendation
 

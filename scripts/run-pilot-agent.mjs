@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import { parseArgs } from "./lib/args.mjs";
@@ -141,6 +142,70 @@ function commandPath(command) {
   return result.stdout.trim();
 }
 
+function sha256Text(text) {
+  return createHash("sha256").update(text).digest("hex");
+}
+
+function sha256File(filePath) {
+  return createHash("sha256").update(readFileSync(filePath)).digest("hex");
+}
+
+function sortedDirectoryFiles(dir) {
+  return readdirSync(dir)
+    .flatMap((entry) => {
+      const fullPath = path.join(dir, entry);
+      const stat = statSync(fullPath);
+      if (stat.isDirectory()) return sortedDirectoryFiles(fullPath);
+      if (stat.isFile()) return [fullPath];
+      return [];
+    })
+    .sort();
+}
+
+function sha256Directory(dir) {
+  const hash = createHash("sha256");
+  for (const filePath of sortedDirectoryFiles(dir)) {
+    hash.update(path.relative(dir, filePath).split(path.sep).join("/"));
+    hash.update("\0");
+    hash.update(readFileSync(filePath));
+    hash.update("\0");
+  }
+  return hash.digest("hex");
+}
+
+function nearestGitRoot(targetPath) {
+  let dir = statSync(targetPath).isDirectory() ? targetPath : path.dirname(targetPath);
+  while (dir !== path.dirname(dir)) {
+    if (existsSync(path.join(dir, ".git"))) return dir;
+    dir = path.dirname(dir);
+  }
+  return null;
+}
+
+function gitOutputOrNull(root, args) {
+  const result = spawnSync("git", ["-C", root, ...args], { encoding: "utf8" });
+  if (result.status !== 0) return null;
+  return result.stdout.trimEnd();
+}
+
+function gitSourceInfo(targetPath, { scope = "path" } = {}) {
+  const root = nearestGitRoot(targetPath);
+  if (!root) return null;
+
+  const relativePath = path.relative(root, targetPath);
+  const statusArgs = scope === "repo"
+    ? ["status", "--short"]
+    : ["status", "--short", "--", relativePath];
+  const statusShort = gitOutputOrNull(root, statusArgs) ?? "";
+
+  return {
+    root,
+    head: gitOutputOrNull(root, ["rev-parse", "HEAD"]),
+    dirty: statusShort.length > 0,
+    status_short: statusShort,
+  };
+}
+
 function copyIfExists(source, dest) {
   if (!existsSync(source)) return false;
   cpSync(source, dest);
@@ -186,7 +251,7 @@ function writeWrapper(binDir, tool, realPath, tracePath, arm) {
   const wrapperPath = path.join(binDir, tool);
   const blockGitWrites = tool === "git" && arm === "but+skill";
   const blockBut = tool === "but" && arm === "git";
-  const mutationList = [...GIT_MUTATIONS].join("|");
+  const mutationList = [...GIT_MUTATIONS].filter((command) => command !== "branch").join("|");
 
   const body = `#!/usr/bin/env bash
 set +e
@@ -240,6 +305,20 @@ if [[ ${blockGitWrites ? "true" : "false"} == true && "$INTERNAL" != true ]]; th
     esac
   done
   case "$SUBCOMMAND" in
+    branch)
+      BRANCH_READ=false
+      if [[ $# -eq $((IDX + 1)) ]]; then
+        BRANCH_READ=true
+      fi
+      for ((ARG_INDEX = IDX + 1; ARG_INDEX < $#; ARG_INDEX++)); do
+        case "\${ARGS[$ARG_INDEX]}" in
+          --list|--show-current) BRANCH_READ=true ;;
+        esac
+      done
+      if [[ "$BRANCH_READ" != true ]]; then
+        POLICY_BLOCK=true
+      fi
+      ;;
     ${mutationList}) POLICY_BLOCK=true ;;
   esac
 fi
@@ -281,6 +360,33 @@ function parseSkillVersion(skillFile) {
   return match?.[1] ?? null;
 }
 
+function renderGitButlerInstructions(workspace, realBut, codexSkillPath, claudeSkillPath) {
+  const setupBlock = run(realBut, ["agent", "setup", "--print"], { cwd: workspace }).stdout.trimEnd();
+  const content = `# AGENTS.md
+
+## Benchmark boundary
+
+Work only in the current repository. Do not inspect parent benchmark directories, hidden oracle files, or solution scripts.
+
+## Local skill
+
+The official GitButler CLI skill is installed for this benchmark trial at:
+
+- ${codexSkillPath}
+- ${claudeSkillPath}
+
+Use the installed skill if your agent runtime loads local skills or you need GitButler command details.
+
+${setupBlock}
+`;
+
+  return {
+    content,
+    setup_block: setupBlock,
+    setup_block_sha256: sha256Text(setupBlock),
+  };
+}
+
 function appendHarnessExclude(workspace) {
   writeFileSync(
     path.join(workspace, ".git/info/exclude"),
@@ -314,7 +420,7 @@ function installPlainGitInstructions(workspace) {
   };
 }
 
-function installGitButlerSkill(workspace, skillDir) {
+function installGitButlerSkill(workspace, skillDir, realBut) {
   const skillFile = path.join(skillDir, "SKILL.md");
   if (!existsSync(skillFile)) {
     throw new Error(`GitButler skill file not found: ${skillFile}`);
@@ -335,35 +441,8 @@ function installGitButlerSkill(workspace, skillDir) {
 
   const codexSkillPath = path.join(workspace, ".codex/skills/but/SKILL.md");
   const claudeSkillPath = path.join(workspace, ".claude/skills/but/SKILL.md");
-  writeAgentInstructionFiles(workspace, `# AGENTS.md
-
-## Local skill
-
-The GitButler CLI skill is installed for this benchmark trial at:
-
-- ${codexSkillPath}
-- ${claudeSkillPath}
-
-The instructions below are complete for this trial. Do not read the installed skill or reference files unless a \`but\` command fails or required syntax is missing.
-
-## Version control
-
-- Use GitButler (\`but\`) for task-level version-control inspection and write operations, including status, diffs, branching, committing, pushing, and history edits.
-- In non-interactive version-control workflows, do not narrate progress between routine commands. Execute the needed commands and keep the final response concise.
-- For selected dirty files or hunks, start with \`but diff\`; it prints the file and hunk IDs needed by \`--changes\`. Do not run \`but status\` or \`but status -fv\` as routine preflight for selected dirty-file or hunk commits. For a new branch, commit in one command with \`but commit <branch> -c -m "<msg>" --changes <ids>\`; do not pre-create it with \`but branch new\`.
-- Pass selected IDs as comma-separated values in one \`--changes\` argument, for example \`--changes a1,b2\`. Do not pass selected IDs as separate space-separated arguments after one \`--changes\`.
-- Do not run \`but status -fv\` just to get uncommitted dirty file/hunk IDs. For pure commit ordering, branch/stack placement, or conflict overview, use compact \`but status\`. Use \`but status -fv\` for per-commit file details or when compact status/diff output lacks details needed for the task.
-- In \`but status\`, an \`(upstream: ...)\` block above a separator is reference-only; judge requested local history from the applied branch commits below the separator. Symbols like \`●\` and \`◐\` are status decorations, not conflict evidence by themselves.
-- Avoid \`but --help\` probes unless a command fails or required syntax is missing from these instructions.
-- For amend/history-edit tasks with existing commits, inspect with \`but status -fv\` to get commit IDs and dirty file/hunk IDs, then use \`but amend <commit-id> --changes <file-or-hunk-id>,<file-or-hunk-id>\`. Put multiple files/hunks for the same target commit in one amend command, then refresh IDs from the returned state before the next amend.
-- For reorder/history-move tasks with an explicit final order, run compact \`but status\` once to get commit IDs. If the task names an adjacent commit block, do not sort the whole branch or move block members one by one: preserve the block's internal oldest-to-newest order, find the commit that should immediately follow the block in the requested oldest-to-newest order, then run one block move: \`but move <oldest-block-id>,<newest-block-id> <following-commit-id>\`. After a successful block move, stop if the returned status shows the requested order; do not move the anchor or any member of that block again. For other explicit reorders, note that \`but status\` displays newest/top first, reverse any oldest-to-newest task order into newest-to-oldest, and move only out-of-place commits. Use \`but move <source-commit-id> <newer-neighbor-commit-id>\` when the source should sit immediately below that newer neighbor in status/output order. Use \`but move <source-commit-id> <branch-name-or-id>\` when the source should become branch top/newest. Each \`but move\` returns updated status state for fresh IDs. For pure reorders, do not inspect file contents before moving; \`but move\` preserves commit contents unless it reports conflicts.
-- For squash tasks, run compact \`but status\` once to get commit IDs. Use \`but squash <source-commit-id> <target-commit-id> -m "<msg>"\`; all commits except the last argument are squashed into the last. For 3+ commits, list sources first and target/result last: \`but squash <source> <source> <target> -m "<msg>"\`. When squashing multiple independent groups from one status snapshot, handle newer/top groups first when practical because editing lower history rewrites IDs above it. Each squash returns updated status state for fresh IDs; after the final squash, stop if that state shows the requested history. Do not run \`--help\`, \`status\`, or \`status -fv\` only to reconfirm.
-- For split-commit tasks, inspect with \`but status -fv\` when commit or placement context is needed, then use \`but uncommit <commit-id> --diff\` to expose committable file/hunk IDs. Pick replacement contents from that dirty diff, not from the old committed diff. For multiple replacements from the same diff, prefer one batch command, adding \`--before <target>\` or \`--after <target>\` only when placement matters: \`but commit batch <branch> --before <target> -m "<msg>" --changes <file-or-hunk-id>,<file-or-hunk-id> -m "<msg>" --changes <file-or-hunk-id>,<file-or-hunk-id>\`. Each \`-m\` pairs with the \`--changes\` group at the same occurrence index. Order batch entries in history order, oldest to newest; when inserting before a newer anchor, the last batch entry lands nearest that anchor. Commit only selected hunks and leave leftovers uncommitted. If the returned workspace state shows the requested commits and leftovers, stop; do not run \`status\`, \`diff\`, \`show\`, or \`--help\` only to reconfirm.
-- Assume multiple agents may be working in this repository. Do not move, amend, squash, discard, commit, push, or otherwise modify another agent's work unless the user asks.
-- Use a dedicated GitButler branch for each agent session, unless the user asks for a different branch structure. Commit only changes that belong to that session.
-- Do not push or open pull requests unless the user asks.
-- Keep commit messages and pull request descriptions succinct: explain what changed, why it changed, and any important decision.
-`);
+  const instructions = renderGitButlerInstructions(workspace, realBut, codexSkillPath, claudeSkillPath);
+  writeAgentInstructionFiles(workspace, instructions.content);
 
   appendHarnessExclude(workspace);
 
@@ -375,6 +454,8 @@ The instructions below are complete for this trial. Do not read the installed sk
       installed_codex: path.join(workspace, "AGENTS.md"),
       installed_claude: path.join(workspace, "CLAUDE.md"),
       source_url: "https://docs.gitbutler.com/ai-agents/getting-started#add-optional-agent-instructions",
+      source_command: "but agent setup --print",
+      setup_block_sha256: instructions.setup_block_sha256,
     },
   };
 }
@@ -394,7 +475,7 @@ function prepareWorkspace(runDir, arm, realBut, skillDir) {
     if (taskConfig.gitbutlerPrep === "setup-and-apply-branch") {
       run(realBut, ["apply", taskConfig.applyBranch], { cwd: workspace, stdio: "pipe" });
     }
-    const setup = installGitButlerSkill(workspace, skillDir);
+    const setup = installGitButlerSkill(workspace, skillDir, realBut);
     if (taskConfig.applyDirtyState !== false) {
       run("node", [path.join(repoRoot, taskConfig.applyStateScript), "dirty", workspace], { cwd: repoRoot });
     }
@@ -1220,6 +1301,25 @@ const verifierResult = verify(workspace);
 const trace = markImplicitToolInternal(parseTrace(tracePath));
 const metrics = traceMetrics(trace, prompt, agentResult);
 const measurement = measurementBreakdown(trace, prompt, agentResult, arm === "but+skill" ? skillDir : null);
+const skillFile = path.join(skillDir, "SKILL.md");
+const butBinaryMetadata = arm === "but+skill"
+  ? {
+      path: realBut,
+      sha256: sha256File(realBut),
+      source_git: gitSourceInfo(realBut, { scope: "repo" }),
+    }
+  : null;
+const skillMetadata = arm === "but+skill"
+  ? {
+      source_dir: skillDir,
+      version: parseSkillVersion(skillFile),
+      skill_file_sha256: sha256File(skillFile),
+      source_dir_sha256: sha256Directory(skillDir),
+      source_git: gitSourceInfo(skillDir),
+      installed_codex: path.join(workspace, ".codex/skills/but/SKILL.md"),
+      installed_claude: path.join(workspace, ".claude/skills/but/SKILL.md"),
+    }
+  : null;
 const runFailureClass = agentResult.timed_out
   ? "AGENT_TIMEOUT"
   : agentResult.status === 0
@@ -1261,15 +1361,8 @@ const result = {
     included_in_agent_duration_or_metrics: false,
   },
   agent_instructions: setup.instructions,
-  but_binary: arm === "but+skill" ? realBut : null,
-  skill: arm === "but+skill"
-    ? {
-        source_dir: skillDir,
-        version: parseSkillVersion(path.join(skillDir, "SKILL.md")),
-        installed_codex: path.join(workspace, ".codex/skills/but/SKILL.md"),
-        installed_claude: path.join(workspace, ".claude/skills/but/SKILL.md"),
-      }
-    : null,
+  but_binary: butBinaryMetadata,
+  skill: skillMetadata,
   agent_result: {
     status: agentResult.status,
     signal: agentResult.signal,
