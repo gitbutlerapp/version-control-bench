@@ -1,5 +1,7 @@
 # Pilot 4 Reorder Guidance Fix
 
+> Current results: this per-pilot rerun is historical context. The latest k=5 full-matrix test run is displayed in [full-k5-2026-06-26.md](full-k5-2026-06-26.md).
+
 Date: 2026-06-25
 
 Task: `pilot-4-reorder-commits`

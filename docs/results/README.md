@@ -1,40 +1,37 @@
 # Results Overview
 
-Latest full matrix: [full-k3-2026-06-22.md](full-k3-2026-06-22.md).
+Latest full matrix: [full-k5-2026-06-26.md](full-k5-2026-06-26.md).
 
-Short answer: on the current checked-in full batch, `but+skill` wins clearly. All 60 runs passed. Compared with plain `git`, `but+skill` cut mean wall time by 52% for Codex and 72% for Claude, while cutting task-relevant version-control commands by 79% and 85%.
+Short answer: yes, the latest clean `but+skill` setup is improving strongly against plain `git`. In the k=5 full matrix, `but+skill` passed all 50 runs. Plain `git` passed all 25 Codex runs but only 20/25 Claude runs.
+
+Compared with plain `git`, `but+skill` cut mean wall time by 62.6% for Codex and 64.3% for Claude, while cutting task-relevant version-control commands by 83.0% and 63.6%.
 
 This is a comparison of plain `git` against GitButler CLI with the agent skill, reported as `but+skill`. It is not a claim about naked `but`, and it is definitely not a GitHub comparison.
 
 ## Current Scorecard
 
-Scope: all five pilot scenarios, `k=3` per `(scenario, agent, arm)` group, Codex and Claude, 60 total runs. Setup work is excluded: fixture creation, `but setup`, skill installation, local agent instruction files, and dirty-state application are not counted as agent work.
+Scope: all five pilot scenarios, `k=5` per `(scenario, agent, arm)` group, Codex and Claude, 100 total runs. Setup work is excluded: fixture creation, `but setup`, skill installation, local agent instruction files, and dirty-state application are not counted as agent work.
 
-| Agent | Pass | Mean wall with `git` | Mean wall with `but+skill` | Wall reduction | Task VC commands with `git` | Task VC commands with `but+skill` | Command reduction |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Codex | 15/15 each arm | 75.5s | 35.9s | 52.4% | 19.9 | 4.1 | 79.3% |
-| Claude | 15/15 each arm | 138.7s | 39.2s | 71.7% | 28.3 | 4.1 | 85.4% |
+| Agent | Arm | Pass | Mean wall | Median wall | Max wall | Task VC commands | Failed task VC commands |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Codex | `git` | 25/25 | 83.6s | 73.2s | 176.6s | 21.4 | 0.6 |
+| Codex | `but+skill` | 25/25 | 31.2s | 25.0s | 60.1s | 3.6 | 0.0 |
+| Claude | `git` | 20/25 | 231.7s | 161.9s | 754.9s | 23.3 | 1.0 |
+| Claude | `but+skill` | 25/25 | 82.6s | 75.8s | 175.2s | 8.5 | 1.8 |
 
-Median wall time was lower for `but+skill` in all 10 scenario/agent pairs. Mean wall time was lower in 9 of 10 pairs; the exception was one Claude squash outlier, and the documented follow-up rerun restored the expected shape.
+## Current Read
 
-## Warm Output Burden
+The biggest result is correctness, not just speed: all `but+skill` runs passed. The only failures were Claude using plain `git`:
 
-The current batch does not expose a strict VC-output-only byte counter from command stdout/stderr. The closest checked-in proxy is warm-estimated transcript bytes: prompt plus agent stdout/stderr after subtracting visible skill/reference reads. Treat this as a within-agent output-burden metric, not as comparable token accounting across Codex and Claude.
+| Scenario | Claude `git` pass | Failure classes |
+| --- | ---: | --- |
+| Selective commit | 4/5 | `DIRTY_STATE_WRONG` |
+| Multi-amend | 2/5 | `CONTENT_WRONG`, `DIRTY_STATE_WRONG`, `GRAPH_WRONG` |
+| Split commit | 4/5 | `CONTENT_WRONG` |
 
-| Agent | Warm output with `git` | Warm output with `but+skill` | Delta | Reduction |
-| --- | ---: | ---: | ---: | ---: |
-| Codex | 21.5 KB | 11.3 KB | -10.2 KB | 47.3% |
-| Claude | 1.7 KB | 1.4 KB | -0.3 KB | 17.0% |
+For average-user version-control requests, the shape is pretty clear: `but+skill` removes a lot of low-level choreography. The clearest win is selective multi-amend, where Claude plain `git` took 525.1s on average and only passed 2/5, while Claude `but+skill` took 77.7s and passed 5/5.
 
-By scenario, `but+skill` had lower warm output in 8 of 10 scenario/agent pairs. The two exceptions were squash runs, where `but+skill` still used far fewer task VC commands but printed slightly more warm transcript.
-
-| # | Scenario | Codex warm output | Claude warm output |
-| ---: | --- | ---: | ---: |
-| 1 | [Selective Validation Commit](../scenarios.md#1-selective-validation-commit) | 11.1 -> 6.9 KB (-37.6%) | 1.2 -> 0.9 KB (-26.3%) |
-| 2 | [Selective Multi-Amend](../scenarios.md#2-selective-multi-amend) | 58.8 -> 24.5 KB (-58.4%) | 2.1 -> 1.5 KB (-30.0%) |
-| 3 | [Split Broad Commit](../scenarios.md#3-split-broad-commit) | 24.9 -> 13.1 KB (-47.5%) | 2.2 -> 1.7 KB (-19.1%) |
-| 4 | [Reorder Existing Commits](../scenarios.md#4-reorder-existing-commits) | 7.1 -> 5.0 KB (-29.6%) | 1.5 -> 1.3 KB (-11.2%) |
-| 5 | [Squash Commit Groups](../scenarios.md#5-squash-commit-groups) | 5.5 -> 7.1 KB (+30.2%) | 1.5 -> 1.6 KB (+6.0%) |
+The one weak spot is Claude reorder commits: `but+skill` was 9.2% slower on mean wall time, though it still used fewer task VC commands and passed all runs. That looks more like agent/tool-command flailing than a correctness issue.
 
 ## Scenario Results
 
@@ -42,11 +39,11 @@ Each scenario name links to the plain-English scenario guide.
 
 | # | Scenario | What it exercises | Codex result | Claude result |
 | ---: | --- | --- | --- | --- |
-| 1 | [Selective Validation Commit](../scenarios.md#1-selective-validation-commit) | Commit one topic from a messy worktree and leave unrelated work alone. | 60.3% less wall, 84.0% fewer task VC commands | 71.1% less wall, 81.1% fewer task VC commands |
-| 2 | [Selective Multi-Amend](../scenarios.md#2-selective-multi-amend) | Fold several dirty fixes into different older commits. | 37.5% less wall, 69.1% fewer task VC commands | 80.8% less wall, 89.3% fewer task VC commands |
-| 3 | [Split Broad Commit](../scenarios.md#3-split-broad-commit) | Replace one broad non-top commit with several clean commits. | 71.7% less wall, 89.6% fewer task VC commands | 85.7% less wall, 91.1% fewer task VC commands |
-| 4 | [Reorder Existing Commits](../scenarios.md#4-reorder-existing-commits) | Move correct commits into a better order without changing contents. | 51.0% less wall, 76.0% fewer task VC commands | 39.5% less wall, 82.9% fewer task VC commands |
-| 5 | [Squash Commit Groups](../scenarios.md#5-squash-commit-groups) | Compress noisy adjacent commits into semantic commits. | 38.8% less wall, 73.5% fewer task VC commands | Full batch: 8.2% more mean wall because of one outlier, but 66.1% fewer task VC commands. Follow-up rerun: 64.3% less wall and 85.2% fewer task VC commands. |
+| 1 | [Selective Validation Commit](../scenarios.md#1-selective-validation-commit) | Commit one topic from a messy worktree and leave unrelated work alone. | 64.7% less wall, 88.8% fewer task VC commands | 79.6% less wall, 88.1% fewer task VC commands; `but+skill` passed 5/5 vs `git` 4/5 |
+| 2 | [Selective Multi-Amend](../scenarios.md#2-selective-multi-amend) | Fold several dirty fixes into different older commits. | 74.3% less wall, 86.3% fewer task VC commands | 85.2% less wall, 81.3% fewer task VC commands; `but+skill` passed 5/5 vs `git` 2/5 |
+| 3 | [Split Broad Commit](../scenarios.md#3-split-broad-commit) | Replace one broad non-top commit with several clean commits. | 52.1% less wall, 81.4% fewer task VC commands | 49.1% less wall, 43.2% fewer task VC commands; `but+skill` passed 5/5 vs `git` 4/5 |
+| 4 | [Reorder Existing Commits](../scenarios.md#4-reorder-existing-commits) | Move correct commits into a better order without changing contents. | 64.2% less wall, 81.8% fewer task VC commands | 9.2% more wall, but 15.8% fewer task VC commands; both arms passed 5/5 |
+| 5 | [Squash Commit Groups](../scenarios.md#5-squash-commit-groups) | Compress noisy adjacent commits into semantic commits. | 40.8% less wall, 61.9% fewer task VC commands | 26.5% less wall, 28.8% fewer task VC commands |
 
 ## What Is Actually Different
 
@@ -54,22 +51,37 @@ The speedup mostly comes from replacing low-level history choreography with one 
 
 | Scenario | Plain `git` shape | `but+skill` shape | Why it matters |
 | --- | --- | --- | --- |
-| Selective Validation Commit | Create a branch, inspect/stage the right files or hunks, commit, then verify leftovers. | `but branch new`, inspect change IDs, `but commit --changes`. | The agent selects semantic change IDs instead of manually staging a dirty worktree. |
+| Selective Validation Commit | Create a branch, inspect/stage the right files or hunks, commit, then verify leftovers. | `but diff`, then `but commit --changes`. | The agent selects semantic change IDs instead of manually staging a dirty worktree. |
 | Selective Multi-Amend | Use fixups, autosquash, interactive rebase stops, patch files, stash/reapply, or equivalent manual surgery. | `but amend <commit> --changes <ids>` once per target commit. | The intended operation is "put these hunks into that old commit"; GitButler exposes that directly. |
-| Split Broad Commit | Rewrite history with reset/rebase/add/commit loops while preserving the later commit on top. | `but uncommit --diff`, then `but commit batch` for the replacement commits. | The agent does one split plan from one inspected diff instead of repeatedly refreshing stale patch state. |
+| Split Broad Commit | Rewrite history with reset/rebase/add/commit loops while preserving the later commit on top. | `but uncommit --diff`, then replacement `but commit` calls. | The agent does one split plan from one inspected diff instead of repeatedly refreshing stale patch state. |
 | Reorder Existing Commits | Edit an interactive rebase todo and avoid accidentally changing commit contents. | `but move <commit block> <target commit>`. | The operation is movement, not patch replay. Fewer places to get clever and break the DAG. |
 | Squash Commit Groups | Run an interactive rebase, mark squash/fixup lines, edit messages, and verify the final stack. | `but squash <commits> -m <message>`. | The agent names the group and result directly, without driving an editor-shaped workflow. |
 
+## Provenance
+
+The 2026-06-26 k=5 matrix used the latest local GitButler binary and skill from `/Users/kiril/src/gitbutler`, with clean source snapshots.
+
+- Setup source command: `but agent setup --print`
+- Setup block SHA-256: `fbec593878727e872b248adfd0226b3555e5bd31273ac7506018d2679b68e897`
+- Binary SHA-256: `27e7368d50857465c17c7d91591df972c9cfc28b67417bdc593e81eebb7d4d42`
+- Skill file SHA-256: `e4856d3a6a09dc60bb76e4f18a715d82c4078791dc373086d01af32b35d2dbed`
+- Skill tree SHA-256: `b39f059ca747afed33a1e7255d3cd7a427c9e28011debbf7a77e8fdfeabb9229`
+- GitButler source head: `2e9a1b454b087d4047a3733afa52812c15805e0d`
+- Binary dirty: `false`
+- Skill dirty: `false`
+
 ## Evidence
 
-- Full batch report: [full-k3-2026-06-22.md](full-k3-2026-06-22.md)
-- Latest Codex/Claude `but+skill` pilot 1 reruns: [pilot-1-but-latest-2026-06-25.md](pilot-1-but-latest-2026-06-25.md)
-- Latest Codex `but+skill` pilot 2 rerun: [pilot-2-codex-but-latest-2026-06-25.md](pilot-2-codex-but-latest-2026-06-25.md)
-- Latest Claude `but+skill` pilot 2 rerun: [pilot-2-claude-but-latest-2026-06-25.md](pilot-2-claude-but-latest-2026-06-25.md)
-- Claude `but+skill` pilot 3 config-isolation rerun: [pilot-3-claude-but-clean-config-2026-06-25.md](pilot-3-claude-but-clean-config-2026-06-25.md)
-- Scenario 4 reorder guidance fix: [pilot-4-reorder-guidance-fix-2026-06-25.md](pilot-4-reorder-guidance-fix-2026-06-25.md)
-- Latest Codex `but+skill` pilot 5 rerun: [pilot-5-codex-but-latest-2026-06-25.md](pilot-5-codex-but-latest-2026-06-25.md)
-- Latest Claude `but+skill` pilot 5 rerun: [pilot-5-claude-but-latest-2026-06-25.md](pilot-5-claude-but-latest-2026-06-25.md)
+- Full batch report: [full-k5-2026-06-26.md](full-k5-2026-06-26.md)
+- Previous full batch report: [full-k3-2026-06-22.md](full-k3-2026-06-22.md)
+- Historical Codex/Claude `but+skill` pilot 1 reruns: [pilot-1-but-latest-2026-06-25.md](pilot-1-but-latest-2026-06-25.md)
+- Historical clean-harness Codex/Claude `but+skill` pilot 1 reruns: [pilot-1-codex-but-clean-harness-2026-06-25.md](pilot-1-codex-but-clean-harness-2026-06-25.md)
+- Historical Codex `but+skill` pilot 2 reruns: [pilot-2-codex-but-latest-2026-06-25.md](pilot-2-codex-but-latest-2026-06-25.md)
+- Historical Claude `but+skill` pilot 2 rerun: [pilot-2-claude-but-latest-2026-06-25.md](pilot-2-claude-but-latest-2026-06-25.md)
+- Historical Claude `but+skill` pilot 3 config-isolation rerun: [pilot-3-claude-but-clean-config-2026-06-25.md](pilot-3-claude-but-clean-config-2026-06-25.md)
+- Historical scenario 4 reorder guidance fix: [pilot-4-reorder-guidance-fix-2026-06-25.md](pilot-4-reorder-guidance-fix-2026-06-25.md)
+- Historical Codex `but+skill` pilot 5 rerun: [pilot-5-codex-but-latest-2026-06-25.md](pilot-5-codex-but-latest-2026-06-25.md)
+- Historical Claude `but+skill` pilot 5 rerun: [pilot-5-claude-but-latest-2026-06-25.md](pilot-5-claude-but-latest-2026-06-25.md)
 - Plain-English scenarios: [../scenarios.md](../scenarios.md)
-- Raw aggregate: `tmp/pilot-runs/full-k3-20260622-224850/aggregate.json`
-- Raw run manifest: `tmp/pilot-runs/full-k3-20260622-224850/manifest.tsv`
+- Raw aggregate: `tmp/pilot-runs/full-k5-20260626-013621/aggregate.json`
+- Raw run manifest: `tmp/pilot-runs/full-k5-20260626-013621/manifest.tsv`

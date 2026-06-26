@@ -20,7 +20,8 @@
     "pilot4:check": "node scripts/run-pilot4-checks.mjs",
     "pilot5:fixture": "node scripts/create-pilot5-fixture.mjs",
     "pilot5:verify": "node scripts/verify-pilot5.mjs",
-    "pilot5:check": "node scripts/run-pilot5-checks.mjs"
+    "pilot5:check": "node scripts/run-pilot5-checks.mjs",
+    "matrix:run": "node scripts/run-full-matrix.mjs"
   },
   "engines": {
     "node": ">=20"

@@ -1,4 +1,6 @@
-# Pilot 3 Current Batch
+# Pilot 3 Historical Batch
+
+> Current results: this early pilot batch is historical context. The latest k=5 full-matrix test run is displayed in [full-k5-2026-06-26.md](full-k5-2026-06-26.md).
 
 Date: 2026-06-20
 Updated: 2026-06-21
