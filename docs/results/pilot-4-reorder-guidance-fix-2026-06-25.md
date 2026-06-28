@@ -1,6 +1,6 @@
 # Pilot 4 Reorder Guidance Fix
 
-> Current results: this per-pilot rerun is historical context. The latest k=5 full-matrix test run is displayed in [full-k5-2026-06-27.md](full-k5-2026-06-27.md).
+> Current results: this per-pilot rerun is historical context. The latest k=5 full-matrix test run is displayed in [full-k5-2026-06-28.md](full-k5-2026-06-28.md).
 
 Date: 2026-06-25
 
