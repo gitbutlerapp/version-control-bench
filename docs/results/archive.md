@@ -1,6 +1,6 @@
 # Results Archive
 
-Current results live in [README.md](README.md). Latest full matrix: [full-k5-2026-06-27.md](full-k5-2026-06-27.md).
+Current results live in [README.md](README.md). Latest full matrix: [full-k5-2026-06-28.md](full-k5-2026-06-28.md).
 
 Older reports are kept for provenance and comparison. They should not be read as the current benchmark result unless explicitly referenced by a newer report.
 
@@ -8,7 +8,8 @@ Older reports are kept for provenance and comparison. They should not be read as
 
 | Report | Scope | Status |
 | --- | --- | --- |
-| [full-k5-2026-06-27.md](full-k5-2026-06-27.md) | Five scenarios, Codex and Claude, `git` and `but+skill`, `k=5` | Current |
+| [full-k5-2026-06-28.md](full-k5-2026-06-28.md) | Five scenarios, Codex and Claude, `git` and `but+skill`, `k=5` | Current |
+| [full-k5-2026-06-27.md](full-k5-2026-06-27.md) | Five scenarios, Codex and Claude, `git` and `but+skill`, `k=5` | Superseded |
 | [full-k5-2026-06-26.md](full-k5-2026-06-26.md) | Five scenarios, Codex and Claude, `git` and `but+skill`, `k=5` | Superseded |
 | [full-k3-2026-06-22.md](full-k3-2026-06-22.md) | Five scenarios, Codex and Claude, `git` and `but+skill`, `k=3` | Superseded |
 

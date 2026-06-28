@@ -1,10 +1,10 @@
 # Results Overview
 
-Latest full matrix: [full-k5-2026-06-27.md](full-k5-2026-06-27.md).
+Latest full matrix: [full-k5-2026-06-28.md](full-k5-2026-06-28.md).
 
-Short answer: yes, the latest clean `but+skill` setup is still improving strongly against plain `git`. In the refreshed k=5 full matrix, `but+skill` passed all 50 runs. Plain `git` passed 49/50, with one Codex multi-amend content failure.
+Short answer: yes, the latest `but+skill` setup is still improving strongly against plain `git`. In the refreshed k=5 full matrix, all 100 runs passed verifier checks. Both arms were clean on correctness; `but+skill` is winning on effort and wall time.
 
-Compared with plain `git`, `but+skill` cut mean wall time by 64.1% for Codex and 53.2% for Claude, while cutting task-relevant version-control commands by 82.4% and 81.7%.
+Compared with plain `git`, `but+skill` cut mean wall time by 64.2% for Codex and 50.0% for Claude, while cutting task-relevant version-control commands by 81.7% and 80.4%.
 
 This is a comparison of plain `git` against GitButler CLI with the agent skill, reported as `but+skill`. It is not a claim about naked `but`, and it is definitely not a GitHub comparison.
 
@@ -14,33 +14,31 @@ Scope: all five pilot scenarios, `k=5` per `(scenario, agent, arm)` group, Codex
 
 | Agent | Arm | Pass | Mean wall | Median wall | Max wall | Task VC commands | Failed task VC commands |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| Codex | `git` | 24/25 | 88.8s | 71.1s | 223.0s | 22.2 | 0.8 |
-| Codex | `but+skill` | 25/25 | 31.9s | 27.1s | 60.7s | 3.9 | 0.0 |
-| Claude | `git` | 25/25 | 101.2s | 51.5s | 316.2s | 24.0 | 0.4 |
-| Claude | `but+skill` | 25/25 | 47.3s | 43.4s | 110.2s | 4.4 | 0.2 |
+| Codex | `git` | 25/25 | 82.7s | 54.4s | 229.6s | 20.1 | 0.5 |
+| Codex | `but+skill` | 25/25 | 29.6s | 27.5s | 48.4s | 3.7 | 0.0 |
+| Claude | `git` | 25/25 | 92.4s | 60.4s | 211.5s | 21.6 | 0.3 |
+| Claude | `but+skill` | 25/25 | 46.2s | 44.0s | 96.0s | 4.2 | 0.2 |
 
 ## Current Read
 
-The biggest result is still correctness: all `but+skill` runs passed again. The only failure was Codex using plain `git`:
+Correctness is clean this time: no verifier failures and no agent-runtime failures. That matters because the previous batch still had one Codex plain-git multi-amend content failure.
 
-| Scenario | Plain `git` pass | Failure classes |
-| --- | ---: | --- |
-| Multi-amend, Codex | 4/5 | `CONTENT_WRONG` |
+The shape is still what we want to see for average-user version-control requests: `but+skill` removes low-level history choreography and keeps the agent closer to the user intent. The strongest wins remain multi-amend and split-commit. Codex multi-amend went from 172.8s with plain `git` to 38.8s with `but+skill`; Claude split-commit went from 173.4s to 72.8s.
 
-For average-user version-control requests, the shape is pretty clear: `but+skill` removes a lot of low-level choreography. The clearest win is selective multi-amend, where Codex plain `git` took 187.6s on average and passed 4/5, while Codex `but+skill` took 41.3s and passed 5/5. Claude showed the same pattern without a correctness miss: 198.0s with `git` versus 47.6s with `but+skill`.
-
-The previous weak spot, Claude reorder commits, looks fixed in this refresh: `but+skill` was 25.0% faster than plain `git` and used 64.7% fewer task VC commands. The remaining soft spot is squash: `but+skill` still uses far fewer commands, but mean wall time is close to plain `git`, especially for Claude.
+The caveat is squash, especially Claude. Claude `but+skill` still used fewer commands, but it was slower than plain `git` on wall time in this run: 65.7s versus 53.2s. That is the main thing to keep watching.
 
 ## Previous k=5 Comparison
 
-Compared with [full-k5-2026-06-26.md](full-k5-2026-06-26.md), this refresh improved overall pass rate from 95/100 to 99/100. The `but+skill` pass rate stayed perfect at 50/50.
+Compared with [full-k5-2026-06-27.md](full-k5-2026-06-27.md), this refresh improved overall pass rate from 99/100 to 100/100. The `but+skill` pass rate stayed perfect at 50/50, and plain `git` recovered to 50/50.
 
 | Agent | Arm | Pass Change | Mean Wall Change | Task VC Change | Read |
 | --- | --- | --- | --- | --- | --- |
-| Codex | `git` | 25/25 -> 24/25 | 83.6s -> 88.8s | 21.4 -> 22.2 | Slightly worse, with one real multi-amend content failure. |
-| Codex | `but+skill` | 25/25 -> 25/25 | 31.2s -> 31.9s | 3.6 -> 3.9 | Basically flat; still clean. |
-| Claude | `git` | 20/25 -> 25/25 | 231.7s -> 101.2s | 23.3 -> 24.0 | Much cleaner, mostly from losing the huge failure/outlier tail. |
-| Claude | `but+skill` | 25/25 -> 25/25 | 82.6s -> 47.3s | 8.5 -> 4.4 | Much better; prior command flailing is mostly gone. |
+| Codex | `git` | 24/25 -> 25/25 | 88.8s -> 82.7s | 22.2 -> 20.1 | Better, mostly because the prior multi-amend content failure did not recur. |
+| Codex | `but+skill` | 25/25 -> 25/25 | 31.9s -> 29.6s | 3.9 -> 3.7 | Slightly faster and slightly fewer commands. |
+| Claude | `git` | 25/25 -> 25/25 | 101.2s -> 92.4s | 24.0 -> 21.6 | Faster, with fewer low-level commands. |
+| Claude | `but+skill` | 25/25 -> 25/25 | 47.3s -> 46.2s | 4.4 -> 4.2 | Basically stable, with a small improvement. |
+
+Scenario-level change versus the previous run is mostly stable-to-better. The biggest positive shift is Claude reorder: `but+skill` moved from 25.0% lower wall to 31.7% lower wall, and from 64.7% fewer task VC commands to 80.4% fewer. The clear negative shift is Claude squash: `but+skill` moved from 2.7% lower wall to 23.7% higher wall, while still using 49.2% fewer task VC commands.
 
 ## Scenario Results
 
@@ -48,11 +46,11 @@ Each scenario name links to the plain-English scenario guide.
 
 | # | Scenario | What it exercises | Codex result | Claude result |
 | ---: | --- | --- | --- | --- |
-| 1 | [Selective Validation Commit](../scenarios.md#1-selective-validation-commit) | Commit one topic from a messy worktree and leave unrelated work alone. | 74.5% less wall, 90.7% fewer task VC commands | 41.0% less wall, 79.2% fewer task VC commands |
-| 2 | [Selective Multi-Amend](../scenarios.md#2-selective-multi-amend) | Fold several dirty fixes into different older commits. | 78.0% less wall, 82.9% fewer task VC commands; `but+skill` passed 5/5 vs `git` 4/5 | 76.0% less wall, 89.6% fewer task VC commands |
-| 3 | [Split Broad Commit](../scenarios.md#3-split-broad-commit) | Replace one broad non-top commit with several clean commits. | 50.5% less wall, 81.3% fewer task VC commands | 50.3% less wall, 83.1% fewer task VC commands |
-| 4 | [Reorder Existing Commits](../scenarios.md#4-reorder-existing-commits) | Move correct commits into a better order without changing contents. | 56.1% less wall, 76.7% fewer task VC commands | 25.0% less wall, 64.7% fewer task VC commands |
-| 5 | [Squash Commit Groups](../scenarios.md#5-squash-commit-groups) | Compress noisy adjacent commits into semantic commits. | 16.1% less wall, 71.2% fewer task VC commands | 2.7% less wall, 63.2% fewer task VC commands |
+| 1 | [Selective Validation Commit](../scenarios.md#1-selective-validation-commit) | Commit one topic from a messy worktree and leave unrelated work alone. | 66.7% less wall, 87.7% fewer task VC commands | 59.0% less wall, 83.6% fewer task VC commands |
+| 2 | [Selective Multi-Amend](../scenarios.md#2-selective-multi-amend) | Fold several dirty fixes into different older commits. | 77.5% less wall, 83.4% fewer task VC commands | 68.0% less wall, 86.2% fewer task VC commands |
+| 3 | [Split Broad Commit](../scenarios.md#3-split-broad-commit) | Replace one broad non-top commit with several clean commits. | 56.3% less wall, 82.5% fewer task VC commands | 58.0% less wall, 84.6% fewer task VC commands |
+| 4 | [Reorder Existing Commits](../scenarios.md#4-reorder-existing-commits) | Move correct commits into a better order without changing contents. | 59.3% less wall, 77.8% fewer task VC commands | 31.7% less wall, 80.4% fewer task VC commands |
+| 5 | [Squash Commit Groups](../scenarios.md#5-squash-commit-groups) | Compress noisy adjacent commits into semantic commits. | 24.9% less wall, 64.3% fewer task VC commands | 23.7% more wall, 49.2% fewer task VC commands |
 
 ## What Is Actually Different
 
@@ -68,22 +66,22 @@ The speedup mostly comes from replacing low-level history choreography with one 
 
 ## Provenance
 
-The 2026-06-27 k=5 matrix used the latest local GitButler binary and skill from `/Users/kiril/src/gitbutler`, with clean source snapshots.
+The 2026-06-28 k=5 matrix used the latest local GitButler binary and skill from `/Users/kiril/src/gitbutler`.
 
 - Setup source command: `but agent setup --print`
 - Setup block SHA-256: `e68d505c5f060b89692c253e8dddb689fb42c5a61fc001bdce0a8dc383db76b2`
-- Binary SHA-256: `2de4303dd47fa81c7e078b1772188c32ad59b8eb3b4f7d99ab079cc87ab7d880`
+- Binary SHA-256: `7c1f5ae7462f67bb9b75b9a5dd54b61c9cc247c35f6762e090d4b1ca2383cdf6`
 - Skill file SHA-256: `220431b093e2ca05c0f7b00925093ed683d839dd8c3ece2e27255dbe53fdfb6c`
 - Skill tree SHA-256: `6ce467c872ae122936eb8cb2f5326c7b86ef8a926e748aabf19d651d195b5ee5`
-- GitButler source head: `3422ca7e1e45f9abcabc2da33eaf91c91c525b2e`
-- Binary dirty: `false`
+- GitButler source head: `0f4aced1b645695fc29ac8c70ea3e9b6ed576fac`
+- Binary source dirty state: `false` for the first four `but+skill` runs, then `true` after unrelated local GitButler checkout edits appeared; the binary hash stayed constant.
 - Skill dirty: `false`
 
 ## Evidence
 
-- Full batch report: [full-k5-2026-06-27.md](full-k5-2026-06-27.md)
-- Previous k=5 full batch report: [full-k5-2026-06-26.md](full-k5-2026-06-26.md)
+- Full batch report: [full-k5-2026-06-28.md](full-k5-2026-06-28.md)
+- Previous k=5 full batch report: [full-k5-2026-06-27.md](full-k5-2026-06-27.md)
 - Results archive: [archive.md](archive.md)
 - Plain-English scenarios: [../scenarios.md](../scenarios.md)
-- Raw aggregate: `tmp/pilot-runs/full-k5-20260627-refresh/aggregate.json`
-- Raw run manifest: `tmp/pilot-runs/full-k5-20260627-refresh/manifest.tsv`
+- Raw aggregate: `tmp/pilot-runs/full-k5-20260628-refresh/aggregate.json`
+- Raw run manifest: `tmp/pilot-runs/full-k5-20260628-refresh/manifest.tsv`

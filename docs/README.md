@@ -26,7 +26,7 @@ Primary scoring should inspect the final Git-visible repository state: refs, DAG
 ## Results
 
 - [results/README.md](results/README.md): human-facing current results overview, with scenario links and `git` vs `but+skill` deltas.
-- [results/full-k5-2026-06-27.md](results/full-k5-2026-06-27.md): latest full five-pilot k=5 matrix for Codex and Claude across `git` and `but+skill`.
+- [results/full-k5-2026-06-28.md](results/full-k5-2026-06-28.md): latest full five-pilot k=5 matrix for Codex and Claude across `git` and `but+skill`.
 - [results/archive.md](results/archive.md): full matrices and historical per-scenario reruns.
 
 ## Opinionated Recommendation
