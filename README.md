@@ -124,9 +124,9 @@ The useful measurement block is `measurement`, not the older coarse `metrics` bl
 
 The current human-facing results page is [docs/results/README.md](docs/results/README.md). It links each scenario to the plain-English [scenario guide](docs/scenarios.md) and shows the `git` vs `but+skill` deltas by agent.
 
-Latest full matrix: [docs/results/full-k5-2026-06-28.md](docs/results/full-k5-2026-06-28.md), all five pilots, `k=5`, Codex and Claude, `git` and `but+skill`, 100 runs total.
+Latest full matrix: [docs/results/full-k5-2026-06-29.md](docs/results/full-k5-2026-06-29.md), all five pilots, `k=5`, Codex and Claude, `git` and `but+skill`, 100 runs total.
 
-Headline from that batch: 100/100 runs passed. `but+skill` cut mean wall time by 64.2% for Codex and 50.0% for Claude, while cutting task-relevant version-control commands by 81.7% and 80.4%. The one watch item is Claude squash: fewer commands with `but+skill`, but slower wall time in this batch.
+Headline from that batch: 98/100 runs passed. `but+skill` cut mean wall time by 61% for Codex and 62.5% for Claude, while cutting task-relevant version-control commands by 82.9% and 84.4%. The watch item is Claude split-commit: the final content was right, but two `but+skill` runs produced the wrong commit order.
 
 ## Docs
 
