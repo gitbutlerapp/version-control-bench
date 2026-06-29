@@ -2,7 +2,6 @@
 
 A small benchmark for version-control work by coding agents.
 
-
 This is not a general coding benchmark. The file changes already exist before the agent starts; the task is to make the right Git state: commit boundaries, branch topology, worktree/index leftovers, and protected history. The main comparison is plain `git` versus GitButler CLI with the agent skill, reported honestly as `but+skill`.
 
 Start with [docs/README.md](docs/README.md) for the full design notes. This root README is the runbook.
