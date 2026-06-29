@@ -8,7 +8,7 @@ Older reports are kept for provenance and comparison. They should not be read as
 
 | Report | Scope | Status |
 | --- | --- | --- |
-| [full-k5-2026-06-29.md](full-k5-2026-06-29.md) | Five scenarios, Codex and Claude, `git` and `but+skill`, `k=5` | Current |
+| [full-k5-2026-06-29.md](full-k5-2026-06-29.md) | Five scenarios, Codex and Claude, `git`, `but+skill`, and `jj+skill`, `k=5` | Current |
 | [full-k5-2026-06-28.md](full-k5-2026-06-28.md) | Five scenarios, Codex and Claude, `git` and `but+skill`, `k=5` | Superseded |
 | [full-k5-2026-06-27.md](full-k5-2026-06-27.md) | Five scenarios, Codex and Claude, `git` and `but+skill`, `k=5` | Superseded |
 | [full-k5-2026-06-26.md](full-k5-2026-06-26.md) | Five scenarios, Codex and Claude, `git` and `but+skill`, `k=5` | Superseded |

@@ -264,7 +264,7 @@ The warm transcript estimate is not a real token counter. It subtracts visible o
 
 ## Output Handling Burden
 
-If both `git` and `but+skill` pass a task, the interesting question becomes: how much work did the agent have to do to turn tool output into the next correct action?
+If multiple arms pass a task, the interesting question becomes: how much work did the agent have to do to turn tool output into the next correct action?
 
 Track this as a first-class ergonomics metric:
 

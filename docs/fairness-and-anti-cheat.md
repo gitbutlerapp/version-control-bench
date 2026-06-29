@@ -14,7 +14,7 @@ That means:
 - same scoring
 - different tool availability and agent policy per arm
 
-Do not compare a GitButler-specific task against a generic Git task. If both tools cannot reasonably solve the task, it does not belong in the main comparison.
+Do not compare a tool-specific task against a generic Git task. If the primary tools cannot reasonably solve the task, it does not belong in the main comparison.
 
 After arm setup, run a pre-agent equivalence check. The Git-visible starting state must match across arms for:
 
@@ -26,6 +26,8 @@ After arm setup, run a pre-agent equivalence check. The Git-visible starting sta
 - configured remotes used by the task
 
 GitButler-specific metadata may differ, but those differences need an explicit allowlist. Any unallowlisted difference is an `ENV_FAILURE`, not an agent failure.
+
+JJ-specific metadata may also differ in the `jj+skill` arm. The Git-visible starting state still needs to match the other arms.
 
 ## Tool Policy Enforcement
 
@@ -52,19 +54,38 @@ Allowed in `git` arm:
 Forbidden in `git` arm:
 
 - `but`
+- `jj`
 - GitButler skill use
+- JJ skill use
 - direct hidden oracle/test access
+- network lookup for solutions
+
+Allowed in `jj+skill` arm:
+
+- `jj` reads and writes
+- read-only `git` commands for inspection
+- normal file edits and test commands
+
+Forbidden in `jj+skill` arm:
+
+- raw `git` writes
+- `but`
+- direct `git update-ref`
+- direct edits to `.git`, `.jj`, hooks, or config unless the task explicitly allows them
+- hidden oracle/test access
 - network lookup for solutions
 
 ### Enforcement Boundary
 
-Use wrapper binaries ahead of real `git` and `but` in `PATH`, plus trace inspection.
+Use wrapper binaries ahead of real `git`, `but`, and `jj` in `PATH`, plus trace inspection.
 
 The wrapper should classify top-level commands, log argv/env/cwd, and enforce policy for direct agent shell commands. It should not classify subprocesses launched by `but` as agent protocol violations; otherwise the benchmark would punish GitButler for using Git internally. The practical boundary is:
 
 - direct `git ...` command typed by the agent: classified and enforced
 - direct `but ...` command typed by the agent: classified and enforced
+- direct `jj ...` command typed by the agent: classified and enforced
 - `git` subprocess spawned inside the `but` binary: allowed and logged as internal if observable
+- `git` subprocess spawned inside the `jj` binary: allowed and logged as internal if observable
 - shell aliases/functions: disabled by clean shell config; if used, wrapper still sees the resolved executable when possible
 - scripts created or invoked by the agent: scan contents and trace subprocesses; forbidden VC writes inside scripts are still protocol violations
 - direct edits under `.git/`, GitButler data dirs, hooks, or config: protocol violations unless the task explicitly allows them
@@ -95,7 +116,7 @@ The old `but-bench` local runner is useful for iteration, but it is too host-dep
 
 `but` may require workspace setup. Treat that as harness prep for the `but+skill` arm, not as agent work, unless the scenario explicitly tests setup.
 
-The primary comparison is `git` vs `but+official skill`, because agent-facing tool documentation is part of the GitButler product surface. If we want to separate the binary from the skill, run a secondary `but-no-skill` ablation and label it clearly.
+The primary GitButler comparison is `git` vs `but+official skill`, because agent-facing tool documentation is part of the GitButler product surface. For JJ, label the arm as `jj+skill` for the same reason. If we want to separate a binary from skill guidance, run a no-skill ablation and label it clearly.
 
 Record:
 

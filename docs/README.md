@@ -2,13 +2,14 @@
 
 Last updated: 2026-06-16
 
-This repo should benchmark how coding agents perform version-control operations when the tool under test is either plain `git` or the GitButler CLI (`but`).
+This repo benchmarks how coding agents perform version-control operations when the tool under test is plain `git`, GitButler CLI (`but`), or Jujutsu (`jj`).
 
 The key design choice is simple: tasks must describe user intent in tool-agnostic language, while the harness supplies an arm-specific tool policy. The same task should run as:
 
-- `git` arm: `git` is available for version-control reads and writes; `but` is unavailable.
-- `but` arm: `but` is available for version-control writes; read-only `git` inspection is allowed; raw `git` writes are a protocol violation.
-- Optional `open` arm: both tools are available and the agent chooses. Useful for adoption/discoverability, not the clean primary comparison.
+- `git` arm: `git` is available for version-control reads and writes; `but` and `jj` are unavailable for writes.
+- `but+skill` arm: `but` is available for version-control writes with the GitButler skill installed; read-only `git` inspection is allowed; raw `git` writes are a protocol violation.
+- `jj+skill` arm: `jj` is available for version-control writes in a colocated repo with an external jj skill installed; read-only `git` inspection is allowed; raw `git` writes are a protocol violation.
+- Optional `open` arm: multiple tools are available and the agent chooses. Useful for adoption/discoverability, not the clean primary comparison.
 
 Primary scoring should inspect the final Git-visible repository state: refs, DAG, commits, trees, index, worktree, conflict state, and local remotes. Do not score the command sequence except for protocol violations and diagnostics.
 
@@ -25,8 +26,8 @@ Primary scoring should inspect the final Git-visible repository state: refs, DAG
 
 ## Results
 
-- [results/README.md](results/README.md): human-facing current results overview, with scenario links and `git` vs `but+skill` deltas.
-- [results/full-k5-2026-06-29.md](results/full-k5-2026-06-29.md): latest full five-pilot k=5 matrix for Codex and Claude across `git` and `but+skill`.
+- [results/README.md](results/README.md): human-facing current results overview, with scenario links and `git`, `but+skill`, and `jj+skill` comparisons.
+- [results/full-k5-2026-06-29.md](results/full-k5-2026-06-29.md): latest consolidated five-pilot k=5 matrix for Codex and Claude across `git`, `but+skill`, and `jj+skill`.
 - [results/archive.md](results/archive.md): full matrices and historical per-scenario reruns.
 
 ## Opinionated Recommendation

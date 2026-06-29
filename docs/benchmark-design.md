@@ -4,7 +4,7 @@
 
 Answer this question cleanly:
 
-> For common version-control operations, do coding agents complete the task more reliably, efficiently, and safely using plain `git` or using GitButler CLI (`but`)?
+> For common version-control operations, do coding agents complete the task more reliably, efficiently, and safely using plain `git`, GitButler CLI (`but`), or Jujutsu (`jj`)?
 
 The tools are the main thing under test. Codex and Claude Code should both be run because a convincing claim needs to show whether the tool effect generalizes across agents.
 
@@ -22,7 +22,7 @@ Use a crossed design:
 
 ```text
 agent runner: Codex CLI, Claude Code
-tool arm: git, but, optional open
+tool arm: git, but+skill, jj+skill, optional open
 task: same task package and same natural-language user instruction
 trial: repeated independent runs
 ```
@@ -30,20 +30,20 @@ trial: repeated independent runs
 Report tool effects as paired deltas within the same agent and task set:
 
 ```text
-Codex:      but_pass_rate - git_pass_rate
-ClaudeCode: but_pass_rate - git_pass_rate
+Codex:      arm_pass_rate - git_pass_rate
+ClaudeCode: arm_pass_rate - git_pass_rate
 Combined:  model-aware aggregate, not blind pooling
 ```
 
-This avoids the sloppy claim "but is better" when the real effect might be "Codex handles but better than Claude" or "Claude handles interactive rebase better than Codex."
+This avoids sloppy claims like "but is better" or "jj is better" when the real effect might be "Codex handles one tool better than Claude" or "Claude handles interactive rebase better than Codex."
 
 ## Tool Arms
 
 ### `git` Arm
 
 - `git` is available.
-- `but` is absent from `PATH`.
-- No GitButler skill or GitButler-specific agent instruction is installed.
+- `but` and `jj` are absent from `PATH`.
+- No GitButler or JJ skill or tool-specific agent instruction is installed.
 - Agent instructions say version-control writes should use plain Git.
 
 ### `but` Arm
@@ -59,11 +59,22 @@ This is the right compromise. A strict no-`git` arm is artificial because Git pl
 
 Name this arm honestly in reports as `but+skill`, not just `but`. The official skill is part of the product experience for agents, so it belongs in the primary comparison. Add a later `but-no-skill` ablation if we want to isolate CLI affordance from skill guidance.
 
+### `jj+skill` Arm
+
+- `jj` is installed and added to `PATH`.
+- The repository is prepared as a colocated JJ/Git repository during harness setup.
+- A public external JJ skill is installed into the agent skill directory.
+- Agent instructions say version-control writes should use `jj`.
+- Read-only `git` inspection is allowed.
+- Raw `git` writes and GitButler writes are protocol violations.
+
+Name this arm honestly in reports as `jj+skill`. The skill is part of the tested agent experience; do not report this as naked JJ.
+
 ### `open` Arm
 
-Optional. Both tools are available and no write-tool restriction is imposed.
+Optional. Multiple tools are available and no write-tool restriction is imposed.
 
-Use this to answer "which tool do agents naturally choose?" Do not mix it into the main git-vs-but comparison.
+Use this to answer "which tool do agents naturally choose?" Do not mix it into the primary controlled comparison.
 
 ## Task Prompt Policy
 

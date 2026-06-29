@@ -16,7 +16,7 @@ const TASKS = [
   { id: "pilot-5-squash-commits", label: "Squash commits" },
 ];
 const AGENTS = ["codex", "claude"];
-const ARMS = ["git", "but+skill"];
+const ARMS = ["git", "but+skill", "jj+skill"];
 
 function timestamp() {
   const d = new Date();
@@ -120,6 +120,7 @@ function rowFromPlan(plan) {
   const transcript = result?.measurement?.transcript ?? {};
   const timing = result?.measurement?.timing ?? {};
   const taskRuntime = timing.observed_command_runtime?.task_vc?.duration_ms_sum ?? null;
+  const toolBinary = result?.tool_binary ?? result?.but_binary ?? result?.jj_binary ?? null;
   return {
     ...plan,
     run_dir: rel(plan.run_dir),
@@ -145,9 +146,13 @@ function rowFromPlan(plan) {
     task_vc_runtime_ms: taskRuntime,
     observed_model: result?.observed_model ?? result?.model ?? null,
     setup_hash: result?.agent_instructions?.setup_block_sha256 ?? null,
-    binary_hash: result?.but_binary?.sha256 ?? null,
-    binary_dirty: result?.but_binary?.source_git?.dirty ?? null,
-    binary_head: result?.but_binary?.source_git?.head ?? null,
+    binary_hash: toolBinary?.sha256 ?? null,
+    binary_dirty: toolBinary?.source_git?.dirty ?? null,
+    binary_head: toolBinary?.source_git?.head ?? null,
+    binary_version: toolBinary?.version ?? null,
+    skill_name: result?.skill?.name ?? null,
+    skill_source_package: result?.skill?.source_package ?? null,
+    skill_source_url: result?.skill?.source_url ?? null,
     skill_hash: result?.skill?.skill_file_sha256 ?? result?.skill?.skill_md_sha256 ?? null,
     skill_tree_hash: result?.skill?.source_dir_sha256 ?? result?.skill?.tree_sha256 ?? null,
     skill_dirty: result?.skill?.source_git?.dirty ?? null,
@@ -318,24 +323,32 @@ function renderReport(data) {
   const passed = rows.filter((row) => row.passed).length;
   const allPassed = passed === total && completed === total;
   const agents = [...new Set(rows.map((row) => row.agent))];
+  const arms = [...new Set(rows.map((row) => row.arm))];
+  const comparisonArms = arms.filter((arm) => arm !== "git");
   const tasks = [...new Map(rows.map((row) => [row.task, row.task_label])).entries()];
 
-  const headlineDeltas = agents.map((agent) => {
+  const headlineDeltas = [];
+  for (const agent of agents) {
     const git = summaryLookup(summaries.overall, { agent, arm: "git" });
-    const but = summaryLookup(summaries.overall, { agent, arm: "but+skill" });
-    if (!git || !but) return null;
-    return {
-      agent,
-      wall: delta(but.mean_wall_ms, git.mean_wall_ms),
-      taskVc: delta(but.mean_task_vc, git.mean_task_vc),
-    };
-  }).filter(Boolean);
+    if (!git) continue;
+    for (const arm of comparisonArms) {
+      const candidate = summaryLookup(summaries.overall, { agent, arm });
+      if (!candidate) continue;
+      headlineDeltas.push({
+        agent,
+        arm,
+        wall: delta(candidate.mean_wall_ms, git.mean_wall_ms),
+        taskVc: delta(candidate.mean_task_vc, git.mean_task_vc),
+      });
+    }
+  }
 
   const headlineBits = headlineDeltas.map((item) => {
     const wallPct = Number.isFinite(item.wall.pct) ? `${round(Math.abs(item.wall.pct), 1)}%` : "n/a";
     const taskPct = Number.isFinite(item.taskVc.pct) ? `${round(Math.abs(item.taskVc.pct), 1)}%` : "n/a";
-    const direction = item.wall.abs <= 0 ? "lower" : "higher";
-    return `${item.agent}: ${wallPct} ${direction} mean wall, ${taskPct} fewer task VC commands`;
+    const wallDirection = item.wall.abs <= 0 ? "lower" : "higher";
+    const taskDirection = item.taskVc.abs <= 0 ? "fewer" : "more";
+    return `${item.agent} ${item.arm}: ${wallPct} ${wallDirection} mean wall, ${taskPct} ${taskDirection} task VC commands`;
   });
   const headlineDeltaSentence = headlineBits.length > 0
     ? ` ${headlineBits.join("; ")}.`
@@ -360,17 +373,21 @@ function renderReport(data) {
       kb(summary.mean_warm_bytes),
     ]);
 
-  const overallDeltaRows = agents.map((agent) => {
+  const overallDeltaRows = [];
+  for (const agent of agents) {
     const git = summaryLookup(summaries.overall, { agent, arm: "git" });
-    const but = summaryLookup(summaries.overall, { agent, arm: "but+skill" });
-    return [
-      title(agent),
-      git && but ? deltaCell(but.mean_wall_ms / 1000, git.mean_wall_ms / 1000, { unit: "s" }) : "n/a",
-      git && but ? deltaCell(but.mean_task_vc, git.mean_task_vc) : "n/a",
-      git && but ? deltaCell(but.mean_failed_task_vc, git.mean_failed_task_vc) : "n/a",
-      git && but ? deltaCell((but.mean_warm_bytes ?? 0) / 1024, (git.mean_warm_bytes ?? 0) / 1024, { unit: " KB" }) : "n/a",
-    ];
-  });
+    for (const arm of comparisonArms) {
+      const candidate = summaryLookup(summaries.overall, { agent, arm });
+      overallDeltaRows.push([
+        title(agent),
+        `\`${arm}\``,
+        git && candidate ? deltaCell(candidate.mean_wall_ms / 1000, git.mean_wall_ms / 1000, { unit: "s" }) : "n/a",
+        git && candidate ? deltaCell(candidate.mean_task_vc, git.mean_task_vc) : "n/a",
+        git && candidate ? deltaCell(candidate.mean_failed_task_vc, git.mean_failed_task_vc) : "n/a",
+        git && candidate ? deltaCell((candidate.mean_warm_bytes ?? 0) / 1024, (git.mean_warm_bytes ?? 0) / 1024, { unit: " KB" }) : "n/a",
+      ]);
+    }
+  }
 
   const byTaskRows = summaries.by_task
     .sort((a, b) => `${a.task}-${a.agent}-${a.arm}`.localeCompare(`${b.task}-${b.agent}-${b.arm}`))
@@ -393,15 +410,18 @@ function renderReport(data) {
   for (const [task, label] of tasks) {
     for (const agent of agents) {
       const git = summaryLookup(summaries.by_task, { task, agent, arm: "git" });
-      const but = summaryLookup(summaries.by_task, { task, agent, arm: "but+skill" });
-      taskDeltaRows.push([
-        label,
-        title(agent),
-        git && but ? deltaCell(but.mean_wall_ms / 1000, git.mean_wall_ms / 1000, { unit: "s" }) : "n/a",
-        git && but ? deltaCell(but.mean_task_vc, git.mean_task_vc) : "n/a",
-        git && but ? deltaCell(but.mean_failed_task_vc, git.mean_failed_task_vc) : "n/a",
-        git && but ? deltaCell((but.mean_warm_bytes ?? 0) / 1024, (git.mean_warm_bytes ?? 0) / 1024, { unit: " KB" }) : "n/a",
-      ]);
+      for (const arm of comparisonArms) {
+        const candidate = summaryLookup(summaries.by_task, { task, agent, arm });
+        taskDeltaRows.push([
+          label,
+          title(agent),
+          `\`${arm}\``,
+          git && candidate ? deltaCell(candidate.mean_wall_ms / 1000, git.mean_wall_ms / 1000, { unit: "s" }) : "n/a",
+          git && candidate ? deltaCell(candidate.mean_task_vc, git.mean_task_vc) : "n/a",
+          git && candidate ? deltaCell(candidate.mean_failed_task_vc, git.mean_failed_task_vc) : "n/a",
+          git && candidate ? deltaCell((candidate.mean_warm_bytes ?? 0) / 1024, (git.mean_warm_bytes ?? 0) / 1024, { unit: " KB" }) : "n/a",
+        ]);
+      }
     }
   }
 
@@ -420,7 +440,7 @@ function renderReport(data) {
     "",
     `Batch: \`${data.batch}\``,
     "",
-    `Scope: ${tasks.length} tasks, ${agents.map(title).join(" and ")}, plain \`git\` vs \`but+skill\`, ${total} planned runs.`,
+    `Scope: ${tasks.length} tasks, ${agents.map(title).join(" and ")}, ${arms.map((arm) => `\`${arm}\``).join(" vs ")}, ${total} planned runs.`,
     "",
     "## Headline",
     "",
@@ -437,10 +457,10 @@ function renderReport(data) {
     "",
     "## Overall Deltas",
     "",
-    "Negative means `but+skill` was lower than plain `git`.",
+    "Negative means the selected arm was lower than plain `git`.",
     "",
     markdownTable(
-      ["Agent", "`but+skill` Mean Wall Delta", "Task VC Delta", "Failed Task VC Delta", "Warm KB Delta"],
+      ["Agent", "Arm", "Mean Wall Delta", "Task VC Delta", "Failed Task VC Delta", "Warm KB Delta"],
       overallDeltaRows,
     ),
     "",
@@ -453,10 +473,10 @@ function renderReport(data) {
     "",
     "## Pairwise Deltas",
     "",
-    "Negative means `but+skill` was lower than plain `git` for the same task and agent.",
+    "Negative means the selected arm was lower than plain `git` for the same task and agent.",
     "",
     markdownTable(
-      ["Task", "Agent", "`but+skill` Mean Wall Delta", "Task VC Delta", "Failed Task VC Delta", "Warm KB Delta"],
+      ["Task", "Agent", "Arm", "Mean Wall Delta", "Task VC Delta", "Failed Task VC Delta", "Warm KB Delta"],
       taskDeltaRows,
     ),
     "",
@@ -478,12 +498,12 @@ function renderReport(data) {
     "",
     "## Provenance",
     "",
-    provenance.length === 0 ? "No `but+skill` provenance was recorded." : provenance.join("\n"),
+    provenance.length === 0 ? "No non-git provenance was recorded." : provenance.join("\n"),
     "",
     "## Notes",
     "",
-    "- Pre-run fixture setup, `but setup`, applying task branches, skill installation, local agent instruction files, and dirty-state application are excluded from measured agent duration and command metrics.",
-    "- This report uses task-relevant VC command counts, not GitButler internal Git calls or agent platform probes, for the headline command comparison.",
+    "- Pre-run fixture setup, tool setup, applying task branches, skill installation, local agent instruction files, and dirty-state application are excluded from measured agent duration and command metrics.",
+    "- This report uses task-relevant VC command counts, not tool-internal commands or agent platform probes, for the headline command comparison.",
     "- Claude transcript bytes and Codex transcript bytes are not directly comparable; read transcript deltas within the same agent.",
     "- The warm transcript estimate subtracts visible skill/reference reads. It is not a token counter.",
     "",
@@ -511,17 +531,25 @@ function unique(values) {
 }
 
 function provenanceLines(rows) {
-  const butRows = rows.filter((row) => row.arm === "but+skill" && row.completed);
-  if (butRows.length === 0) return [];
-  return [
-    `- Setup block SHA-256: ${unique(butRows.map((row) => `\`${row.setup_hash}\``)).join(", ") || "n/a"}`,
-    `- Binary SHA-256: ${unique(butRows.map((row) => `\`${row.binary_hash}\``)).join(", ") || "n/a"}`,
-    `- Skill file SHA-256: ${unique(butRows.map((row) => `\`${row.skill_hash}\``)).join(", ") || "n/a"}`,
-    `- Skill tree SHA-256: ${unique(butRows.map((row) => `\`${row.skill_tree_hash}\``)).join(", ") || "n/a"}`,
-    `- GitButler source head: ${unique(butRows.map((row) => `\`${row.binary_head ?? row.skill_head}\``)).join(", ") || "n/a"}`,
-    `- Binary dirty: ${unique(butRows.map((row) => `\`${row.binary_dirty}\``)).join(", ") || "n/a"}`,
-    `- Skill dirty: ${unique(butRows.map((row) => `\`${row.skill_dirty}\``)).join(", ") || "n/a"}`,
-  ];
+  const lines = [];
+  const arms = unique(rows.map((row) => row.arm)).filter((arm) => arm !== "git");
+  for (const arm of arms) {
+    const armRows = rows.filter((row) => row.arm === arm && row.completed);
+    if (armRows.length === 0) continue;
+    lines.push(`### \`${arm}\``);
+    lines.push(`- Setup block SHA-256: ${unique(armRows.map((row) => `\`${row.setup_hash}\``)).join(", ") || "n/a"}`);
+    lines.push(`- Binary SHA-256: ${unique(armRows.map((row) => `\`${row.binary_hash}\``)).join(", ") || "n/a"}`);
+    lines.push(`- Binary version: ${unique(armRows.map((row) => row.binary_version ? `\`${row.binary_version}\`` : null)).join(", ") || "n/a"}`);
+    lines.push(`- Skill: ${unique(armRows.map((row) => row.skill_name ? `\`${row.skill_name}\`` : null)).join(", ") || "n/a"}`);
+    lines.push(`- Skill package: ${unique(armRows.map((row) => row.skill_source_package ? `\`${row.skill_source_package}\`` : null)).join(", ") || "n/a"}`);
+    lines.push(`- Skill source URL: ${unique(armRows.map((row) => row.skill_source_url ? `[source](${row.skill_source_url})` : null)).join(", ") || "n/a"}`);
+    lines.push(`- Skill file SHA-256: ${unique(armRows.map((row) => `\`${row.skill_hash}\``)).join(", ") || "n/a"}`);
+    lines.push(`- Skill tree SHA-256: ${unique(armRows.map((row) => `\`${row.skill_tree_hash}\``)).join(", ") || "n/a"}`);
+    lines.push(`- Source head: ${unique(armRows.map((row) => `\`${row.binary_head ?? row.skill_head}\``)).join(", ") || "n/a"}`);
+    lines.push(`- Binary dirty: ${unique(armRows.map((row) => `\`${row.binary_dirty}\``)).join(", ") || "n/a"}`);
+    lines.push(`- Skill dirty: ${unique(armRows.map((row) => `\`${row.skill_dirty}\``)).join(", ") || "n/a"}`);
+  }
+  return lines;
 }
 
 function writePlan(batchDir, plans) {
@@ -568,6 +596,11 @@ const timeoutMs = args.get("timeout-ms") ?? "900000";
 const gitbutlerRoot = path.resolve(args.get("gitbutler-root") ?? "/Users/kiril/src/gitbutler");
 const butBin = path.resolve(args.get("but-bin") ?? path.join(gitbutlerRoot, "target/release/but"));
 const skillDir = path.resolve(args.get("skill-dir") ?? path.join(gitbutlerRoot, "crates/but/skill"));
+const jjBin = args.get("jj-bin") ? path.resolve(args.get("jj-bin")) : null;
+const jjSkillDir = args.get("jj-skill-dir") ? path.resolve(args.get("jj-skill-dir")) : null;
+const jjSkillPackage = args.get("jj-skill-package") ?? null;
+const jjSkillName = args.get("jj-skill-name") ?? null;
+const jjSkillUrl = args.get("jj-skill-url") ?? null;
 const batchName = args.get("batch-name") ?? `full-k${k}-${timestamp()}`;
 const batchDir = path.resolve(args.get("out") ?? path.join(repoRoot, "tmp/pilot-runs", batchName));
 const commandLine = ["node", "scripts/run-full-matrix.mjs", ...process.argv.slice(2)];
@@ -611,6 +644,11 @@ for (const plan of plans) {
     "--run-id", plan.run_id,
     "--out", plan.run_dir,
   ];
+  if (jjBin) runArgs.push("--jj-bin", jjBin);
+  if (jjSkillDir) runArgs.push("--jj-skill-dir", jjSkillDir);
+  if (jjSkillPackage) runArgs.push("--jj-skill-package", jjSkillPackage);
+  if (jjSkillName) runArgs.push("--jj-skill-name", jjSkillName);
+  if (jjSkillUrl) runArgs.push("--jj-skill-url", jjSkillUrl);
 
   console.log(`[${plan.idx}/${plans.length}] ${plan.task} ${plan.agent} ${plan.arm} r${plan.rep}`);
   const started = Date.now();

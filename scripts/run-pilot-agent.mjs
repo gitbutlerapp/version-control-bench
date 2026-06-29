@@ -10,6 +10,12 @@ import { run } from "./lib/process.mjs";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
 const DEFAULT_CODEX_MODEL = "gpt-5.5";
+const DEFAULT_JJ_SKILL = {
+  package: "onevcat/skills@onevcat-jj",
+  name: "onevcat-jj",
+  source_url: "https://raw.githubusercontent.com/onevcat/skills/master/skills/onevcat-jj/SKILL.md",
+  selection_note: "Top direct jj result from `npx skills find jj` on 2026-06-29; the skills CLI showed 279 installs.",
+};
 
 const TASK_CONFIGS = {
   "pilot-1-selective-validation": {
@@ -131,6 +137,25 @@ const BUT_MUTATIONS = new Set([
 
 const BUT_INSPECTIONS = new Set(["status", "diff", "show", "oplog"]);
 
+const JJ_MUTATIONS = new Set([
+  "abandon",
+  "absorb",
+  "commit",
+  "describe",
+  "desc",
+  "duplicate",
+  "edit",
+  "new",
+  "rebase",
+  "resolve",
+  "restore",
+  "split",
+  "squash",
+  "undo",
+]);
+
+const JJ_INSPECTIONS = new Set(["diff", "log", "show", "status", "st", "evolog"]);
+
 function shellQuote(value) {
   return `'${String(value).replaceAll("'", "'\\''")}'`;
 }
@@ -140,6 +165,21 @@ function commandPath(command) {
     encoding: "utf8",
   });
   return result.stdout.trim();
+}
+
+function executablePath(value, fallbackCommand) {
+  const candidate = value ?? commandPath(fallbackCommand);
+  if (!candidate) {
+    throw new Error(`Could not find required executable: ${fallbackCommand}`);
+  }
+  if (!value || candidate.includes("/") || path.isAbsolute(candidate)) {
+    return path.resolve(candidate);
+  }
+  const found = commandPath(candidate);
+  if (!found) {
+    throw new Error(`Could not find required executable: ${candidate}`);
+  }
+  return path.resolve(found);
 }
 
 function sha256Text(text) {
@@ -249,8 +289,9 @@ function prepareClaudeSettings(runDir, enabled, effortLevel) {
 
 function writeWrapper(binDir, tool, realPath, tracePath, arm) {
   const wrapperPath = path.join(binDir, tool);
-  const blockGitWrites = tool === "git" && arm === "but+skill";
-  const blockBut = tool === "but" && arm === "git";
+  const blockGitWrites = tool === "git" && ["but+skill", "jj+skill"].includes(arm);
+  const blockBut = tool === "but" && arm !== "but+skill";
+  const blockJj = tool === "jj" && arm !== "jj+skill";
   const mutationList = [...GIT_MUTATIONS].filter((command) => command !== "branch").join("|");
 
   const body = `#!/usr/bin/env bash
@@ -270,7 +311,7 @@ if [[ -n "$GRANDPARENT_PID" ]]; then
   GRANDPARENT="$(ps -p "$GRANDPARENT_PID" -o comm= 2>/dev/null | tr -d '[:space:]')"
 fi
 INTERNAL=false
-if [[ "$TOOL" == "git" && ( "$PARENT" == *but* || "$GRANDPARENT" == *but* ) ]]; then
+if [[ "$TOOL" == "git" && ( "$PARENT" == *but* || "$GRANDPARENT" == *but* || "$PARENT" == *jj* || "$GRANDPARENT" == *jj* ) ]]; then
   INTERNAL=true
 fi
 trace_argv() {
@@ -283,6 +324,9 @@ trace_argv() {
 TRACE_ARGV="$(trace_argv "$@")"
 POLICY_BLOCK=false
 if [[ ${blockBut ? "true" : "false"} == true ]]; then
+  POLICY_BLOCK=true
+fi
+if [[ ${blockJj ? "true" : "false"} == true ]]; then
   POLICY_BLOCK=true
 fi
 if [[ ${blockGitWrites ? "true" : "false"} == true && "$INTERNAL" != true ]]; then
@@ -341,7 +385,7 @@ exit "$STATUS"
   writeFileSync(wrapperPath, body, { mode: 0o755 });
 }
 
-function createWrappers(runDir, arm, realBut) {
+function createWrappers(runDir, arm, realBut, realJj) {
   const binDir = path.join(runDir, "bin");
   mkdirSync(binDir, { recursive: true });
   const tracePath = path.join(runDir, "command-trace.tsv");
@@ -350,6 +394,7 @@ function createWrappers(runDir, arm, realBut) {
   const realGit = commandPath("git");
   writeWrapper(binDir, "git", realGit, tracePath, arm);
   writeWrapper(binDir, "but", realBut, tracePath, arm);
+  writeWrapper(binDir, "jj", realJj, tracePath, arm);
 
   return { binDir, tracePath };
 }
@@ -357,6 +402,12 @@ function createWrappers(runDir, arm, realBut) {
 function parseSkillVersion(skillFile) {
   const content = readFileSync(skillFile, "utf8");
   const match = content.match(/^version:\s*"?([^"\n]+)"?\s*$/m);
+  return match?.[1] ?? null;
+}
+
+function parseSkillName(skillFile) {
+  const content = readFileSync(skillFile, "utf8");
+  const match = content.match(/^name:\s*"?([^"\n]+)"?\s*$/m);
   return match?.[1] ?? null;
 }
 
@@ -384,6 +435,48 @@ ${setupBlock}
     content,
     setup_block: setupBlock,
     setup_block_sha256: sha256Text(setupBlock),
+  };
+}
+
+function renderJjInstructions(workspace, realJj, codexSkillPath, claudeSkillPath, sourceMetadata) {
+  const version = run(realJj, ["--version"], { cwd: workspace }).stdout.trimEnd();
+  const policyBlock = `## Version control
+
+- Use Jujutsu (\`jj\`) for version-control write operations in this benchmark trial.
+- The repository was prepared with \`jj git init --colocate\`; Git-visible refs still matter to the verifier.
+- Do not use raw \`git\` writes or GitButler (\`but\`) in this benchmark trial.
+- Read-only Git inspection is allowed if it helps you verify Git-visible state.
+- Always pass \`--no-pager\` to jj commands that may print long output.
+- Always pass \`-m\` / \`--message\` to jj commands that need descriptions; do not open an editor.
+- Keep bookmarks updated for any named task branch so the final Git branch points at the requested history.
+- When the task asks to leave changes uncommitted, leave them in the working-copy commit \`@\`.
+`;
+
+  const content = `# AGENTS.md
+
+## Benchmark boundary
+
+Work only in the current repository. Do not inspect parent benchmark directories, hidden oracle files, or solution scripts.
+
+## Local skill
+
+The local Jujutsu CLI skill is installed for this benchmark trial at:
+
+- ${codexSkillPath}
+- ${claudeSkillPath}
+
+Skill source: ${sourceMetadata.package ?? sourceMetadata.source_url ?? "external source"}.
+
+Use the installed skill if your agent runtime loads local skills or you need Jujutsu command details.
+
+${policyBlock}
+`;
+
+  return {
+    content,
+    version,
+    setup_block: policyBlock.trimEnd(),
+    setup_block_sha256: sha256Text(policyBlock.trimEnd()),
   };
 }
 
@@ -447,6 +540,7 @@ function installGitButlerSkill(workspace, skillDir, realBut) {
   appendHarnessExclude(workspace);
 
   return {
+    name: "but",
     source_dir: skillDir,
     version: parseSkillVersion(skillFile),
     installed,
@@ -460,9 +554,88 @@ function installGitButlerSkill(workspace, skillDir, realBut) {
   };
 }
 
-function prepareWorkspace(runDir, arm, realBut, skillDir) {
+function fetchJjSkillSource(runDir, sourceMetadata) {
+  const dest = path.join(runDir, "external-skills", sourceMetadata.name);
+  const skillFile = path.join(dest, "SKILL.md");
+  mkdirSync(dest, { recursive: true });
+
+  const fetched = run("curl", ["-fsSL", sourceMetadata.source_url], { cwd: repoRoot, check: false });
+  if (fetched.status !== 0 || !fetched.stdout.trim()) {
+    throw new Error(`Failed to fetch jj skill from ${sourceMetadata.source_url}\n${fetched.stderr}`);
+  }
+
+  writeFileSync(skillFile, fetched.stdout);
+  return {
+    dir: dest,
+    source: {
+      ...sourceMetadata,
+      fetched_at: new Date().toISOString(),
+    },
+  };
+}
+
+function resolveJjSkillSource(runDir, configuredDir, sourceMetadata) {
+  if (configuredDir) {
+    return {
+      dir: configuredDir,
+      source: {
+        ...sourceMetadata,
+        configured_dir: configuredDir,
+      },
+    };
+  }
+
+  return fetchJjSkillSource(runDir, sourceMetadata);
+}
+
+function installJjSkill(workspace, skillDir, realJj, sourceMetadata) {
+  const skillFile = path.join(skillDir, "SKILL.md");
+  if (!existsSync(skillFile)) {
+    throw new Error(`Jujutsu skill file not found: ${skillFile}`);
+  }
+
+  const refsDir = path.join(skillDir, "references");
+  const installed = [];
+  const skillName = parseSkillName(skillFile) ?? sourceMetadata.name ?? path.basename(skillDir);
+
+  for (const root of [`.codex/skills/${skillName}`, `.claude/skills/${skillName}`]) {
+    const dest = path.join(workspace, root);
+    mkdirSync(dest, { recursive: true });
+    cpSync(skillFile, path.join(dest, "SKILL.md"));
+    if (existsSync(refsDir)) {
+      cpSync(refsDir, path.join(dest, "references"), { recursive: true });
+    }
+    installed.push(dest);
+  }
+
+  const codexSkillPath = path.join(workspace, `.codex/skills/${skillName}/SKILL.md`);
+  const claudeSkillPath = path.join(workspace, `.claude/skills/${skillName}/SKILL.md`);
+  const instructions = renderJjInstructions(workspace, realJj, codexSkillPath, claudeSkillPath, sourceMetadata);
+  writeAgentInstructionFiles(workspace, instructions.content);
+
+  appendHarnessExclude(workspace);
+
+  return {
+    name: skillName,
+    source_dir: skillDir,
+    source: sourceMetadata,
+    version: parseSkillVersion(skillFile),
+    installed,
+    instructions: {
+      installed_codex: path.join(workspace, "AGENTS.md"),
+      installed_claude: path.join(workspace, "CLAUDE.md"),
+      source_package: sourceMetadata.package ?? null,
+      source_url: sourceMetadata.source_url ?? null,
+      source_command: "jj --version",
+      setup_block_sha256: instructions.setup_block_sha256,
+      tool_version: instructions.version,
+    },
+  };
+}
+
+function prepareWorkspace(runDir, arm, realBut, butSkillDir, realJj, jjSkill) {
   const workspace = path.join(runDir, "workspace");
-  const dirty = arm !== "but+skill" && taskConfig.fixtureDirty !== false;
+  const dirty = arm === "git" && taskConfig.fixtureDirty !== false;
   run("node", [path.join(repoRoot, taskConfig.createFixtureScript), "--out", workspace, "--force", "true", "--dirty", String(dirty)], {
     cwd: repoRoot,
   });
@@ -475,7 +648,17 @@ function prepareWorkspace(runDir, arm, realBut, skillDir) {
     if (taskConfig.gitbutlerPrep === "setup-and-apply-branch") {
       run(realBut, ["apply", taskConfig.applyBranch], { cwd: workspace, stdio: "pipe" });
     }
-    const setup = installGitButlerSkill(workspace, skillDir, realBut);
+    const setup = installGitButlerSkill(workspace, butSkillDir, realBut);
+    if (taskConfig.applyDirtyState !== false) {
+      run("node", [path.join(repoRoot, taskConfig.applyStateScript), "dirty", workspace], { cwd: repoRoot });
+    }
+    return { workspace, setup };
+  }
+
+  if (arm === "jj+skill") {
+    run(realJj, ["git", "init", "--colocate"], { cwd: workspace, stdio: "pipe" });
+    run(realJj, ["config", "set", "--repo", "ui.paginate", "never"], { cwd: workspace, stdio: "pipe" });
+    const setup = installJjSkill(workspace, jjSkill.dir, realJj, jjSkill.source);
     if (taskConfig.applyDirtyState !== false) {
       run("node", [path.join(repoRoot, taskConfig.applyStateScript), "dirty", workspace], { cwd: repoRoot });
     }
@@ -703,6 +886,30 @@ function vcSubcommand(entry) {
     }
   }
 
+  if (entry.tool === "jj") {
+    while (i < parts.length) {
+      const part = parts[i];
+      if (["-R", "--repository", "--config", "--config-file", "--at-operation", "--at-op", "--color"].includes(part)) {
+        i += 2;
+        continue;
+      }
+      if (part.startsWith("--repository=")
+        || part.startsWith("--config=")
+        || part.startsWith("--config-file=")
+        || part.startsWith("--at-operation=")
+        || part.startsWith("--at-op=")
+        || part.startsWith("--color=")) {
+        i += 1;
+        continue;
+      }
+      if (["--no-pager", "--quiet", "--ignore-working-copy", "--ignore-immutable", "--debug"].includes(part)) {
+        i += 1;
+        continue;
+      }
+      break;
+    }
+  }
+
   return { command: parts[i] ?? "", args: parts.slice(i + 1) };
 }
 
@@ -734,13 +941,35 @@ function isButMutation(entry) {
   return !args.includes("--help") && !args.includes("-h") && BUT_MUTATIONS.has(command);
 }
 
+function isJjInspection(entry) {
+  const { command, args } = vcSubcommand(entry);
+  if (args.includes("--help") || args.includes("-h") || command === "help") return true;
+  if (JJ_INSPECTIONS.has(command)) return true;
+  if (command === "bookmark") return args[0] === "list";
+  if (command === "file") return ["list", "show", "search", "annotate"].includes(args[0]);
+  if (command === "git") return ["remote"].includes(args[0]);
+  if (command === "op") return ["log", "show"].includes(args[0]);
+  return false;
+}
+
+function isJjMutation(entry) {
+  const { command, args } = vcSubcommand(entry);
+  if (args.includes("--help") || args.includes("-h") || command === "help") return false;
+  if (JJ_MUTATIONS.has(command)) return true;
+  if (command === "bookmark") return args[0] !== "list";
+  if (command === "file") return ["untrack"].includes(args[0]);
+  if (command === "git") return ["init", "clone", "fetch", "push", "import", "export"].includes(args[0]);
+  if (command === "op") return ["restore", "abandon"].includes(args[0]);
+  return false;
+}
+
 function isShellParent(parent) {
   if (!parent) return false;
   return ["sh", "bash", "zsh", "/bin/sh", "/bin/bash", "/bin/zsh"].some((shell) => parent === shell || parent.endsWith(`/${shell}`));
 }
 
 function isVcEntry(entry) {
-  return entry.tool === "git" || entry.tool === "but";
+  return entry.tool === "git" || entry.tool === "but" || entry.tool === "jj";
 }
 
 function isNumber(value) {
@@ -802,11 +1031,17 @@ function durationStats(entries) {
 }
 
 function isInspection(entry) {
-  return entry.tool === "git" ? isGitInspection(entry) : isButInspection(entry);
+  if (entry.tool === "git") return isGitInspection(entry);
+  if (entry.tool === "but") return isButInspection(entry);
+  if (entry.tool === "jj") return isJjInspection(entry);
+  return false;
 }
 
 function isMutation(entry) {
-  return entry.tool === "git" ? isGitMutation(entry) : isButMutation(entry);
+  if (entry.tool === "git") return isGitMutation(entry);
+  if (entry.tool === "but") return isButMutation(entry);
+  if (entry.tool === "jj") return isJjMutation(entry);
+  return false;
 }
 
 function isCodexPlatformProbe(entry) {
@@ -977,6 +1212,7 @@ function summarizeCommands(entries) {
     vc_command_count: vc.length,
     git_command_count: vc.filter((entry) => entry.tool === "git").length,
     but_command_count: vc.filter((entry) => entry.tool === "but").length,
+    jj_command_count: vc.filter((entry) => entry.tool === "jj").length,
     inspection_count: inspections.length,
     mutation_count: mutations.length,
     failed_vc_command_count: failed.length,
@@ -1042,7 +1278,7 @@ function countMatchingLineBytes(text, predicate) {
     .reduce((sum, line) => sum + Buffer.byteLength(line), 0);
 }
 
-function estimateSkillReferenceOutputBytes(text) {
+function estimateSkillReferenceOutputBytes(text, skillName) {
   const lines = text.split(/(?<=\n)/);
   let pendingExec = false;
   let commandReadsSkill = false;
@@ -1058,7 +1294,8 @@ function estimateSkillReferenceOutputBytes(text) {
     }
 
     if (pendingExec) {
-      commandReadsSkill = line.includes(".codex/skills/but") || line.includes(".claude/skills/but");
+      commandReadsSkill = Boolean(skillName)
+        && (line.includes(`.codex/skills/${skillName}`) || line.includes(`.claude/skills/${skillName}`));
       pendingExec = false;
       continue;
     }
@@ -1089,13 +1326,13 @@ function directoryByteLength(dir) {
   return readdirSync(dir).reduce((sum, entry) => sum + directoryByteLength(path.join(dir, entry)), 0);
 }
 
-function transcriptBreakdown(prompt, agentResult, skillDir) {
+function transcriptBreakdown(prompt, agentResult, skillDir, skillName) {
   const promptBytes = Buffer.byteLength(prompt);
   const stdoutBytes = Buffer.byteLength(agentResult.stdout);
   const stderrBytes = Buffer.byteLength(agentResult.stderr);
   const totalBytes = promptBytes + stdoutBytes + stderrBytes;
   const platformWarningBytes = countMatchingLineBytes(agentResult.stderr, (line) => line.includes(" WARN codex_"));
-  const skillReferenceOutputBytes = estimateSkillReferenceOutputBytes(agentResult.stderr);
+  const skillReferenceOutputBytes = estimateSkillReferenceOutputBytes(agentResult.stderr, skillName);
   const nonWarningTranscriptBytes = totalBytes - platformWarningBytes;
   const warmEstimatedTotalBytes = Math.max(0, totalBytes - skillReferenceOutputBytes);
   const warmEstimatedNonWarningBytes = Math.max(0, nonWarningTranscriptBytes - skillReferenceOutputBytes);
@@ -1167,11 +1404,11 @@ function timingBreakdown(trace, agentResult) {
   };
 }
 
-function measurementBreakdown(trace, prompt, agentResult, skillDir) {
+function measurementBreakdown(trace, prompt, agentResult, skillDir, skillName) {
   return {
     schema_version: 1,
     timing: timingBreakdown(trace, agentResult),
-    transcript: transcriptBreakdown(prompt, agentResult, skillDir),
+    transcript: transcriptBreakdown(prompt, agentResult, skillDir, skillName),
     commands: commandBreakdown(trace),
   };
 }
@@ -1179,8 +1416,8 @@ function measurementBreakdown(trace, prompt, agentResult, skillDir) {
 function traceMetrics(trace, prompt, agentResult) {
   const visible = trace.filter((entry) => !entry.internal);
   const shellCommands = visible.filter((entry) => isShellParent(entry.parent));
-  const allVc = visible.filter((entry) => entry.tool === "git" || entry.tool === "but");
-  const shellVc = shellCommands.filter((entry) => entry.tool === "git" || entry.tool === "but");
+  const allVc = visible.filter(isVcEntry);
+  const shellVc = shellCommands.filter(isVcEntry);
   const vc = allVc;
   const inspections = vc.filter(isInspection);
   const mutations = vc.filter(isMutation);
@@ -1244,8 +1481,16 @@ const agent = args.get("agent") ?? "codex";
 const arm = args.get("arm") ?? "git";
 const model = args.get("model") ?? (agent === "codex" ? DEFAULT_CODEX_MODEL : "");
 const timeoutMs = Number(args.get("timeout-ms") ?? 900000);
-const realBut = path.resolve(args.get("but-bin") ?? commandPath("but"));
+const realBut = executablePath(args.get("but-bin"), "but");
+const realJj = executablePath(args.get("jj-bin"), "jj");
 const skillDir = path.resolve(args.get("skill-dir") ?? "/Users/kiril/src/gitbutler/crates/but/skill");
+const configuredJjSkillDir = args.get("jj-skill-dir") ? path.resolve(args.get("jj-skill-dir")) : null;
+const jjSkillSource = {
+  package: args.get("jj-skill-package") ?? DEFAULT_JJ_SKILL.package,
+  name: args.get("jj-skill-name") ?? DEFAULT_JJ_SKILL.name,
+  source_url: args.get("jj-skill-url") ?? DEFAULT_JJ_SKILL.source_url,
+  selection_note: args.get("jj-skill-selection-note") ?? DEFAULT_JJ_SKILL.selection_note,
+};
 const codexCleanConfig = agent === "codex" ? args.get("codex-clean-config") !== "false" : false;
 const codexIsolatedHome = agent === "codex" && codexCleanConfig && args.get("codex-isolated-home") !== "false";
 const codexDisablePlugins = agent === "codex" && codexCleanConfig && args.get("codex-disable-plugins") !== "false";
@@ -1262,16 +1507,17 @@ if (!taskConfig) {
 }
 taskDir = path.join(repoRoot, taskConfig.taskDir);
 
-if (!["git", "but+skill"].includes(arm)) {
-  console.error("Usage: node scripts/run-pilot-agent.mjs --task <task-id> --agent <codex|claude> --arm <git|but+skill>");
+if (!["git", "but+skill", "jj+skill"].includes(arm)) {
+  console.error("Usage: node scripts/run-pilot-agent.mjs --task <task-id> --agent <codex|claude> --arm <git|but+skill|jj+skill>");
   process.exit(2);
 }
 
 rmSync(runDir, { recursive: true, force: true });
 mkdirSync(runDir, { recursive: true });
 
-const { workspace, setup } = prepareWorkspace(runDir, arm, realBut, skillDir);
-const { binDir, tracePath } = createWrappers(runDir, arm, realBut);
+const resolvedJjSkill = arm === "jj+skill" ? resolveJjSkillSource(runDir, configuredJjSkillDir, jjSkillSource) : null;
+const { workspace, setup } = prepareWorkspace(runDir, arm, realBut, skillDir, realJj, resolvedJjSkill);
+const { binDir, tracePath } = createWrappers(runDir, arm, realBut, realJj);
 const codexHome = prepareCodexHome(runDir, codexIsolatedHome);
 const claudeSettings = prepareClaudeSettings(runDir, claudeCleanConfig, claudeEffortLevel);
 const prompt = buildPrompt();
@@ -1284,6 +1530,7 @@ const env = {
   VCB_CODEX_CLEAN_CONFIG: String(codexCleanConfig),
   VCB_CODEX_DISABLE_PLUGINS: String(codexDisablePlugins),
   VCB_CLAUDE_CLEAN_CONFIG: String(claudeCleanConfig),
+  JJ_EDITOR: "false",
 };
 if (codexHome) {
   env.CODEX_HOME = codexHome.path;
@@ -1300,8 +1547,10 @@ const observedModel = parseAgentModel(agentResult);
 const verifierResult = verify(workspace);
 const trace = markImplicitToolInternal(parseTrace(tracePath));
 const metrics = traceMetrics(trace, prompt, agentResult);
-const measurement = measurementBreakdown(trace, prompt, agentResult, arm === "but+skill" ? skillDir : null);
-const skillFile = path.join(skillDir, "SKILL.md");
+const activeSkillDir = arm === "but+skill" ? skillDir : arm === "jj+skill" ? resolvedJjSkill.dir : null;
+const activeSkillName = arm.endsWith("+skill") ? setup.name : null;
+const measurement = measurementBreakdown(trace, prompt, agentResult, activeSkillDir, activeSkillName);
+const skillFile = path.join(activeSkillDir ?? skillDir, "SKILL.md");
 const butBinaryMetadata = arm === "but+skill"
   ? {
       path: realBut,
@@ -1309,15 +1558,33 @@ const butBinaryMetadata = arm === "but+skill"
       source_git: gitSourceInfo(realBut, { scope: "repo" }),
     }
   : null;
-const skillMetadata = arm === "but+skill"
+const jjBinaryMetadata = arm === "jj+skill"
   ? {
-      source_dir: skillDir,
+      path: realJj,
+      sha256: sha256File(realJj),
+      source_git: gitSourceInfo(realJj, { scope: "repo" }),
+      version: run(realJj, ["--version"], { cwd: workspace }).stdout.trimEnd(),
+    }
+  : null;
+const toolBinaryMetadata = arm === "but+skill" ? butBinaryMetadata : arm === "jj+skill" ? jjBinaryMetadata : null;
+const skillSourceGit = activeSkillDir
+  ? (arm === "jj+skill" && !setup.source?.configured_dir ? null : gitSourceInfo(activeSkillDir))
+  : null;
+const skillMetadata = activeSkillDir
+  ? {
+      name: activeSkillName,
+      source_dir: activeSkillDir,
+      source_package: setup.source?.package ?? null,
+      source_url: setup.source?.source_url ?? null,
+      source_selection_note: setup.source?.selection_note ?? null,
+      source_fetched_at: setup.source?.fetched_at ?? null,
+      configured_dir: setup.source?.configured_dir ?? null,
       version: parseSkillVersion(skillFile),
       skill_file_sha256: sha256File(skillFile),
-      source_dir_sha256: sha256Directory(skillDir),
-      source_git: gitSourceInfo(skillDir),
-      installed_codex: path.join(workspace, ".codex/skills/but/SKILL.md"),
-      installed_claude: path.join(workspace, ".claude/skills/but/SKILL.md"),
+      source_dir_sha256: sha256Directory(activeSkillDir),
+      source_git: skillSourceGit,
+      installed_codex: path.join(workspace, `.codex/skills/${activeSkillName}/SKILL.md`),
+      installed_claude: path.join(workspace, `.claude/skills/${activeSkillName}/SKILL.md`),
     }
   : null;
 const runFailureClass = agentResult.timed_out
@@ -1350,18 +1617,22 @@ const result = {
   workspace,
   task: taskConfig.id,
   pre_run_setup: {
-    fixture_created_clean: arm === "but+skill",
+    fixture_created_clean: arm !== "git",
     gitbutler_setup_before_agent: arm === "but+skill",
     gitbutler_branch_applied_before_agent: arm === "but+skill" && taskConfig.gitbutlerPrep === "setup-and-apply-branch"
       ? taskConfig.applyBranch
       : null,
-    skill_installed_before_agent: arm === "but+skill",
+    jj_setup_before_agent: arm === "jj+skill",
+    jj_colocated_before_agent: arm === "jj+skill",
+    skill_installed_before_agent: arm.endsWith("+skill"),
     agent_instructions_before_agent: true,
     dirty_state_applied_before_agent: taskConfig.applyDirtyState !== false || taskConfig.fixtureDirty !== false,
     included_in_agent_duration_or_metrics: false,
   },
   agent_instructions: setup.instructions,
+  tool_binary: toolBinaryMetadata,
   but_binary: butBinaryMetadata,
+  jj_binary: jjBinaryMetadata,
   skill: skillMetadata,
   agent_result: {
     status: agentResult.status,

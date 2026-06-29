@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import path from "node:path";
 import { parseArgs } from "./lib/args.mjs";
-import { fileText, gitMaybe, gitShow, gitText, readJson, sameSet, weightedScore } from "./lib/verifier.mjs";
+import { fileText, gitMaybe, gitShow, gitText, readJson, sameSet, weightedScore, workingCopyDiff } from "./lib/verifier.mjs";
 
 function classify(checks) {
   if (!checks.git_repo || !checks.main_exists || !checks.main_has_single_commit) return "ENV_FAILURE";
@@ -106,7 +106,7 @@ const leftoverWorktreeResults = atoms.leftover.map((atom) => {
 details.leftover_atoms_preserved = leftoverWorktreeResults;
 checks.leftover_atoms_preserved = leftoverWorktreeResults.every((result) => result.present);
 
-const uncommittedDiff = gitMaybe(repoDir, ["diff", "--unified=0", "HEAD"]) ?? "";
+const uncommittedDiff = workingCopyDiff(repoDir);
 const targetDiffResults = atoms.target.map((atom) => ({
   id: atom.id,
   absent: !uncommittedDiff.includes(atom.snippet),

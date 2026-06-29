@@ -2,7 +2,7 @@
 
 A small benchmark for version-control work by coding agents.
 
-This is not a general coding benchmark. The file changes already exist before the agent starts; the agent's job is to make the right Git state: commit boundaries, branch topology, worktree/index leftovers, and protected history. The main comparison is plain `git` versus GitButler CLI with the agent skill, reported as `but+skill`.
+This is not a general coding benchmark. The file changes already exist before the agent starts; the agent's job is to make the right Git-visible state: commit boundaries, branch topology, worktree/index leftovers, and protected history. The main comparison now supports plain `git`, GitButler CLI with the agent skill (`but+skill`), and Jujutsu with an external agent skill (`jj+skill`).
 
 Start with [docs/README.md](docs/README.md) for design notes. This root README is the operator runbook.
 
@@ -13,7 +13,7 @@ Start with [docs/README.md](docs/README.md) for design notes. This root README i
 - Hidden oracle verifiers under `scripts/verify-pilot*.mjs`.
 - Reference `git` and `but` solutions in each task directory.
 - An agent runner for Codex and Claude: `scripts/run-pilot-agent.mjs`.
-- Tool-policy wrappers that block the wrong write tool per arm and split measurements into task, platform, and GitButler-internal commands.
+- Tool-policy wrappers that block the wrong write tool per arm and split measurements into task, platform, and tool-internal commands.
 - Checked-in result summaries under [docs/results/](docs/results/), starting with the [results overview](docs/results/README.md).
 
 ## Scenario Guide
@@ -65,6 +65,7 @@ Run one task with Codex:
 ```bash
 npm run pilot:agent -- --task pilot-3-split-commit --agent codex --arm git
 npm run pilot:agent -- --task pilot-3-split-commit --agent codex --arm 'but+skill'
+npm run pilot:agent -- --task pilot-3-split-commit --agent codex --arm 'jj+skill'
 ```
 
 Run one task with Claude:
@@ -72,16 +73,18 @@ Run one task with Claude:
 ```bash
 npm run pilot:agent -- --task pilot-5-squash-commits --agent claude --arm git
 npm run pilot:agent -- --task pilot-5-squash-commits --agent claude --arm 'but+skill'
+npm run pilot:agent -- --task pilot-5-squash-commits --agent claude --arm 'jj+skill'
 ```
 
 Defaults are `--task pilot-1-selective-validation`, `--agent codex`, `--arm git`, and Codex model `gpt-5.5`. Use `--model <name>` to override.
 
-The two supported arms are:
+The supported arms are:
 
-- `git`: plain Git is allowed for version-control writes; `but` is blocked.
+- `git`: plain Git is allowed for version-control writes; `but` and `jj` are blocked.
 - `but+skill`: GitButler is prepared before the measured run, the GitButler skill is installed into `.codex/skills/but` and `.claude/skills/but`, local `AGENTS.md` / `CLAUDE.md` files are written, and raw Git write commands are blocked. Git commands spawned inside GitButler are counted as tool-internal, not agent commands.
+- `jj+skill`: the fixture repo is prepared with `jj git init --colocate`, the external `onevcat/skills@onevcat-jj` skill is fetched into the run directory and installed into the agent skill folders, local `AGENTS.md` / `CLAUDE.md` files are written, and raw Git writes plus GitButler are blocked. Git commands spawned inside jj are counted as tool-internal, not agent commands.
 
-Pre-run fixture setup, `but setup`, applying task branches, skill installation, and dirty-state application are excluded from measured agent duration and command metrics.
+Pre-run fixture setup, tool setup, applying task branches, skill installation, and dirty-state application are excluded from measured agent duration and command metrics.
 
 ## Local GitButler Build
 
@@ -94,6 +97,12 @@ npm run pilot:agent -- --agent codex --arm 'but+skill' --but-bin /Users/kiril/sr
 ```
 
 Use `--skill-dir <path>` to test a different GitButler skill directory.
+
+## Local Jujutsu Setup
+
+The `jj+skill` arm uses the `jj` binary found on `PATH` by default. Override it with `--jj-bin <path>`.
+
+By default, the runner fetches the external `onevcat/skills@onevcat-jj` skill from `https://raw.githubusercontent.com/onevcat/skills/master/skills/onevcat-jj/SKILL.md`. Use `--jj-skill-dir <path>` to use a local copy, or `--jj-skill-package`, `--jj-skill-name`, and `--jj-skill-url` to point at another public skill.
 
 ## Codex Isolation
 
@@ -115,18 +124,18 @@ The useful measurement block is `measurement`, not the older coarse `metrics` bl
 
 - task-relevant VC commands
 - platform probes from Codex or Claude startup
-- GitButler-internal Git calls
+- tool-internal Git calls
 - command timing
 - cold and warm-estimated transcript bytes
 - warning and skill/reference output bytes
 
 ## Current Results
 
-The human-facing results page is [docs/results/README.md](docs/results/README.md). It links each scenario to the plain-English [scenario guide](docs/scenarios.md) and shows the `git` vs `but+skill` deltas by agent.
+The human-facing results page is [docs/results/README.md](docs/results/README.md). It links each scenario to the plain-English [scenario guide](docs/scenarios.md) and compares `git`, `but+skill`, and `jj+skill` by agent.
 
-Latest full matrix: [docs/results/full-k5-2026-06-29.md](docs/results/full-k5-2026-06-29.md), all five pilots, `k=5`, Codex and Claude, `git` and `but+skill`, 100 runs total.
+Latest full matrix: [docs/results/full-k5-2026-06-29.md](docs/results/full-k5-2026-06-29.md), all five pilots, `k=5`, Codex and Claude, `git`, `but+skill`, and `jj+skill`, 150 runs total.
 
-Headline from that batch: 98/100 runs passed. `but+skill` cut mean wall time by 61% for Codex and 62.5% for Claude, while cutting task-relevant version-control commands by 82.9% and 84.4%. The watch item is Claude split-commit: the final content was right, but two `but+skill` runs produced the wrong commit order.
+Headline from that consolidated batch: 142/150 runs passed. `but+skill` is still the strongest arm: it cut mean wall time by 61% for Codex and 62.5% for Claude versus plain `git`, while cutting task-relevant version-control commands by 82.9% and 84.4%. `jj+skill` got a fair external-skill run, but did not outperform: Codex passed 25/25 with JJ but was slower than `git`, while Claude passed 19/25 and failed split-commit 5/5.
 
 ## Docs
 

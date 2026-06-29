@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
-import { git, gitText } from "./process.mjs";
+import { git, gitText, run } from "./process.mjs";
 
 export { gitText } from "./process.mjs";
 
@@ -21,6 +21,22 @@ export function commitExpectationsFromEditAtoms(editAtoms) {
 export function gitMaybe(repoDir, args) {
   const result = git(repoDir, args, { check: false });
   return result.status === 0 ? result.stdout : null;
+}
+
+export function hasJjRepo(repoDir) {
+  return existsSync(path.join(repoDir, ".jj"));
+}
+
+export function jjMaybe(repoDir, args) {
+  const result = run("jj", ["--no-pager", ...args], { cwd: repoDir, check: false });
+  return result.status === 0 ? result.stdout : null;
+}
+
+export function workingCopyDiff(repoDir) {
+  if (hasJjRepo(repoDir)) {
+    return jjMaybe(repoDir, ["diff", "--git", "--context", "0", "-r", "@"]) ?? "";
+  }
+  return gitMaybe(repoDir, ["diff", "HEAD", "--unified=0"]) ?? "";
 }
 
 export function gitShow(repoDir, ref, filePath) {

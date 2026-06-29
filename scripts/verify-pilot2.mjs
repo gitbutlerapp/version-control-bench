@@ -13,6 +13,7 @@ import {
   sameArray,
   sameSet,
   weightedScore,
+  workingCopyDiff,
 } from "./lib/verifier.mjs";
 
 function classify(checks) {
@@ -147,7 +148,7 @@ const leftoverWorktreeResults = atoms.leftover.map((atom) => {
 details.leftover_atoms_preserved = leftoverWorktreeResults;
 checks.leftover_atoms_preserved = leftoverWorktreeResults.every((result) => result.present);
 
-const uncommittedDiff = gitMaybe(repoDir, ["diff", "HEAD", "--unified=0"]) ?? "";
+const uncommittedDiff = workingCopyDiff(repoDir);
 const targetDiffResults = atoms.target.map((atom) => ({
   id: atom.id,
   absent: !uncommittedDiff.includes(atom.snippet),
