@@ -1,0 +1,49 @@
+import { LIMITS, METHOD, EYEBROWS } from '../content';
+import type { ResultsData } from '@/lib/types';
+
+export function Methodology({ data }: { data: ResultsData }) {
+  const m = data.meta;
+  return (
+    <section id="method">
+      <div className="section-head">
+        <p className="eyebrow">{EYEBROWS.method}</p>
+        <h2>{METHOD.title}</h2>
+        <p className="lede">{METHOD.lede}</p>
+      </div>
+
+      <p className="method-disclosure">
+        <span className="eyebrow">Disclosure</span>
+        {METHOD.disclosure}
+      </p>
+
+      <dl className="method-list">
+        {METHOD.facts.map((f) => (
+          <div key={f.term} className="method-item">
+            <dt>{f.term}</dt>
+            <dd>{f.body}</dd>
+          </div>
+        ))}
+      </dl>
+
+      <div className="pills" aria-label="Test parameters">
+        <span className="pill mono">k={m.k}</span>
+        <span className="pill mono">n=25 per cell</span>
+        <span className="pill mono">oracle: git-state</span>
+        <span className="pill mono">jj 0.42.0</span>
+        <span className="pill mono">{m.total_runs} runs</span>
+      </div>
+
+      <div className="limits">
+        <h3 className="limits-title">{LIMITS.title}</h3>
+        <dl className="method-list method-list-caveat">
+          {LIMITS.items.map((l) => (
+            <div key={l.term} className="method-item">
+              <dt>{l.term}</dt>
+              <dd>{l.body}</dd>
+            </div>
+          ))}
+        </dl>
+      </div>
+    </section>
+  );
+}
