@@ -607,15 +607,6 @@ const commandLine = ["node", "scripts/run-full-matrix.mjs", ...process.argv.slic
 
 mkdirSync(batchDir, { recursive: true });
 
-if (buildBut) {
-  const build = runCapture("cargo", ["build", "-p", "but", "--release"], { cwd: gitbutlerRoot });
-  writeFileSync(path.join(batchDir, "but-build.log"), `${build.stdout}${build.stderr}`);
-  if (build.status !== 0) {
-    console.error(`GitButler build failed; see ${rel(path.join(batchDir, "but-build.log"))}`);
-    process.exit(build.status ?? 1);
-  }
-}
-
 const plans = plannedRuns({ tasks, agents, arms, k, batchName, batchDir });
 writePlan(batchDir, plans);
 
@@ -624,6 +615,15 @@ if (dryRun) {
   console.log(`Batch: ${rel(batchDir)}`);
   console.log(`Plan: ${rel(path.join(batchDir, "plan.tsv"))}`);
   process.exit(0);
+}
+
+if (buildBut) {
+  const build = runCapture("cargo", ["build", "-p", "but", "--release"], { cwd: gitbutlerRoot });
+  writeFileSync(path.join(batchDir, "but-build.log"), `${build.stdout}${build.stderr}`);
+  if (build.status !== 0) {
+    console.error(`GitButler build failed; see ${rel(path.join(batchDir, "but-build.log"))}`);
+    process.exit(build.status ?? 1);
+  }
 }
 
 for (const plan of plans) {
