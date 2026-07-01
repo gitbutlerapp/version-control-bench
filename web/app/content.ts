@@ -99,7 +99,7 @@ export const COST = {
 
 export const LEDGER = {
   title: 'Every run that failed',
-  lede: 'Thirteen of 150 runs failed the grader. Every failure was Claude; most were Jujutsu, with one plain git miss and one GitButler miss.',
+  lede: 'Thirteen of 150 runs failed the grader. Every failure was Claude; most were Jujutsu, with two plain git misses and one GitButler miss.',
   proportionality:
     'Jujutsu had the widest correctness problem: Claude split-commit failed 5/5, multi-amend failed 3/5, and reorder failed 2/5. GitButler had one Claude selective-commit partition miss. Plain git had two Claude misses.',
   defs: [

@@ -72,7 +72,7 @@ const SCENARIOS = [
     title: 'Split one overloaded commit into clean ones',
     situation:
       "There's a commit halfway down your branch doing too much — it mixes validation, scoring, and docs, plus stray debug work that should never have been there. You want to break it into three clean, ordered commits, keep the later commit on top exactly where it is, and turn the stray work back into uncommitted changes.",
-    crux: 'Rewriting a commit that is not on top, without disturbing what is above it. This is the chore GitButler failed twice; see the failures section.',
+    crux: 'Rewriting a commit that is not on top, without disturbing what is above it.',
     shape: 'split',
   },
   {

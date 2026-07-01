@@ -20,7 +20,7 @@ export function Provenance({ data }: { data: ResultsData }) {
 
       <div className="prov-grid">
         {data.source_snapshots.map((s) => (
-          <div key={s.batch} className="prov-card">
+          <div key={`${s.batch}:${s.arms.join('-')}`} className="prov-card">
             <div className="prov-card-head">
               <span className="eyebrow">{s.arms.join(' · ')}</span>
               <span className="faint mono">

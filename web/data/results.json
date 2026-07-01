@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-07-01T07:08:06.683Z",
+  "generated_at": "2026-07-01T08:01:52.501Z",
   "meta": {
     "k": 5,
     "total_runs": 150,
@@ -75,7 +75,7 @@
         "label": "Split commit",
         "title": "Split one overloaded commit into clean ones",
         "situation": "There's a commit halfway down your branch doing too much — it mixes validation, scoring, and docs, plus stray debug work that should never have been there. You want to break it into three clean, ordered commits, keep the later commit on top exactly where it is, and turn the stray work back into uncommitted changes.",
-        "crux": "Rewriting a commit that is not on top, without disturbing what is above it. This is the chore GitButler failed twice; see the failures section.",
+        "crux": "Rewriting a commit that is not on top, without disturbing what is above it.",
         "shape": "split",
         "prompt": "Split the non-top commit `add lead workflow` on the existing `split-workflow` branch. Do not keep the original broad commit.\n\nReplace it with these three commits, in this order, below the existing top commit `add handler routing metadata`:\n\n- `refactor validation helpers`: the validation helper changes in `src/lead.ts` and the malformed-email test in `tests/lead.test.ts`.\n- `tune lead scoring`: the enterprise-domain scoring changes in `src/lead.ts` and the enterprise-domain scoring test in `tests/lead.test.ts`.\n- `document lead workflow`: the workflow documentation changes in `README.md` and `docs/lead-workflow.md`.\n\nKeep `add handler routing metadata` as the top commit after the split.\n\nLeave the config logging change, the debug lead summary helper, and the investigation notes uncommitted."
       },
