@@ -53,7 +53,7 @@ const SCENARIOS = [
     label: 'Selective commit',
     title: 'Commit just one thing, leave the rest alone',
     situation:
-      'You sat down to fix input validation and also poked at logging, tweaked some config, and left a couple of debug notes. You want a clean branch with only the validation work committed — everything else still sitting in your worktree, untouched.',
+      'You sat down to fix input validation and also poked at logging, tweaked some config, and left a couple of debug notes. You ask for a clean branch with only the validation work committed: everything else still sitting in the worktree, untouched.',
     crux: "The hard part isn't committing. It's committing only the right files and hunks, and not the rest of the dirty worktree.",
     shape: 'select',
   },
@@ -62,7 +62,7 @@ const SCENARIOS = [
     label: 'Multi-amend',
     title: 'Fold each fix into the commit it belongs to',
     situation:
-      "Review came back and you've got three small fixes sitting dirty in your tree: one belongs in the validation commit, one in the scoring commit, one in the docs commit. You don't want a “misc review fixes” commit — you want each change folded back into the commit it actually fixes.",
+      'Review came back and there are three small fixes sitting dirty in the tree: one belongs in the validation commit, one in the scoring commit, one in the docs commit. Instead of a “misc review fixes” commit, you ask for each change folded back into the commit it actually fixes.',
     crux: 'Each fix has to land in a different existing commit, not in one new catch-all commit.',
     shape: 'amend',
   },
@@ -71,7 +71,7 @@ const SCENARIOS = [
     label: 'Split commit',
     title: 'Split one overloaded commit into clean ones',
     situation:
-      "There's a commit halfway down your branch doing too much — it mixes validation, scoring, and docs, plus stray debug work that should never have been there. You want to break it into three clean, ordered commits, keep the later commit on top exactly where it is, and turn the stray work back into uncommitted changes.",
+      'A commit halfway down the branch is doing too much: it mixes validation, scoring, and docs, plus stray debug work that should never have been there. You ask to break it into three clean, ordered commits, keep the later commit on top exactly where it is, and turn the stray work back into uncommitted changes.',
     crux: 'Rewriting a commit that is not on top, without disturbing what is above it.',
     shape: 'split',
   },
@@ -80,7 +80,7 @@ const SCENARIOS = [
     label: 'Reorder commits',
     title: 'Reorder commits so the story reads right',
     situation:
-      'The branch is correct and the tests pass, but the history reads out of order: the retry and notification commits landed late, after work that logically depends on them. You want to move that block earlier so the branch reads in the order the feature was actually built — same contents, same messages, nothing left dirty.',
+      'The branch is correct and the tests pass, but the history reads out of order: the retry and notification commits landed late, after work that logically depends on them. You ask to move that block earlier so the branch reads in the order the feature was actually built: same contents, same messages, nothing left dirty.',
     crux: 'Reordering commits with no content change; a wrong move produces a conflict.',
     shape: 'reorder',
   },
@@ -89,7 +89,7 @@ const SCENARIOS = [
     label: 'Squash commits',
     title: 'Squash the noise into commits that mean something',
     situation:
-      'Your branch is an honest record of how you worked: “extract helper”, “wire helper”, “fix typo”, “actually wire helper”, then a few more steps. Before review, you want the history to say what changed, not narrate every keystroke.',
+      'The branch is an honest record of how the work happened: “extract helper”, “wire helper”, “fix typo”, “actually wire helper”, then a few more steps. Before review, you ask for the history to say what changed, not narrate every keystroke.',
     crux: 'Compress the step-by-step commits into a couple of semantic ones, keep the unrelated commits separate, and end with the exact same final files and a clean worktree.',
     shape: 'squash',
   },

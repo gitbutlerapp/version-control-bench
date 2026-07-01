@@ -1,59 +1,35 @@
 'use client';
 
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
-import type { AgentId, MetricId } from '@/lib/types';
+import type { RealAgentId } from '@/lib/types';
 
 interface ViewState {
-  agent: AgentId;
-  metric: MetricId;
-  setAgent: (a: AgentId) => void;
-  setMetric: (m: MetricId) => void;
+  agent: RealAgentId;
+  setAgent: (a: RealAgentId) => void;
 }
 
 const ViewCtx = createContext<ViewState | null>(null);
 
-const AGENTS: AgentId[] = ['both', 'codex', 'claude'];
-const METRICS: MetricId[] = ['time', 'ops'];
+const AGENTS: RealAgentId[] = ['codex', 'claude'];
 
 export function ViewProvider({ children }: { children: React.ReactNode }) {
-  const [agent, setAgentState] = useState<AgentId>('both');
-  const [metric, setMetricState] = useState<MetricId>('time');
+  const [agent, setAgentState] = useState<RealAgentId>('codex');
 
   // hydrate from URL once on mount (client-only; fine for static export)
   useEffect(() => {
     const p = new URLSearchParams(window.location.search);
-    const a = p.get('agent') as AgentId | null;
-    const m = p.get('metric') as MetricId | null;
+    const a = p.get('agent') as RealAgentId | null;
     if (a && AGENTS.includes(a)) setAgentState(a);
-    if (m && METRICS.includes(m)) setMetricState(m);
   }, []);
 
-  const sync = useCallback((next: { agent: AgentId; metric: MetricId }) => {
+  const setAgent = useCallback((a: RealAgentId) => {
+    setAgentState(a);
     const p = new URLSearchParams(window.location.search);
-    p.set('agent', next.agent);
-    p.set('metric', next.metric);
-    const url = `${window.location.pathname}?${p.toString()}`;
-    window.history.replaceState(null, '', url);
+    p.set('agent', a);
+    window.history.replaceState(null, '', `${window.location.pathname}?${p.toString()}`);
   }, []);
 
-  const setAgent = useCallback(
-    (a: AgentId) => {
-      setAgentState(a);
-      sync({ agent: a, metric });
-    },
-    [metric, sync],
-  );
-  const setMetric = useCallback(
-    (m: MetricId) => {
-      setMetricState(m);
-      sync({ agent, metric: m });
-    },
-    [agent, sync],
-  );
-
-  return (
-    <ViewCtx.Provider value={{ agent, metric, setAgent, setMetric }}>{children}</ViewCtx.Provider>
-  );
+  return <ViewCtx.Provider value={{ agent, setAgent }}>{children}</ViewCtx.Provider>;
 }
 
 export function useView(): ViewState {

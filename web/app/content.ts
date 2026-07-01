@@ -1,26 +1,38 @@
-// Page copy. Voice: a neutral benchmark spec — third person, descriptive, no
-// first-person narrator and no selling. The benchmark describes what it tests,
-// how it grades, and what the runs produced. GitButler's involvement is a flat
-// disclosure, not a frame.
+// Page copy. Voice: a benchmark/methods report — measured and precise, a light
+// academic register kept accessible to a non-specialist. The benchmark is the
+// subject; GitButler is one of three tools plus a single flat disclosure.
 
 export const HERO = {
   title: 'A version-control benchmark for coding agents',
   intro: [
-    'This benchmark measures how coding agents handle common version-control work — pulling one change out of a messy worktree, splitting a commit, reordering history. Two agents, Claude Code and Codex, run five such tasks with three tools: git, Jujutsu, and GitButler.',
-    'Every run is graded by a deterministic checker on the resulting Git state, not on the commands used to get there. The tasks, the grading, and the per-run data are all below.',
+    'Nearly all software work touches version control: recording changes, then shaping them into a history a reviewer can follow. Increasingly the one doing that work is a coding agent rather than a person, and as agents take over more of it, the tool they are handed starts to decide whether the job actually gets done. This benchmark measures how well two agents (Claude Code and Codex) do five realistic version-control tasks with each of three tools.',
+    'For each, the question is how reliably, quickly, and efficiently an agent reaches the intended result with a given tool — judged on the final Git history, not the commands used to get there.',
   ],
 };
 
+// The results matrix: 5 tasks (rows) x 3 tools, each with pass, time, commands, KB.
+export const RESULTS = {
+  eyebrow: 'Results',
+  title: 'Every tool on every task',
+  lede: 'Time, commands, and version-control output for each tool on each task, for the selected agent. Reliability comes first: a run that produces the wrong history fails however fast it was, so pass rate leads each tool, and cells where the tool did not pass all five runs are muted.',
+  columns: {
+    pass: 'Reliability — the share of the five runs that produced the exact history the task asked for.',
+    time: 'Speed — mean wall-clock time per run, with setup excluded.',
+    cmds: 'Version-control commands the agent ran. Not a headline axis; it explains why a tool is faster or leaner.',
+    kb: 'Efficiency — version-control output the agent read back, a proxy for token cost. Comparable within one agent only.',
+  },
+};
+
 export const SCENARIOS_INTRO = {
-  title: 'The five tasks',
-  lede: 'Each task starts from a realistic repository state and a plain-English instruction. The file changes already exist; the job is to produce the Git history a reviewer would expect — the right commit boundaries, branch shape, and leftover changes. Nothing about the code itself is graded.',
+  title: 'The five scenarios',
+  lede: 'Each scenario is a pre-built Git repository fixed at a specific starting state — a real commit history plus uncommitted changes in the working tree — together with a plain-English instruction describing the intended result. No code is generated during a run; the file changes already exist. Only the version-control operation is measured: moving the repository from that starting state to the Git history the instruction calls for.',
 };
 
 export const METHOD = {
   title: 'How it is measured',
-  lede: 'Every tool gets the same task and the same plain-English instruction; the tool name never appears in the prompt. Correctness is decided by a deterministic grader on the final Git state, and setup is excluded from timing.',
+  lede: 'The grader scores the outcome, not the commands: a hidden, deterministic check on the final Git state, where two entirely different command sequences pass if they produce the same history. Every tool gets the same task and the same plain-English instruction, the tool name never appears in the prompt, and setup is excluded from timing.',
   disclosure:
-    'This benchmark is built and maintained by GitButler, one of the three tools measured. Correctness is determined by the grader, not by GitButler. The task definitions, the grader, and the per-run data are public.',
+    'This benchmark is built and maintained by GitButler, one of the three tools measured; correctness is determined by the grader, not by GitButler, and the task definitions, the grader, and the per-run data are all public.',
   facts: [
     {
       term: 'Same task, same words, every tool',
@@ -28,15 +40,15 @@ export const METHOD = {
     },
     {
       term: 'Deterministic grader',
-      body: 'Correctness is checked by a hidden, deterministic grader that inspects the resulting Git state — commit boundaries, branch topology, what stayed uncommitted. It is not an LLM judge, and it does not check whether the agent ran some "correct" sequence. Two different command sequences pass if they produce the same history.',
+      body: 'Correctness is checked by a hidden, deterministic grader that inspects the resulting Git state: commit boundaries, branch topology, what stayed uncommitted. It is not an LLM judge, and it does not check whether the agent ran some "correct" sequence. Two different command sequences pass if they produce the same history.',
     },
     {
       term: 'Setup is excluded from timing',
-      body: "Building the fixture, preparing the workspace, installing each tool's skill, and dirtying the worktree all happen before the clock starts. Measured time and command counts cover only the agent's work on the task.",
+      body: "Building the fixture, preparing the workspace, installing each tool's skill, and dirtying the worktree all happen before the clock starts. The measured figures cover only the agent's work on the task.",
     },
     {
       term: 'Raw git writes are blocked',
-      body: 'In the GitButler and Jujutsu arms, raw git writes are blocked, so the agent has to use the tool under test. When the tool calls git internally, that is the tool\'s own work and does not count against the agent.',
+      body: "In the GitButler and Jujutsu arms, raw git writes are blocked, so the agent has to use the tool under test. When the tool calls git internally, that is the tool's own work and does not count against the agent.",
     },
     {
       term: 'Jujutsu setup',
@@ -70,28 +82,28 @@ export const LIMITS = {
     },
     {
       term: 'The agents are not ranked',
-      body: 'Claude and Codex both appear to check whether the tool effect holds across agents. They are not ranked against each other.',
+      body: 'Claude and Codex are both run to check whether the tool effect holds across agents. They are not ranked against each other.',
     },
   ],
 };
 
 export const SCORECARD = {
   title: 'Tool by tool',
-  lede: 'Each tool on each task, graded the same way. Pick an agent and a metric; pass rate sits to the left of every bar.',
+  lede: 'Each tool on each task, graded the same way. Pick an agent and a metric; reliability comes first, so pass rate sits to the left of every bar, and speed and efficiency are read only among the runs that passed.',
   gateNote:
-    'A run that produces the wrong history fails, regardless of how fast it finished. Read pass rate before speed.',
+    'Reliability is the gate: a run that produces the wrong history fails, regardless of how fast it finished. Read pass rate before speed.',
 };
 
 export const MECHANISM = {
-  title: 'Command breakdown',
-  lede: 'Most version-control commands an agent runs are inspections — status, log, diff — to read the current state before each edit. The split below is inspect versus mutate commands per tool.',
+  title: 'Why one tool is faster: command volume',
+  lede: 'Command count is not a headline axis; it is the mechanism behind speed and efficiency. A tool that needs fewer inspect and mutate commands tends to finish faster and emit less output. Most version-control commands an agent runs are inspections (status, log, diff) to read the current state before each edit; the split below is inspect versus mutate commands per tool.',
   approxNote:
     'Approximate split — inspect and mutate counts are classified per command and do not always sum to the total.',
 };
 
 export const COST = {
   title: 'Output size',
-  lede: 'Each tool produces a different amount of version-control output for the agent to read back — a rough proxy for tokens spent.',
+  lede: 'This is the backing measure for the efficiency axis: each tool produces a different amount of version-control output for the agent to read back, a proxy for the tokens spent getting to the answer.',
   warning:
     'Claude and Codex record their transcripts in different formats, so these kilobyte numbers are not comparable between agents. Compare tools within one agent only, never across agents.',
   note: 'KB is a token-cost proxy, not a token counter. The warm figure subtracts the bytes spent reading the tool skill, so it estimates task-only output. Cold is the raw total.',
@@ -125,14 +137,14 @@ export const METRIC_LABELS = {
 };
 
 export const AGENT_NOTE =
-  'Both agents are shown to check whether the tool effect holds across them. This is not a Claude-versus-Codex comparison.';
+  'Both agents are run to check whether the tool effect holds across them. This is not a Claude-versus-Codex comparison.';
 
 // Section kicker labels (rendered uppercase mono above each heading).
 export const EYEBROWS = {
   scenarios: 'Scenarios',
   method: 'Method',
   proof: 'Results',
-  mechanism: 'Commands',
+  mechanism: 'Why',
   cost: 'Output',
   failures: 'Failures',
   provenance: 'About',
@@ -147,5 +159,5 @@ export const MICRO = {
   reproduceLede:
     'The numbers above are derived from the latest full-matrix aggregate. Below is exactly what produced them.',
   footerNote:
-    'Maintained by GitButler, one of the three tools measured. The grader is deterministic and the data is public.',
+    'Maintained by GitButler, one of the three tools measured; the grader is deterministic and the data is public.',
 };

@@ -18,7 +18,7 @@ const jbmono = JetBrains_Mono({
 
 const title = 'A version-control benchmark for coding agents';
 const description =
-  'We measured Claude Code and Codex doing five real Git cleanup chores three ways — plain git, GitButler, and Jujutsu. Timed, graded by a hidden checker, and shown with the warts. Built by GitButler, one of the three tools measured.';
+  'How reliably, quickly, and efficiently coding agents (Claude Code, Codex) handle five realistic version-control tasks with git, Jujutsu, and GitButler — graded on the resulting Git history by a deterministic checker. Maintained by GitButler, one of the three tools measured.';
 
 export const metadata: Metadata = {
   title,

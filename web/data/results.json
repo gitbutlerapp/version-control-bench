@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-07-01T08:01:52.501Z",
+  "generated_at": "2026-07-01T13:44:37.365Z",
   "meta": {
     "k": 5,
     "total_runs": 150,
@@ -56,7 +56,7 @@
         "id": "pilot-1-selective-validation",
         "label": "Selective commit",
         "title": "Commit just one thing, leave the rest alone",
-        "situation": "You sat down to fix input validation and also poked at logging, tweaked some config, and left a couple of debug notes. You want a clean branch with only the validation work committed — everything else still sitting in your worktree, untouched.",
+        "situation": "You sat down to fix input validation and also poked at logging, tweaked some config, and left a couple of debug notes. You ask for a clean branch with only the validation work committed: everything else still sitting in the worktree, untouched.",
         "crux": "The hard part isn't committing. It's committing only the right files and hunks, and not the rest of the dirty worktree.",
         "shape": "select",
         "prompt": "Commit just the input validation work on a new branch. Leave the logging/config cleanup and debug notes uncommitted."
@@ -65,7 +65,7 @@
         "id": "pilot-2-multi-amend",
         "label": "Multi-amend",
         "title": "Fold each fix into the commit it belongs to",
-        "situation": "Review came back and you've got three small fixes sitting dirty in your tree: one belongs in the validation commit, one in the scoring commit, one in the docs commit. You don't want a “misc review fixes” commit — you want each change folded back into the commit it actually fixes.",
+        "situation": "Review came back and there are three small fixes sitting dirty in the tree: one belongs in the validation commit, one in the scoring commit, one in the docs commit. Instead of a “misc review fixes” commit, you ask for each change folded back into the commit it actually fixes.",
         "crux": "Each fix has to land in a different existing commit, not in one new catch-all commit.",
         "shape": "amend",
         "prompt": "Amend the existing five-commit `amend-series` branch. Do not create a new commit.\n\nRoute the already-present dirty changes like this:\n\n- Amend the validation helper changes in `src/lead.ts`, the malformed-email test in `tests/lead.test.ts`, and the validation wording in `README.md` into commit `refactor validation helpers`.\n- Amend the scoring changes in `src/lead.ts` and the enterprise-domain scoring test in `tests/lead.test.ts` into commit `add lead scoring`.\n- Amend the response-behavior documentation changes in `README.md` and `docs/response.md` into commit `document response behavior`.\n\nLeave the config logging change, the debug lead summary helper, and the investigation notes uncommitted."
@@ -74,7 +74,7 @@
         "id": "pilot-3-split-commit",
         "label": "Split commit",
         "title": "Split one overloaded commit into clean ones",
-        "situation": "There's a commit halfway down your branch doing too much — it mixes validation, scoring, and docs, plus stray debug work that should never have been there. You want to break it into three clean, ordered commits, keep the later commit on top exactly where it is, and turn the stray work back into uncommitted changes.",
+        "situation": "A commit halfway down the branch is doing too much: it mixes validation, scoring, and docs, plus stray debug work that should never have been there. You ask to break it into three clean, ordered commits, keep the later commit on top exactly where it is, and turn the stray work back into uncommitted changes.",
         "crux": "Rewriting a commit that is not on top, without disturbing what is above it.",
         "shape": "split",
         "prompt": "Split the non-top commit `add lead workflow` on the existing `split-workflow` branch. Do not keep the original broad commit.\n\nReplace it with these three commits, in this order, below the existing top commit `add handler routing metadata`:\n\n- `refactor validation helpers`: the validation helper changes in `src/lead.ts` and the malformed-email test in `tests/lead.test.ts`.\n- `tune lead scoring`: the enterprise-domain scoring changes in `src/lead.ts` and the enterprise-domain scoring test in `tests/lead.test.ts`.\n- `document lead workflow`: the workflow documentation changes in `README.md` and `docs/lead-workflow.md`.\n\nKeep `add handler routing metadata` as the top commit after the split.\n\nLeave the config logging change, the debug lead summary helper, and the investigation notes uncommitted."
@@ -83,7 +83,7 @@
         "id": "pilot-4-reorder-commits",
         "label": "Reorder commits",
         "title": "Reorder commits so the story reads right",
-        "situation": "The branch is correct and the tests pass, but the history reads out of order: the retry and notification commits landed late, after work that logically depends on them. You want to move that block earlier so the branch reads in the order the feature was actually built — same contents, same messages, nothing left dirty.",
+        "situation": "The branch is correct and the tests pass, but the history reads out of order: the retry and notification commits landed late, after work that logically depends on them. You ask to move that block earlier so the branch reads in the order the feature was actually built: same contents, same messages, nothing left dirty.",
         "crux": "Reordering commits with no content change; a wrong move produces a conflict.",
         "shape": "reorder",
         "prompt": "Reorder the existing commits on the `reorder-series` branch. Move the adjacent delivery-related block (`add retry policy` and `add notification sender`) earlier in the branch. Do not change any file contents and do not create functional changes.\n\nFinal commit order must be exactly this, oldest to newest:\n\n1. `add app configuration`\n2. `add retry policy`\n3. `add notification sender`\n4. `add customer model`\n5. `add email formatter`\n6. `document notification flow`\n\nThe commit messages and each commit's content should stay attached to the same subject. Leave the worktree clean."
@@ -92,7 +92,7 @@
         "id": "pilot-5-squash-commits",
         "label": "Squash commits",
         "title": "Squash the noise into commits that mean something",
-        "situation": "Your branch is an honest record of how you worked: “extract helper”, “wire helper”, “fix typo”, “actually wire helper”, then a few more steps. Before review, you want the history to say what changed, not narrate every keystroke.",
+        "situation": "The branch is an honest record of how the work happened: “extract helper”, “wire helper”, “fix typo”, “actually wire helper”, then a few more steps. Before review, you ask for the history to say what changed, not narrate every keystroke.",
         "crux": "Compress the step-by-step commits into a couple of semantic ones, keep the unrelated commits separate, and end with the exact same final files and a clean worktree.",
         "shape": "squash",
         "prompt": "Squash commit groups on the existing `squash-series` branch. Do not change any file contents and do not create functional changes.\n\nKeep these commits as separate commits:\n\n- `add parser token model`\n- `add export endpoint`\n\nSquash these adjacent commit groups:\n\n- Squash `extract parser helpers` and `wire parser helpers` into one commit named `add parser pipeline`.\n- Squash `add retry option`, `test retry option`, and `document retry option` into one commit named `add retry support`.\n\nThe final branch order, oldest to newest, should be:\n\n1. `add parser token model`\n2. `add parser pipeline`\n3. `add export endpoint`\n4. `add retry support`\n\nLeave the worktree clean."

@@ -1,52 +1,36 @@
 'use client';
 
 import { useView } from '../state/ViewContext';
-import { AGENT_NOTE, METRIC_LABELS } from '../content';
-import type { AgentId, MetricId } from '@/lib/types';
+import { AGENT_NOTE } from '../content';
+import type { RealAgentId } from '@/lib/types';
 
-const AGENT_OPTIONS: { id: AgentId; label: string }[] = [
-  { id: 'both', label: 'Both' },
+const AGENT_OPTIONS: { id: RealAgentId; label: string }[] = [
   { id: 'codex', label: 'Codex' },
   { id: 'claude', label: 'Claude' },
 ];
-const METRIC_OPTIONS: { id: MetricId; label: string }[] = [
-  { id: 'time', label: METRIC_LABELS.time.label },
-  { id: 'ops', label: METRIC_LABELS.ops.label },
-];
 
 const ANCHORS = [
+  { href: '#results', label: 'Results' },
   { href: '#chores', label: 'Scenarios' },
   { href: '#method', label: 'Method' },
-  { href: '#scorecard', label: 'Results' },
   { href: '#failures', label: 'Failures' },
-  { href: '#provenance', label: 'About' },
 ];
 
-function Segmented<T extends string>({
-  legend,
-  options,
-  value,
-  onChange,
-}: {
-  legend: string;
-  options: { id: T; label: string }[];
-  value: T;
-  onChange: (v: T) => void;
-}) {
+// The agent switch. Lives next to the table it drives, not in the header.
+export function AgentToggle() {
+  const { agent, setAgent } = useView();
   return (
-    <div className="segmented" role="radiogroup" aria-label={legend}>
-      <span className="segmented-legend eyebrow" aria-hidden>
-        {legend}
-      </span>
+    <div className="segmented agent-toggle" role="radiogroup" aria-label="Agent">
+      <span className="segmented-legend eyebrow">Agent</span>
       <div className="segmented-track">
-        {options.map((o) => (
+        {AGENT_OPTIONS.map((o) => (
           <button
             key={o.id}
             role="radio"
-            aria-checked={value === o.id}
+            aria-checked={agent === o.id}
             className="segmented-opt num"
-            data-active={value === o.id}
-            onClick={() => onChange(o.id)}
+            data-active={agent === o.id}
+            onClick={() => setAgent(o.id)}
           >
             {o.label}
           </button>
@@ -57,17 +41,12 @@ function Segmented<T extends string>({
 }
 
 export function StickyBar() {
-  const { agent, metric, setAgent, setMetric } = useView();
   return (
     <div className="stickybar">
       <div className="page stickybar-inner">
         <a href="#top" className="stickybar-brand mono">
           vc-bench
         </a>
-        <div className="stickybar-controls">
-          <Segmented legend="Agent" options={AGENT_OPTIONS} value={agent} onChange={setAgent} />
-          <Segmented legend="Metric" options={METRIC_OPTIONS} value={metric} onChange={setMetric} />
-        </div>
         <nav className="stickybar-nav" aria-label="Sections">
           {ANCHORS.map((a) => (
             <a key={a.href} href={a.href}>
@@ -82,11 +61,10 @@ export function StickyBar() {
 
 export function AgentCaption() {
   const { agent } = useView();
+  const label = agent === 'codex' ? 'Codex' : 'Claude';
   return (
     <p className="agent-caption faint">
-      <span className="mono">{agent === 'both' ? 'Codex + Claude, averaged' : `${agent} only`}</span>
-      {' · '}
-      {AGENT_NOTE}
+      <span className="mono">{label}</span> — {AGENT_NOTE}
     </p>
   );
 }

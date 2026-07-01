@@ -8,21 +8,18 @@ export const dynamic = 'force-static';
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
 export const alt =
-  'Which version-control tool should your coding agent use? A benchmark by GitButler.';
+  'A version-control benchmark for coding agents: git, Jujutsu, and GitButler compared on five realistic tasks.';
 
 export default function OgImage() {
-  const but = data.cells_overall.find((c) => c.agent === 'both' && c.arm === 'but+skill');
-  const timeDelta = but?.vs_git ? Math.round(but.vs_git.time_pct) : -61;
-
   const tile = (value: string, label: string, accent: string) => ({
     value,
     label,
     accent,
   });
   const tiles = [
+    tile('3 tools', 'git · Jujutsu · GitButler', '#f4a623'),
+    tile('5 tasks', '2 agents · k=5 runs each', '#5cc8b8'),
     tile(`${data.meta.total_passed} / ${data.meta.total_runs}`, 'runs passed the grader', '#46b17b'),
-    tile(`${timeDelta}%`, 'wall time vs git, GitButler', '#f4a623'),
-    tile('5 chores', '2 agents · 3 tools · k=5', '#5cc8b8'),
   ];
 
   return new ImageResponse(
@@ -92,8 +89,8 @@ export default function OgImage() {
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'space-between', color: '#626d7c', fontSize: 22 }}>
-          <div>git · Jujutsu · GitButler — graded by a hidden oracle</div>
-          <div>built by GitButler</div>
+          <div>reliability · speed · efficiency — graded on the resulting Git history</div>
+          <div>maintained by GitButler</div>
         </div>
       </div>
     ),
