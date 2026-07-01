@@ -99,14 +99,22 @@ export const COST = {
 
 export const LEDGER = {
   title: 'Every run that failed',
-  lede: 'Eight of 150 runs failed the grader. All eight were Claude, all in a skill arm.',
+  lede: 'Thirteen of 150 runs failed the grader. Every failure was Claude; most were Jujutsu, with one plain git miss and one GitButler miss.',
   proportionality:
-    "git did not fail. GitButler's one failure was GRAPH_WRONG — the right files in the wrong commit order. Jujutsu's failures were mostly CONTENT_WRONG — wrong final contents or leftovers.",
+    'Jujutsu had the widest correctness problem: Claude split-commit failed 5/5, multi-amend failed 3/5, and reorder failed 2/5. GitButler had one Claude selective-commit partition miss. Plain git had two Claude misses.',
   defs: [
     { term: 'GRAPH_WRONG', read: 'Right file contents, wrong commit order or topology.' },
     {
       term: 'CONTENT_WRONG',
       read: 'Wrong final file contents, or leftovers committed that should have stayed out.',
+    },
+    {
+      term: 'DIRTY_STATE_WRONG',
+      read: 'The final dirty worktree state did not match the expected leftovers.',
+    },
+    {
+      term: 'PARTITION_WRONG',
+      read: 'The run committed or left behind the wrong subset of changes.',
     },
   ],
 };
@@ -137,7 +145,7 @@ export const MICRO = {
   kbCalloutLabel: 'Comparable within one agent only',
   reproduceTitle: 'About this benchmark',
   reproduceLede:
-    'The numbers above are derived from two committed snapshots. Below is exactly what produced them.',
+    'The numbers above are derived from the latest full-matrix aggregate. Below is exactly what produced them.',
   footerNote:
     'Maintained by GitButler, one of the three tools measured. The grader is deterministic and the data is public.',
 };

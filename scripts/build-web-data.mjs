@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// Derive the committed web/data/results.json from the two raw aggregate.json
-// benchmark snapshots (which live under the gitignored tmp/ dir).
+// Derive the committed web/data/results.json from raw aggregate.json benchmark
+// snapshots (which live under the gitignored tmp/ dir).
 //
 // This script is the honesty firewall for the results page. It precomputes the
 // correctness gate, within-agent deltas, and per-scenario failures, and it
@@ -10,9 +10,10 @@
 //
 // Usage:
 //   node scripts/build-web-data.mjs
+//   node scripts/build-web-data.mjs --aggregate <path> --out <path>
 //   node scripts/build-web-data.mjs --baseline <path> --jj <path> --out <path>
 //
-// Re-run after a new benchmark batch (edit DEFAULTS or pass --baseline/--jj),
+// Re-run after a new benchmark batch (edit DEFAULTS or pass --aggregate),
 // then commit web/data/results.json.
 
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
@@ -24,8 +25,9 @@ const REPO = resolve(__dirname, '..');
 
 // ---- source snapshots (the "current value") -------------------------------
 const DEFAULTS = {
-  baseline: 'tmp/pilot-runs/full-k5-20260629-refresh/aggregate.json', // git + but+skill
-  jj: 'tmp/pilot-runs/jj-k5-codex-claude-20260629/aggregate.json', // jj+skill
+  aggregate: 'tmp/pilot-runs/full-k5-20260701-all-tools/aggregate.json',
+  baseline: null, // legacy: git + but+skill
+  jj: null, // legacy: jj+skill
   out: 'web/data/results.json',
 };
 
@@ -33,7 +35,10 @@ function parseArgs(argv) {
   const out = { ...DEFAULTS };
   for (let i = 0; i < argv.length; i += 2) {
     const k = argv[i]?.replace(/^--/, '');
-    if (k && k in out) out[k] = argv[i + 1];
+    if (k && k in out) {
+      out[k] = argv[i + 1];
+      if (k === 'baseline' || k === 'jj') out.aggregate = null;
+    }
   }
   return out;
 }
@@ -119,6 +124,16 @@ const FAILURE_READS = {
     label: 'CONTENT_WRONG',
     read: 'Final file contents or leftovers differed from the expected history.',
   },
+  DIRTY_STATE_WRONG: {
+    severity: 'worse-miss',
+    label: 'DIRTY_STATE_WRONG',
+    read: 'The final dirty worktree state differed from the expected leftovers.',
+  },
+  PARTITION_WRONG: {
+    severity: 'worse-miss',
+    label: 'PARTITION_WRONG',
+    read: 'The run committed or left behind the wrong subset of changes.',
+  },
 };
 
 // ---- helpers ---------------------------------------------------------------
@@ -131,7 +146,7 @@ function readJSON(p) {
   } catch (err) {
     throw new Error(
       `Could not read source snapshot at ${abs}\n  -> ${err.message}\n` +
-        `  (raw aggregates live under the gitignored tmp/ dir; pass --baseline / --jj if they moved)`,
+        `  (raw aggregates live under the gitignored tmp/ dir; pass --aggregate if it moved)`,
     );
   }
 }
@@ -210,13 +225,130 @@ function vsGit(cell, gitCell) {
   return out;
 }
 
-// ---- main ------------------------------------------------------------------
-function build({ baseline, jj, out }) {
+function unique(values) {
+  return [...new Set(values.filter((v) => v != null))];
+}
+
+function rowsForArms(rows, arms) {
+  return rows.filter((r) => arms.includes(r.arm));
+}
+
+function firstCompletedRow(rows, arm) {
+  return rows.find((r) => r.arm === arm && r.completed);
+}
+
+function sourceSnapshotsFromAggregate(agg) {
+  const rows = agg.rows;
+  const snapshots = [];
+  const arms = unique(rows.map((r) => r.arm));
+
+  if (arms.includes('git') || arms.includes('but+skill')) {
+    const sampleBut = firstCompletedRow(rows, 'but+skill') ?? {};
+    const scopedArms = ['git', 'but+skill'].filter((arm) => arms.includes(arm));
+    snapshots.push({
+      batch: agg.batch,
+      arms: scopedArms,
+      generated_at: agg.generated_at,
+      runs: rowsForArms(rows, scopedArms).length,
+      provenance: {
+        setup_hash: sampleBut.setup_hash ?? null,
+        binary_hash: sampleBut.binary_hash ?? null,
+        gitbutler_head: sampleBut.binary_head ?? null,
+        skill_hash: sampleBut.skill_hash ?? null,
+        skill_tree_hash: sampleBut.skill_tree_hash ?? null,
+      },
+    });
+  }
+
+  if (arms.includes('jj+skill')) {
+    const sampleJj = firstCompletedRow(rows, 'jj+skill') ?? {};
+    snapshots.push({
+      batch: agg.batch,
+      arms: ['jj+skill'],
+      generated_at: agg.generated_at,
+      runs: rowsForArms(rows, ['jj+skill']).length,
+      provenance: {
+        setup_hash: sampleJj.setup_hash ?? null,
+        binary_hash: sampleJj.binary_hash ?? null,
+        jj_version: sampleJj.binary_version ?? 'jj 0.42.0',
+        skill_package: sampleJj.skill_source_package ?? 'onevcat/skills@onevcat-jj',
+        skill_source_url:
+          sampleJj.skill_source_url ??
+          'https://raw.githubusercontent.com/onevcat/skills/master/skills/onevcat-jj/SKILL.md',
+        skill_hash: sampleJj.skill_hash ?? null,
+      },
+    });
+  }
+
+  return snapshots;
+}
+
+function loadSources({ aggregate, baseline, jj }) {
+  if (aggregate) {
+    const agg = readJSON(aggregate);
+    return {
+      rows: agg.rows,
+      summaries: agg.summaries.overall,
+      byTask: agg.summaries.by_task,
+      generatedAt: agg.generated_at,
+      sourceSnapshots: sourceSnapshotsFromAggregate(agg),
+    };
+  }
+
+  if (!baseline || !jj) {
+    throw new Error('Pass either --aggregate <path> or both --baseline <path> and --jj <path>.');
+  }
+
   const base = readJSON(baseline);
   const jjAgg = readJSON(jj);
-  const allRows = [...base.rows, ...jjAgg.rows];
-  const allSummaries = [...base.summaries.overall, ...jjAgg.summaries.overall];
-  const allByTask = [...base.summaries.by_task, ...jjAgg.summaries.by_task];
+  const sampleBase = base.rows.find((r) => r.binary_hash) || {};
+  const sampleJj = jjAgg.rows.find((r) => r.binary_hash) || {};
+
+  return {
+    rows: [...base.rows, ...jjAgg.rows],
+    summaries: [...base.summaries.overall, ...jjAgg.summaries.overall],
+    byTask: [...base.summaries.by_task, ...jjAgg.summaries.by_task],
+    generatedAt: jjAgg.generated_at ?? base.generated_at,
+    sourceSnapshots: [
+      {
+        batch: base.batch,
+        arms: ['git', 'but+skill'],
+        generated_at: base.generated_at,
+        runs: base.rows.length,
+        provenance: {
+          setup_hash: sampleBase.setup_hash ?? null,
+          binary_hash: sampleBase.binary_hash ?? null,
+          gitbutler_head: sampleBase.binary_head ?? null,
+          skill_hash: sampleBase.skill_hash ?? null,
+          skill_tree_hash: sampleBase.skill_tree_hash ?? null,
+        },
+      },
+      {
+        batch: jjAgg.batch,
+        arms: ['jj+skill'],
+        generated_at: jjAgg.generated_at,
+        runs: jjAgg.rows.length,
+        provenance: {
+          setup_hash: sampleJj.setup_hash ?? null,
+          binary_hash: sampleJj.binary_hash ?? null,
+          jj_version: sampleJj.binary_version ?? 'jj 0.42.0',
+          skill_package: sampleJj.skill_source_package ?? 'onevcat/skills@onevcat-jj',
+          skill_source_url:
+            sampleJj.skill_source_url ??
+            'https://raw.githubusercontent.com/onevcat/skills/master/skills/onevcat-jj/SKILL.md',
+          skill_hash: sampleJj.skill_hash ?? null,
+        },
+      },
+    ],
+  };
+}
+
+// ---- main ------------------------------------------------------------------
+function build({ aggregate, baseline, jj, out }) {
+  const source = loadSources({ aggregate, baseline, jj });
+  const allRows = source.rows;
+  const allSummaries = source.summaries;
+  const allByTask = source.byTask;
 
   // ---- overall cells: 2 real agents x 3 arms, plus a 'both' per arm --------
   const overallByKey = {};
@@ -308,42 +440,9 @@ function build({ baseline, jj, out }) {
     warm_bytes: r.warm_bytes,
   }));
 
-  // ---- provenance ----------------------------------------------------------
-  const sampleBase = base.rows.find((r) => r.binary_hash) || {};
-  const sampleJj = jjAgg.rows.find((r) => r.binary_hash) || {};
-  const source_snapshots = [
-    {
-      batch: base.batch,
-      arms: ['git', 'but+skill'],
-      generated_at: base.generated_at,
-      runs: base.rows.length,
-      provenance: {
-        setup_hash: sampleBase.setup_hash ?? null,
-        binary_hash: sampleBase.binary_hash ?? null,
-        gitbutler_head: sampleBase.binary_head ?? null,
-        skill_hash: sampleBase.skill_hash ?? null,
-        skill_tree_hash: sampleBase.skill_tree_hash ?? null,
-      },
-    },
-    {
-      batch: jjAgg.batch,
-      arms: ['jj+skill'],
-      generated_at: jjAgg.generated_at,
-      runs: jjAgg.rows.length,
-      provenance: {
-        setup_hash: sampleJj.setup_hash ?? null,
-        binary_hash: sampleJj.binary_hash ?? null,
-        jj_version: 'jj 0.42.0',
-        skill_package: 'onevcat/skills@onevcat-jj',
-        skill_source_url:
-          'https://raw.githubusercontent.com/onevcat/skills/master/skills/onevcat-jj/SKILL.md',
-        skill_hash: sampleJj.skill_hash ?? null,
-      },
-    },
-  ];
-
   const total_runs = allRows.length;
   const total_passed = allRows.filter((r) => r.passed).length;
+  const snapshotDate = new Date(source.generatedAt).toISOString().slice(0, 10);
 
   const data = {
     schema_version: 1,
@@ -353,7 +452,7 @@ function build({ baseline, jj, out }) {
       total_runs,
       total_passed,
       pass_rate: round((total_passed / total_runs) * 100, 1),
-      snapshot_date: '2026-06-29',
+      snapshot_date: snapshotDate,
       agents: [
         ...AGENTS.map((a) => ({
           ...a,
@@ -383,7 +482,7 @@ function build({ baseline, jj, out }) {
         'warm_bytes subtracts visible skill/reference reads — a token-cost proxy, not a token counter. Claude and Codex record transcripts in different formats, so KB is only comparable between tools within the same agent.',
       generator: 'node scripts/build-web-data.mjs',
     },
-    source_snapshots,
+    source_snapshots: source.sourceSnapshots,
     cells_overall,
     cells_by_scenario,
     rows,
@@ -410,8 +509,8 @@ function validate(d) {
       throw new Error(`validate: 'both' cell carries cross-agent KB (forbidden) for arm ${c.arm}`);
     }
   }
-  if (d.meta.total_passed !== 142 || d.meta.total_runs !== 150) {
-    throw new Error(`validate: expected 142/150 passed, got ${d.meta.total_passed}/${d.meta.total_runs}`);
+  if (d.meta.total_runs !== 150) {
+    throw new Error(`validate: expected 150 runs, got ${d.meta.total_runs}`);
   }
 }
 
