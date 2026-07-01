@@ -4,8 +4,6 @@ import { ViewProvider } from './state/ViewContext';
 import { StickyBar } from './components/Controls';
 import { Hero } from './components/Hero';
 import { ResultsTable } from './components/ResultsTable';
-import { Mechanism } from './components/Mechanism';
-import { Cost } from './components/Cost';
 import { Scenarios } from './components/Scenarios';
 import { FailureLedger } from './components/FailureLedger';
 import { Methodology } from './components/Methodology';
@@ -21,8 +19,6 @@ export function ResultsApp({ data }: { data: ResultsData }) {
         <ResultsTable data={data} />
         <Scenarios data={data} />
         <Methodology data={data} />
-        <Mechanism data={data} />
-        <Cost data={data} />
         <FailureLedger data={data} />
         <Provenance data={data} />
       </main>

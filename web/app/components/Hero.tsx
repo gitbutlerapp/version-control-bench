@@ -7,7 +7,7 @@ export function Hero({ data }: { data: ResultsData }) {
   return (
     <header className="hero" id="top">
       <p className="eyebrow hero-eyebrow">
-        3 tools · 2 agents · 5 tasks · k={m.k} · {m.snapshot_date}
+        3 tools · 2 agents · 5 scenarios · k={m.k} · {m.snapshot_date}
       </p>
       <h1 className="hero-title">{HERO.title}</h1>
 

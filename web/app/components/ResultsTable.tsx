@@ -7,7 +7,7 @@ import { PassChip } from './Bars';
 import { Tooltip } from './Tooltip';
 import type { ArmId, Cell, ResultsData } from '@/lib/types';
 import { TOOL_VAR, overallCell, scenarioCell } from '@/lib/selectors';
-import { count, kb, secondsLabel } from '@/lib/format';
+import { count, kb, seconds } from '@/lib/format';
 
 interface Row {
   key: string;
@@ -60,7 +60,8 @@ function Group({ cell, best }: { cell: Cell | undefined; best: { t: boolean; c: 
         <PassChip pass={cell.pass} n={cell.n} size="sm" />
       </td>
       <td className="m-num" data-dirty={dirty} data-best={best.t}>
-        {secondsLabel(cell.mean_wall_ms)}
+        {seconds(cell.mean_wall_ms)}
+        <span className="m-unit">s</span>
       </td>
       <td className="m-num" data-dirty={dirty} data-best={best.c}>
         {count(cell.mean_task_vc)}
@@ -86,7 +87,7 @@ export function ResultsTable({ data }: { data: ResultsData }) {
   }));
   const overallRow: Row = {
     key: 'all',
-    label: 'All tasks',
+    label: 'All scenarios',
     overall: true,
     cells: arms.map((arm) => overallCell(data, agent, arm)),
   };
@@ -123,23 +124,21 @@ export function ResultsTable({ data }: { data: ResultsData }) {
 
   return (
     <section id="results">
-      <div className="section-head">
-        <p className="eyebrow">{RESULTS.eyebrow}</p>
-        <h2>{RESULTS.title}</h2>
-        <p className="lede">{RESULTS.lede}</p>
-      </div>
-
-      <div className="results-controls">
+      <div className="results-head">
+        <div className="section-head">
+          <p className="eyebrow">{RESULTS.eyebrow}</p>
+          <h2>{RESULTS.title}</h2>
+        </div>
         <AgentToggle />
       </div>
-      <AgentCaption />
+      <p className="lede">{RESULTS.lede}</p>
 
       <div className="matrix-wrap">
         <table className="matrix">
           <thead>
             <tr className="matrix-tools">
               <th className="m-corner" rowSpan={2} scope="col">
-                Task
+                Scenario
               </th>
               {arms.map((arm) => (
                 <th
@@ -163,9 +162,10 @@ export function ResultsTable({ data }: { data: ResultsData }) {
         </table>
       </div>
 
-      <ul className="matrix-legend faint">
+      <ul className="matrix-legend">
         <li>
-          <span className="legend-swatch legend-pass" /> pass rate — reliability first
+          <PassChip pass={5} n={5} size="sm" /> pass rate — reliability first: a wrong history
+          fails regardless of speed
         </li>
         <li>
           <span className="legend-bold">bold</span> = best among tools that passed every run
@@ -175,6 +175,7 @@ export function ResultsTable({ data }: { data: ResultsData }) {
         </li>
         <li>KB is comparable within one agent only</li>
       </ul>
+      <AgentCaption />
     </section>
   );
 }

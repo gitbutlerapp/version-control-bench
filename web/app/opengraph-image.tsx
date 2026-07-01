@@ -18,7 +18,7 @@ export default function OgImage() {
   });
   const tiles = [
     tile('3 tools', 'git · Jujutsu · GitButler', '#f4a623'),
-    tile('5 tasks', '2 agents · k=5 runs each', '#5cc8b8'),
+    tile('5 scenarios', '2 agents · k=5 runs each', '#5cc8b8'),
     tile(`${data.meta.total_passed} / ${data.meta.total_runs}`, 'runs passed the grader', '#46b17b'),
   ];
 

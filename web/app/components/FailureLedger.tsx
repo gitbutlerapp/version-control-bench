@@ -10,6 +10,7 @@ interface LedgerRow {
   count: number;
   severity: string;
   read: string;
+  groupStart?: boolean;
 }
 
 // Build the ledger from the per-scenario cells, in plain tool order.
@@ -39,6 +40,10 @@ function buildRows(data: ResultsData): LedgerRow[] {
       }
     }
   }
+  // mark tool-group boundaries so the table can articulate them
+  rows.forEach((r, i) => {
+    if (i > 0 && r.arm !== rows[i - 1].arm) r.groupStart = true;
+  });
   return rows;
 }
 
@@ -59,7 +64,7 @@ export function FailureLedger({ data }: { data: ResultsData }) {
           <tr>
             <th>Tool</th>
             <th>Agent</th>
-            <th>Task</th>
+            <th>Scenario</th>
             <th>Failure</th>
             <th className="ta-r">Runs</th>
             <th>What went wrong</th>
@@ -67,7 +72,7 @@ export function FailureLedger({ data }: { data: ResultsData }) {
         </thead>
         <tbody>
           {rows.map((r, i) => (
-            <tr key={i} data-severity={r.severity}>
+            <tr key={i} data-severity={r.severity} data-group-start={r.groupStart || undefined}>
               <td>
                 <span
                   className="ledger-tool"
@@ -86,20 +91,11 @@ export function FailureLedger({ data }: { data: ResultsData }) {
               <td className="ta-r num">
                 {r.count}/5
               </td>
-              <td className="faint">{r.read}</td>
+              <td className="muted">{r.read}</td>
             </tr>
           ))}
         </tbody>
       </table>
-
-      <dl className="ledger-defs">
-        {LEDGER.defs.map((d) => (
-          <div key={d.term}>
-            <dt className="mono">{d.term}</dt>
-            <dd className="faint">{d.read}</dd>
-          </div>
-        ))}
-      </dl>
 
       <p className="prose ledger-proportion">{LEDGER.proportionality}</p>
     </section>

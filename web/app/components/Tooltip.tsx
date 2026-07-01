@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 interface TooltipProps {
@@ -15,6 +15,7 @@ interface TooltipProps {
 // so it escapes the results table's overflow-x clip.
 export function Tooltip({ label, children, className, onActivate }: TooltipProps) {
   const ref = useRef<HTMLSpanElement>(null);
+  const tipId = useId();
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
 
   const show = useCallback(() => {
@@ -28,6 +29,14 @@ export function Tooltip({ label, children, className, onActivate }: TooltipProps
   }, []);
   const hide = useCallback(() => setPos(null), []);
 
+  // the position is computed once from the trigger rect; scrolling would
+  // strand a fixed-position tooltip mid-air, so dismiss it instead
+  useEffect(() => {
+    if (!pos) return;
+    window.addEventListener('scroll', hide, { capture: true, passive: true });
+    return () => window.removeEventListener('scroll', hide, { capture: true });
+  }, [pos, hide]);
+
   const interactive = Boolean(onActivate);
 
   return (
@@ -37,6 +46,7 @@ export function Tooltip({ label, children, className, onActivate }: TooltipProps
       data-interactive={interactive}
       role={interactive ? 'button' : undefined}
       tabIndex={0}
+      aria-describedby={pos ? tipId : undefined}
       onMouseEnter={show}
       onMouseLeave={hide}
       onFocus={show}
@@ -58,7 +68,7 @@ export function Tooltip({ label, children, className, onActivate }: TooltipProps
       {pos &&
         typeof document !== 'undefined' &&
         createPortal(
-          <span className="tooltip" role="tooltip" style={{ left: pos.x, top: pos.y + 8 }}>
+          <span id={tipId} className="tooltip" role="tooltip" style={{ left: pos.x, top: pos.y + 8 }}>
             {label}
           </span>,
           document.body,

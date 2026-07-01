@@ -171,7 +171,7 @@ function SelectGraph() {
         aria-label="Selective commit: commit only the validation change on a new branch, leave logging, config and notes uncommitted"
         preserveAspectRatio="xMidYMin meet"
       >
-        <text x={12} y={24} className="cg-col">
+        <text x={12} y={16} className="cg-col">
           dirty worktree
         </text>
         <rect
@@ -206,8 +206,8 @@ function SelectGraph() {
         })}
 
         {/* validation pulled out into a commit on a new branch */}
-        <line x1={158} y1={rowY(0)} x2={210} y2={rowY(0)} className="cg-arrow" />
-        <path d={`M214 ${rowY(0)} l-7 -4 l0 8 z`} className="cg-arrowhead" />
+        <line x1={158} y1={rowY(0)} x2={214} y2={rowY(0)} className="cg-arrow" />
+        <path d={`M218 ${rowY(0)} l-7 -4 l0 8 z`} className="cg-arrowhead" />
         <line x1={228} y1={rowY(0)} x2={228} y2={rowY(0) + 22} className="cg-edge" />
         <circle
           cx={228}
@@ -252,12 +252,12 @@ function AmendGraph() {
         aria-label="Multi-amend: each dirty fix is folded into the existing commit it belongs to; debug and config changes stay uncommitted"
         preserveAspectRatio="xMidYMin meet"
       >
-        <text x={10} y={30} className="cg-col">
+        <text x={10} y={16} className="cg-col">
           dirty fixes
         </text>
         <rect x={4} y={38} width={100} height={124} rx={8} className="cg-box" />
 
-        <text x={BRANCH_X} y={30} className="cg-col" textAnchor="middle">
+        <text x={BRANCH_X} y={16} className="cg-col" textAnchor="middle">
           branch
         </text>
         <line x1={BRANCH_X} y1={targetY[0]} x2={BRANCH_X} y2={targetY[2]} className="cg-edge" />
@@ -266,7 +266,7 @@ function AmendGraph() {
             key={y}
             cx={BRANCH_X}
             cy={y}
-            r={5}
+            r={R}
             fill="var(--surface-2)"
             stroke="var(--border-strong)"
             strokeWidth={1.5}
@@ -292,8 +292,8 @@ function AmendGraph() {
                 {t.fix}
               </text>
               {/* arrow routing it to its commit */}
-              <line x1={108} y1={y} x2={198} y2={y} className="cg-arrow" />
-              <path d={`M202 ${y} l-7 -4 l0 8 z`} className="cg-arrowhead" />
+              <line x1={108} y1={y} x2={196} y2={y} className="cg-arrow" />
+              <path d={`M200 ${y} l-7 -4 l0 8 z`} className="cg-arrowhead" />
               {/* the target commit */}
               <circle
                 cx={BRANCH_X}
@@ -359,12 +359,12 @@ export function CommitGraph({ scenario }: { scenario: ScenarioMeta }) {
         <Column nodes={spec.after} x={COL_AFTER} side="after" />
 
         {spec.note && (
-          <text x={8} y={noteY} className="cg-note">
+          <text x={arrowX} y={noteY} textAnchor="middle" className="cg-note">
             {spec.note}
           </text>
         )}
         {spec.leftovers && (
-          <text x={8} y={leftoversY} className="cg-leftovers">
+          <text x={arrowX} y={leftoversY} textAnchor="middle" className="cg-leftovers">
             ↳ stays uncommitted: {spec.leftovers}
           </text>
         )}

@@ -28,7 +28,7 @@ export function AgentToggle() {
             key={o.id}
             role="radio"
             aria-checked={agent === o.id}
-            className="segmented-opt num"
+            className="segmented-opt"
             data-active={agent === o.id}
             onClick={() => setAgent(o.id)}
           >

@@ -35,14 +35,7 @@ export function Methodology({ data }: { data: ResultsData }) {
 
       <div className="limits">
         <h3 className="limits-title">{LIMITS.title}</h3>
-        <dl className="method-list method-list-caveat">
-          {LIMITS.items.map((l) => (
-            <div key={l.term} className="method-item">
-              <dt>{l.term}</dt>
-              <dd>{l.body}</dd>
-            </div>
-          ))}
-        </dl>
+        <p className="limits-body">{LIMITS.body}</p>
       </div>
     </section>
   );

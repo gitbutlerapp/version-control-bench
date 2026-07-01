@@ -45,52 +45,53 @@ function parseArgs(argv) {
 
 // ---- scenario metadata -----------------------------------------------------
 // label + reader-facing prompt come from the task packages so the page stays in
-// sync with what the agents actually saw. `situation` is the "imagine when this
-// applies to you" hook; `shape` drives the before/after commit-graph sketch.
+// sync with what the agents actually saw. `situation` describes the prepared
+// starting state and what the instruction asks for; `crux` names what makes the
+// operation non-trivial; `shape` drives the commit-graph sketch.
 const SCENARIOS = [
   {
     id: 'pilot-1-selective-validation',
     label: 'Selective commit',
-    title: 'Commit just one thing, leave the rest alone',
+    title: 'Selective commit from a mixed working tree',
     situation:
-      'You sat down to fix input validation and also poked at logging, tweaked some config, and left a couple of debug notes. You ask for a clean branch with only the validation work committed: everything else still sitting in the worktree, untouched.',
-    crux: "The hard part isn't committing. It's committing only the right files and hunks, and not the rest of the dirty worktree.",
+      'The working tree mixes an input-validation fix with unrelated logging, configuration, and debug-note changes. The instruction asks for a new branch containing only the validation work, with every other change left uncommitted in the working tree. Leaving the right changes uncommitted is part of the graded outcome.',
+    crux: 'The difficulty is partitioning: selecting the correct files and hunks (contiguous blocks of changed lines within a file) without sweeping in the rest of the uncommitted changes.',
     shape: 'select',
   },
   {
     id: 'pilot-2-multi-amend',
     label: 'Multi-amend',
-    title: 'Fold each fix into the commit it belongs to',
+    title: 'Amend fixes into multiple earlier commits',
     situation:
-      'Review came back and there are three small fixes sitting dirty in the tree: one belongs in the validation commit, one in the scoring commit, one in the docs commit. Instead of a “misc review fixes” commit, you ask for each change folded back into the commit it actually fixes.',
-    crux: 'Each fix has to land in a different existing commit, not in one new catch-all commit.',
+      'The branch contains separate validation, scoring, and documentation commits, and the working tree holds three uncommitted fixes, each corresponding to one of those commits. The instruction asks for each fix to be amended into its matching commit — folded into the existing commit rather than recorded as a new one.',
+    crux: 'Each fix must be applied to a different existing commit, not combined into a single new commit, so the run rewrites three points in the history instead of adding one commit on top.',
     shape: 'amend',
   },
   {
     id: 'pilot-3-split-commit',
     label: 'Split commit',
-    title: 'Split one overloaded commit into clean ones',
+    title: 'Split a non-top commit',
     situation:
-      'A commit halfway down the branch is doing too much: it mixes validation, scoring, and docs, plus stray debug work that should never have been there. You ask to break it into three clean, ordered commits, keep the later commit on top exactly where it is, and turn the stray work back into uncommitted changes.',
-    crux: 'Rewriting a commit that is not on top, without disturbing what is above it.',
+      'A commit in the middle of the branch mixes validation, scoring, and documentation changes, plus stray debug edits, and a later commit is built on top of it. The instruction asks for that commit to be split into three ordered single-purpose commits, with the debug edits returned to the working tree as uncommitted changes and the commit above left in place.',
+    crux: 'The commit is not the most recent one: rewriting it requires rebuilding every commit above it without changing their contents.',
     shape: 'split',
   },
   {
     id: 'pilot-4-reorder-commits',
     label: 'Reorder commits',
-    title: 'Reorder commits so the story reads right',
+    title: 'Reorder a block of commits',
     situation:
-      'The branch is correct and the tests pass, but the history reads out of order: the retry and notification commits landed late, after work that logically depends on them. You ask to move that block earlier so the branch reads in the order the feature was actually built: same contents, same messages, nothing left dirty.',
-    crux: 'Reordering commits with no content change; a wrong move produces a conflict.',
+      "The branch's contents are correct, but the retry and notification commits appear after commits that logically depend on them. The instruction asks for that block to be moved earlier in the history, with every commit's contents and message unchanged and nothing left uncommitted.",
+    crux: "The reordering must preserve each commit's contents and message exactly; an incorrect sequence of moves produces conflicts.",
     shape: 'reorder',
   },
   {
     id: 'pilot-5-squash-commits',
     label: 'Squash commits',
-    title: 'Squash the noise into commits that mean something',
+    title: 'Squash commit groups',
     situation:
-      'The branch is an honest record of how the work happened: “extract helper”, “wire helper”, “fix typo”, “actually wire helper”, then a few more steps. Before review, you ask for the history to say what changed, not narrate every keystroke.',
-    crux: 'Compress the step-by-step commits into a couple of semantic ones, keep the unrelated commits separate, and end with the exact same final files and a clean worktree.',
+      'The branch records the work as many small incremental commits — “extract helper”, “wire helper”, “fix typo”, “actually wire helper” — alongside unrelated commits. The instruction asks for the incremental commits to be squashed (combined) into a small number of semantic commits, with the unrelated commits kept separate.',
+    crux: 'The grouping must be correct — incremental commits combined into semantic units, unrelated commits left intact — and the run must end with the same final file contents and no uncommitted changes.',
     shape: 'squash',
   },
 ];

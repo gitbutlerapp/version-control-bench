@@ -17,8 +17,8 @@ export function kb(bytes: number | null): string {
 }
 
 export function count(n: number): string {
-  // task_vc means carry one decimal; whole numbers stay clean.
-  return Number.isInteger(n) ? String(n) : n.toFixed(1);
+  // one decimal always, so table columns stay digit-stable across rows
+  return n.toFixed(1);
 }
 
 export function pct(n: number | null, withSign = true): string {

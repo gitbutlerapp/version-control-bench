@@ -17,9 +17,9 @@ function ScenarioSection({ scenario, index }: { scenario: ScenarioMeta; index: n
           <blockquote className="mono">{scenario.prompt}</blockquote>
         </details>
       </div>
-      <figure className="scenario-illo">
+      <div className="scenario-illo">
         <CommitGraph scenario={scenario} />
-      </figure>
+      </div>
     </article>
   );
 }
