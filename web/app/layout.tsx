@@ -23,7 +23,7 @@ const description =
 export const metadata: Metadata = {
   title,
   description,
-  metadataBase: new URL('https://version-control-bench.vercel.app'),
+  metadataBase: new URL('https://vcbench.dev'),
   openGraph: {
     title,
     description,
