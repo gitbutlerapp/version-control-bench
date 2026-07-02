@@ -297,6 +297,26 @@ section:first-of-type {
   border-bottom: 2px solid var(--tool);
   border-left: 1px solid var(--border);
 }
+.m-tool-link {
+  color: inherit;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3em;
+  transition: color 120ms ease;
+}
+.m-tool-link::after {
+  content: "↗";
+  font-size: 0.72em;
+  color: var(--text-faint);
+  transition: color 120ms ease;
+}
+.m-tool-link:hover {
+  color: var(--tool);
+  text-decoration: none;
+}
+.m-tool-link:hover::after {
+  color: var(--tool);
+}
 .matrix-metrics .m-h {
   font-family: var(--font-mono);
   font-size: var(--fs-micro);
@@ -750,6 +770,17 @@ section:first-of-type {
   font-size: var(--fs-caption);
   color: var(--text-muted);
   white-space: pre-wrap;
+}
+.scenario-source {
+  display: inline-block;
+  margin-top: var(--s-4);
+  font-size: var(--fs-micro);
+  color: var(--text-faint);
+  transition: color 120ms ease;
+}
+.scenario-source:hover {
+  color: var(--link);
+  text-decoration: none;
 }
 .scenario-illo {
   margin: 0;

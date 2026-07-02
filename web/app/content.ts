@@ -2,6 +2,18 @@
 // terms used consistently, accessible to a non-specialist. The benchmark is
 // the subject; GitButler is one of three tools plus a single flat disclosure.
 
+// Public benchmark repository. Each scenario id is also its task directory name.
+export const REPO_URL = 'https://github.com/gitbutlerapp/version-control-bench';
+export const taskDefUrl = (scenarioId: string) =>
+  `${REPO_URL}/tree/main/tasks/${scenarioId}`;
+
+// Homepage / docs for each measured tool, linked from the results-matrix headers.
+export const TOOL_URL: Record<string, string> = {
+  git: 'https://git-scm.com/',
+  'jj+skill': 'https://www.jj-vcs.dev/latest/',
+  'but+skill': 'https://docs.gitbutler.com/ai-agents/overview',
+};
+
 export const HERO = {
   title: 'A version-control benchmark for coding agents',
   intro: [

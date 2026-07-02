@@ -1,7 +1,7 @@
 'use client';
 
 import { useView } from '../state/ViewContext';
-import { RESULTS } from '../content';
+import { RESULTS, TOOL_URL } from '../content';
 import { AgentCaption, AgentToggle } from './Controls';
 import { PassChip } from './Bars';
 import { Tooltip } from './Tooltip';
@@ -147,7 +147,18 @@ export function ResultsTable({ data }: { data: ResultsData }) {
                   className="m-tool"
                   style={{ ['--tool' as string]: `var(--tool-${TOOL_VAR[arm as ArmId]})` }}
                 >
-                  {armMeta[arm]?.label ?? arm}
+                  {TOOL_URL[arm] ? (
+                    <a
+                      className="m-tool-link"
+                      href={TOOL_URL[arm]}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      {armMeta[arm]?.label ?? arm}
+                    </a>
+                  ) : (
+                    (armMeta[arm]?.label ?? arm)
+                  )}
                 </th>
               ))}
             </tr>

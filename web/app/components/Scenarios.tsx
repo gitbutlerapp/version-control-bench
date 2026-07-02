@@ -1,4 +1,4 @@
-import { SCENARIOS_INTRO, EYEBROWS, MICRO } from '../content';
+import { SCENARIOS_INTRO, EYEBROWS, MICRO, taskDefUrl } from '../content';
 import { CommitGraph } from './CommitGraph';
 import type { ResultsData, ScenarioMeta } from '@/lib/types';
 
@@ -16,6 +16,9 @@ function ScenarioSection({ scenario, index }: { scenario: ScenarioMeta; index: n
           <summary>{MICRO.promptLabel}</summary>
           <blockquote className="mono">{scenario.prompt}</blockquote>
         </details>
+        <a className="scenario-source mono" href={taskDefUrl(scenario.id)}>
+          tasks/{scenario.id} ↗
+        </a>
       </div>
       <div className="scenario-illo">
         <CommitGraph scenario={scenario} />
