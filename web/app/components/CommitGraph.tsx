@@ -152,7 +152,7 @@ function Column({ nodes, x, side }: { nodes: Node[]; x: number; side: 'before' |
   );
 }
 
-// Selective commit is a different move — partition a dirty worktree, not
+// Selective commit is a different move: partition a dirty worktree, not
 // reshape history. Show the four changes as uncommitted files, one pulled into
 // a commit on a new branch, the rest left dirty.
 function SelectGraph() {
@@ -345,7 +345,7 @@ export function CommitGraph({ scenario }: { scenario: ScenarioMeta }) {
       <svg
         viewBox={`0 0 300 ${height}`}
         role="img"
-        aria-label={`${scenario.label}: history before and after — ${spec.note ?? ''}`}
+        aria-label={`${scenario.label}: history before and after${spec.note ? `, ${spec.note}` : ''}`}
         preserveAspectRatio="xMidYMin meet"
       >
         {/* before → after arrow */}

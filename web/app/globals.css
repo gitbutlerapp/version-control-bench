@@ -41,8 +41,10 @@
   --radius-lg: 12px;
   --shadow-1: 0 1px 0 rgba(0, 0, 0, 0.4);
   --shadow-2: 0 14px 40px -18px rgba(0, 0, 0, 0.8);
+  --scroll-shadow: rgba(0, 0, 0, 0.45);
 
   /* ---- dark surfaces (default) ---- */
+  color-scheme: dark;
   --bg: #0d1014;
   --surface-1: #151a21;
   --surface-2: #1c222b;
@@ -75,6 +77,57 @@
   --pass-soft: #46b17b1f;
   --fail-soft: #e0556b1f;
   --warn-soft: #e8b33914;
+}
+
+/* =========================================================================
+   light theme — same instrument readout on paper instead of a dark panel.
+   Accents are darkened so they stay legible as text/borders on white.
+   ========================================================================= */
+:root[data-theme='light'] {
+  color-scheme: light;
+  --shadow-1: 0 1px 0 rgba(15, 23, 42, 0.05);
+  --shadow-2: 0 16px 40px -20px rgba(20, 30, 50, 0.28);
+  --scroll-shadow: rgba(20, 30, 50, 0.16);
+
+  --bg: #f5f6f8;
+  --surface-1: #ffffff;
+  --surface-2: #e9edf2;
+  --surface-inset: #eef1f5;
+  --border: #dfe4ea;
+  --border-strong: #c2ccd7;
+  --text: #1a2029;
+  --text-muted: #545f6d;
+  --text-faint: #7b8592;
+  --link: #2f66d0;
+  --focus: #2f66d0;
+
+  --tool-git: #67727f;
+  --tool-but: #a86a08;
+  --tool-jj: #147d6e;
+  --tool-git-soft: #67727f1f;
+  --tool-but-soft: #f4a62333;
+  --tool-jj-soft: #1f9e8c26;
+
+  --agent-claude: #c15f3e;
+  --agent-codex: #5a679a;
+  --agent-both: #6b7788;
+
+  --pass: #1a7a46;
+  --fail: #cc3049;
+  --warn: #9a6b00;
+  --pass-soft: #46b17b26;
+  --fail-soft: #e0556b26;
+  --warn-soft: #e8b33921;
+}
+
+/* smooth the palette swap. The pre-paint init script sets the theme before the
+   first paint, so this only ever animates a deliberate toggle, never load. */
+@media (prefers-reduced-motion: no-preference) {
+  body,
+  body * {
+    transition: background-color 200ms ease, border-color 200ms ease,
+      color 200ms ease, fill 200ms ease, stroke 200ms ease;
+  }
 }
 
 /* =========================================================================
@@ -236,7 +289,7 @@ section:first-of-type {
   background-color: var(--surface-1);
   background-image:
     linear-gradient(to left, var(--surface-1), transparent 24px),
-    linear-gradient(to left, rgba(0, 0, 0, 0.45), transparent);
+    linear-gradient(to left, var(--scroll-shadow), transparent);
   background-position: right, right;
   background-size: 24px 100%, 16px 100%;
   background-repeat: no-repeat, no-repeat;
@@ -503,16 +556,15 @@ section:first-of-type {
   color: var(--tool-but);
   margin-right: 6px;
 }
-.stickybar-controls {
+.stickybar-right {
   display: flex;
+  align-items: center;
   gap: var(--s-4);
-  flex-wrap: wrap;
   margin-left: auto;
 }
 .stickybar-nav {
   display: flex;
   gap: var(--s-4);
-  margin-left: auto;
   font-size: var(--fs-caption);
 }
 .stickybar-nav a {
@@ -522,6 +574,40 @@ section:first-of-type {
 .stickybar-nav a:hover {
   color: var(--text);
   text-decoration: none;
+}
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-1);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 120ms ease, border-color 120ms ease, background-color 120ms ease;
+}
+.theme-toggle:hover {
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+.theme-icon {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+}
+.icon-moon {
+  fill: currentColor;
+  stroke: none;
+}
+/* show the icon of the theme you'll switch TO */
+:root[data-theme='dark'] .icon-moon,
+:root[data-theme='light'] .icon-sun {
+  display: none;
 }
 
 .segmented {

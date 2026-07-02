@@ -89,7 +89,7 @@ export default function OgImage() {
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'space-between', color: '#626d7c', fontSize: 22 }}>
-          <div>reliability · speed · efficiency — graded on the resulting Git history</div>
+          <div>reliability · speed · efficiency, graded on the resulting Git history</div>
           <div>maintained by GitButler</div>
         </div>
       </div>

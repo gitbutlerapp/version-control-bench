@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-07-01T19:53:36.847Z",
+  "generated_at": "2026-07-02T07:53:25.826Z",
   "meta": {
     "k": 5,
     "total_runs": 150,
@@ -65,7 +65,7 @@
         "id": "pilot-2-multi-amend",
         "label": "Multi-amend",
         "title": "Amend fixes into multiple earlier commits",
-        "situation": "The branch contains separate validation, scoring, and documentation commits, and the working tree holds three uncommitted fixes, each corresponding to one of those commits. The instruction asks for each fix to be amended into its matching commit — folded into the existing commit rather than recorded as a new one.",
+        "situation": "The branch contains separate validation, scoring, and documentation commits, and the working tree holds three uncommitted fixes, each corresponding to one of those commits. The instruction asks for each fix to be amended into its matching commit, folded into the existing commit rather than recorded as a new one.",
         "crux": "Each fix must be applied to a different existing commit, not combined into a single new commit, so the run rewrites three points in the history instead of adding one commit on top.",
         "shape": "amend",
         "prompt": "Amend the existing five-commit `amend-series` branch. Do not create a new commit.\n\nRoute the already-present dirty changes like this:\n\n- Amend the validation helper changes in `src/lead.ts`, the malformed-email test in `tests/lead.test.ts`, and the validation wording in `README.md` into commit `refactor validation helpers`.\n- Amend the scoring changes in `src/lead.ts` and the enterprise-domain scoring test in `tests/lead.test.ts` into commit `add lead scoring`.\n- Amend the response-behavior documentation changes in `README.md` and `docs/response.md` into commit `document response behavior`.\n\nLeave the config logging change, the debug lead summary helper, and the investigation notes uncommitted."
@@ -92,8 +92,8 @@
         "id": "pilot-5-squash-commits",
         "label": "Squash commits",
         "title": "Squash commit groups",
-        "situation": "The branch records the work as many small incremental commits — “extract helper”, “wire helper”, “fix typo”, “actually wire helper” — alongside unrelated commits. The instruction asks for the incremental commits to be squashed (combined) into a small number of semantic commits, with the unrelated commits kept separate.",
-        "crux": "The grouping must be correct — incremental commits combined into semantic units, unrelated commits left intact — and the run must end with the same final file contents and no uncommitted changes.",
+        "situation": "The branch records the work as many small incremental commits (“extract helper”, “wire helper”, “fix typo”, “actually wire helper”) alongside unrelated commits. The instruction asks for the incremental commits to be squashed (combined) into a small number of semantic commits, with the unrelated commits kept separate.",
+        "crux": "The grouping must be correct (incremental commits combined into semantic units, unrelated commits left intact) and the run must end with the same final file contents and no uncommitted changes.",
         "shape": "squash",
         "prompt": "Squash commit groups on the existing `squash-series` branch. Do not change any file contents and do not create functional changes.\n\nKeep these commits as separate commits:\n\n- `add parser token model`\n- `add export endpoint`\n\nSquash these adjacent commit groups:\n\n- Squash `extract parser helpers` and `wire parser helpers` into one commit named `add parser pipeline`.\n- Squash `add retry option`, `test retry option`, and `document retry option` into one commit named `add retry support`.\n\nThe final branch order, oldest to newest, should be:\n\n1. `add parser token model`\n2. `add parser pipeline`\n3. `add export endpoint`\n4. `add retry support`\n\nLeave the worktree clean."
       }
@@ -117,7 +117,7 @@
       }
     },
     "kb_comparable_within_agent_only": true,
-    "kb_note": "warm_bytes subtracts visible skill/reference reads — a token-cost proxy, not a token counter. Claude and Codex record transcripts in different formats, so KB is only comparable between tools within the same agent.",
+    "kb_note": "warm_bytes subtracts visible skill/reference reads: a token-cost proxy, not a token counter. Claude and Codex record transcripts in different formats, so KB is only comparable between tools within the same agent.",
     "generator": "node scripts/build-web-data.mjs"
   },
   "source_snapshots": [

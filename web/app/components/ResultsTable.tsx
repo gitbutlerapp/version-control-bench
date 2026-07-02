@@ -175,7 +175,7 @@ export function ResultsTable({ data }: { data: ResultsData }) {
 
       <ul className="matrix-legend">
         <li>
-          <PassChip pass={5} n={5} size="sm" /> pass rate — reliability first: a wrong history
+          <PassChip pass={5} n={5} size="sm" /> pass rate (reliability first): a wrong history
           fails regardless of speed
         </li>
         <li>

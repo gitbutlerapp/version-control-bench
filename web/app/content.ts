@@ -1,4 +1,4 @@
-// Page copy. Register: a benchmark report — declarative and precise, defined
+// Page copy. Register: a benchmark report, declarative and precise, defined
 // terms used consistently, accessible to a non-specialist. The benchmark is
 // the subject; GitButler is one of three tools plus a single flat disclosure.
 
@@ -18,7 +18,7 @@ export const HERO = {
   title: 'A version-control benchmark for coding agents',
   intro: [
     'Coding agents do a growing share of version-control work. This benchmark measures how Claude Code and Codex handle five common version-control tasks with git, Jujutsu, and GitButler.',
-    'Each tool is scored on reliability, speed, and efficiency — judged on the resulting Git history, not the commands used to produce it.',
+    'Each tool is scored on reliability, speed, and efficiency, judged on the resulting Git history rather than the commands used to produce it.',
   ],
 };
 
@@ -28,16 +28,16 @@ export const RESULTS = {
   title: 'Results matrix',
   lede: 'Each tool on each scenario, for the selected agent.',
   columns: {
-    pass: 'Reliability — the share of the five runs that produced the exact history specified by the instruction.',
-    time: 'Speed — mean wall-clock time per run, with setup excluded.',
+    pass: 'Reliability: the share of the five runs that produced the exact history specified by the instruction.',
+    time: 'Speed: mean wall-clock time per run, with setup excluded.',
     cmds: 'Count of version-control commands the agent ran per run. Fewer commands generally correspond to lower wall-clock time and less output.',
-    kb: 'Efficiency — kilobytes of version-control output the agent read back per run (skill reads excluded), a proxy for token cost. Comparable within one agent only.',
+    kb: 'Efficiency: kilobytes of version-control output the agent read back per run (skill reads excluded), a proxy for token cost. Comparable within one agent only.',
   },
 };
 
 export const SCENARIOS_INTRO = {
   title: 'Scenarios',
-  lede: 'Each scenario is a pre-built Git repository — a commit history plus uncommitted changes — and a plain-English instruction describing the intended result. No code is generated during a run; only the version-control operation is measured.',
+  lede: 'Each scenario is a pre-built Git repository (a commit history plus uncommitted changes) and a plain-English instruction describing the intended result. No code is generated during a run; only the version-control operation is measured.',
 };
 
 export const METHOD = {
@@ -52,7 +52,7 @@ export const METHOD = {
     },
     {
       term: 'Deterministic grader',
-      body: "Correctness is checked by a hidden, deterministic grader — a scripted check that returns the same verdict for the same final state. It inspects the resulting Git state: commit boundaries, branch topology (which commits sit on which branch, in what order), and what stayed uncommitted. It is not an LLM judge, and it does not compare the agent's commands against a reference sequence: two different command sequences pass if they produce the same history.",
+      body: "Correctness is checked by a hidden, deterministic grader: a scripted check that returns the same verdict for the same final state. It inspects the resulting Git state: commit boundaries, branch topology (which commits sit on which branch, in what order), and what stayed uncommitted. It is not an LLM judge, and it does not compare the agent's commands against a reference sequence: two different command sequences pass if they produce the same history.",
     },
     {
       term: 'Timing boundary',

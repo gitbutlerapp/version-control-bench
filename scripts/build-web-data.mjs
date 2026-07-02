@@ -63,7 +63,7 @@ const SCENARIOS = [
     label: 'Multi-amend',
     title: 'Amend fixes into multiple earlier commits',
     situation:
-      'The branch contains separate validation, scoring, and documentation commits, and the working tree holds three uncommitted fixes, each corresponding to one of those commits. The instruction asks for each fix to be amended into its matching commit — folded into the existing commit rather than recorded as a new one.',
+      'The branch contains separate validation, scoring, and documentation commits, and the working tree holds three uncommitted fixes, each corresponding to one of those commits. The instruction asks for each fix to be amended into its matching commit, folded into the existing commit rather than recorded as a new one.',
     crux: 'Each fix must be applied to a different existing commit, not combined into a single new commit, so the run rewrites three points in the history instead of adding one commit on top.',
     shape: 'amend',
   },
@@ -90,8 +90,8 @@ const SCENARIOS = [
     label: 'Squash commits',
     title: 'Squash commit groups',
     situation:
-      'The branch records the work as many small incremental commits — “extract helper”, “wire helper”, “fix typo”, “actually wire helper” — alongside unrelated commits. The instruction asks for the incremental commits to be squashed (combined) into a small number of semantic commits, with the unrelated commits kept separate.',
-    crux: 'The grouping must be correct — incremental commits combined into semantic units, unrelated commits left intact — and the run must end with the same final file contents and no uncommitted changes.',
+      'The branch records the work as many small incremental commits (“extract helper”, “wire helper”, “fix typo”, “actually wire helper”) alongside unrelated commits. The instruction asks for the incremental commits to be squashed (combined) into a small number of semantic commits, with the unrelated commits kept separate.',
+    crux: 'The grouping must be correct (incremental commits combined into semantic units, unrelated commits left intact) and the run must end with the same final file contents and no uncommitted changes.',
     shape: 'squash',
   },
 ];
@@ -199,7 +199,7 @@ function bothCell(codex, claude, extra = {}) {
     mean_task_vc: round(avg(codex.mean_task_vc, claude.mean_task_vc), 1),
     mean_inspect: round(avg(codex.mean_inspect, claude.mean_inspect), 1),
     mean_mutate: round(avg(codex.mean_mutate, claude.mean_mutate), 1),
-    mean_cold_bytes: null, // cross-agent KB is not comparable — never emit it
+    mean_cold_bytes: null, // cross-agent KB is not comparable: never emit it
     mean_warm_bytes: null,
     ...extra,
   };
@@ -480,7 +480,7 @@ function build({ aggregate, baseline, jj, out }) {
       },
       kb_comparable_within_agent_only: true,
       kb_note:
-        'warm_bytes subtracts visible skill/reference reads — a token-cost proxy, not a token counter. Claude and Codex record transcripts in different formats, so KB is only comparable between tools within the same agent.',
+        'warm_bytes subtracts visible skill/reference reads: a token-cost proxy, not a token counter. Claude and Codex record transcripts in different formats, so KB is only comparable between tools within the same agent.',
       generator: 'node scripts/build-web-data.mjs',
     },
     source_snapshots: source.sourceSnapshots,
