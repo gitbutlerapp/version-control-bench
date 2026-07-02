@@ -404,9 +404,6 @@ section:first-of-type {
 .matrix tbody tr:hover .m-task {
   background: var(--surface-2);
 }
-.matrix tbody tr:hover td[data-dirty='true'] {
-  background: color-mix(in srgb, var(--warn) 8%, var(--surface-2));
-}
 .matrix tbody td,
 .matrix tbody th,
 .matrix tfoot td,
@@ -420,10 +417,6 @@ section:first-of-type {
   color: var(--text);
   font-weight: 700;
 }
-.m-num[data-dirty='true'] {
-  color: var(--text-faint);
-  background: var(--warn-soft);
-}
 .m-unit {
   color: var(--text-faint);
 }
@@ -434,7 +427,7 @@ section:first-of-type {
 .matrix tfoot th {
   border-top: 2px solid var(--border-strong);
 }
-.matrix tfoot .m-num:not([data-dirty='true']) {
+.matrix tfoot .m-num {
   color: var(--text);
 }
 
@@ -457,12 +450,6 @@ section:first-of-type {
   color: var(--text);
   font-family: var(--font-mono);
   font-weight: 700;
-}
-.legend-dirty {
-  color: var(--text-faint);
-  background: var(--warn-soft);
-  padding: 0 4px;
-  border-radius: 2px;
 }
 
 /* =========================================================================

@@ -25,18 +25,17 @@ function openScenario(id: string) {
   el.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
-// index of the lowest value among the tools that passed every run (the gate):
-// speed/efficiency only count where the tool was reliable.
+// index of the lowest value across the tools (lower is better for time/cmds/kb).
+// Pass rate is shown per cell; it does not gate which value counts as best.
 function bestIdx(cells: (Cell | undefined)[], get: (c: Cell) => number): number {
   let best = -1;
   let bestVal = Infinity;
   cells.forEach((c, i) => {
-    if (c && c.clean) {
-      const v = get(c);
-      if (v < bestVal) {
-        bestVal = v;
-        best = i;
-      }
+    if (!c) return;
+    const v = get(c);
+    if (v < bestVal) {
+      bestVal = v;
+      best = i;
     }
   });
   return best;
@@ -53,20 +52,19 @@ function Group({ cell, best }: { cell: Cell | undefined; best: { t: boolean; c: 
       </>
     );
   }
-  const dirty = !cell.clean;
   return (
     <>
       <td className="m-pass">
         <PassChip pass={cell.pass} n={cell.n} size="sm" />
       </td>
-      <td className="m-num" data-dirty={dirty} data-best={best.t}>
+      <td className="m-num" data-best={best.t}>
         {seconds(cell.mean_wall_ms)}
         <span className="m-unit">s</span>
       </td>
-      <td className="m-num" data-dirty={dirty} data-best={best.c}>
+      <td className="m-num" data-best={best.c}>
         {count(cell.mean_task_vc)}
       </td>
-      <td className="m-num" data-dirty={dirty} data-best={best.k}>
+      <td className="m-num" data-best={best.k}>
         {kb(cell.mean_warm_bytes)}
       </td>
     </>
@@ -179,10 +177,7 @@ export function ResultsTable({ data }: { data: ResultsData }) {
           fails regardless of speed
         </li>
         <li>
-          <span className="legend-bold">bold</span> = best among tools that passed every run
-        </li>
-        <li>
-          <span className="legend-dirty">muted</span> = the tool did not pass all five runs here
+          <span className="legend-bold">bold</span> = best value in each column
         </li>
         <li>KB is comparable within one agent only</li>
       </ul>
