@@ -54,8 +54,8 @@ const SCENARIOS = [
     label: 'Selective commit',
     title: 'Selective commit from a mixed working tree',
     situation:
-      'The working tree mixes an input-validation fix with unrelated logging, configuration, and debug-note changes. The instruction asks for a new branch containing only the validation work, with every other change left uncommitted in the working tree. Leaving the right changes uncommitted is part of the graded outcome.',
-    crux: 'The difficulty is partitioning: selecting the correct files and hunks (contiguous blocks of changed lines within a file) without sweeping in the rest of the uncommitted changes.',
+      'A dirty working tree mixes an input-validation fix with unrelated logging, config, and debug-note edits. The task is a single commit on a new branch holding only the validation work, which spans three files, with everything else left uncommitted.',
+    crux: 'One file, src/handler.ts, has changes on both sides: two validation hunks belong in the commit while a logging hunk must stay behind. Picking the right hunks without sweeping in the rest is the whole task.',
     shape: 'select',
   },
   {
@@ -63,8 +63,8 @@ const SCENARIOS = [
     label: 'Multi-amend',
     title: 'Amend fixes into multiple earlier commits',
     situation:
-      'The branch contains separate validation, scoring, and documentation commits, and the working tree holds three uncommitted fixes, each corresponding to one of those commits. The instruction asks for each fix to be amended into its matching commit, folded into the existing commit rather than recorded as a new one.',
-    crux: 'Each fix must be applied to a different existing commit, not combined into a single new commit, so the run rewrites three points in the history instead of adding one commit on top.',
+      'A five-commit branch has uncommitted changes in the working tree that belong to three of its commits. The task routes each change into its matching commit by amending, not by adding a new one, and leaves a config tweak, a debug helper, and notes uncommitted.',
+    crux: 'The changes are hunks spread across shared files: src/lead.ts, the tests, and README each feed more than one target commit, so a single file must be split across different amends.',
     shape: 'amend',
   },
   {
@@ -90,8 +90,8 @@ const SCENARIOS = [
     label: 'Squash commits',
     title: 'Squash commit groups',
     situation:
-      'The branch records the work as many small incremental commits (“extract helper”, “wire helper”, “fix typo”, “actually wire helper”) alongside unrelated commits. The instruction asks for the incremental commits to be squashed (combined) into a small number of semantic commits, with the unrelated commits kept separate.',
-    crux: 'The grouping must be correct (incremental commits combined into semantic units, unrelated commits left intact) and the run must end with the same final file contents and no uncommitted changes.',
+      'A seven-commit branch interleaves two standalone commits with two runs of incremental commits: a two-commit parser group and a three-commit retry group. The task squashes each run into one semantic commit and leaves the standalone commits untouched, ending with four.',
+    crux: 'Only the two adjacent groups may be combined; the standalone commits must stay separate, and the final file contents must be identical with a clean worktree.',
     shape: 'squash',
   },
 ];

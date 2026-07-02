@@ -14,31 +14,9 @@ interface GraphSpec {
 
 // Vertical commit stacks, newest at the top (like `git log`), shown as a
 // before | after diff. Fits the narrow column beside the scenario text.
-const SPECS: Record<ScenarioMeta['shape'], GraphSpec> = {
-  select: {
-    before: [{ label: 'worktree', tone: 'ghost' }],
-    after: [{ label: 'validation', tone: 'result' }],
-    note: 'one topic committed on a new branch',
-    leftovers: 'logging · config · notes',
-  },
-  amend: {
-    before: [
-      { label: 'E', tone: 'changed' },
-      { label: 'D' },
-      { label: 'C', tone: 'changed' },
-      { label: 'B' },
-      { label: 'A', tone: 'changed' },
-    ],
-    after: [
-      { label: 'E′', tone: 'result' },
-      { label: 'D' },
-      { label: 'C′', tone: 'result' },
-      { label: 'B' },
-      { label: 'A′', tone: 'result' },
-    ],
-    note: 'each dirty fix folded into its commit',
-    leftovers: 'debug · config notes',
-  },
+// Drives the generic before|after stack renderer for the history-shape
+// scenarios. select and amend have their own bespoke components below.
+const SPECS: Record<'split' | 'reorder' | 'squash', GraphSpec> = {
   split: {
     before: [{ label: 'top' }, { label: 'mixed', tone: 'changed' }],
     after: [
@@ -85,7 +63,7 @@ const SPECS: Record<ScenarioMeta['shape'], GraphSpec> = {
       { label: 'B+C', tone: 'result' },
       { label: 'A' },
     ],
-    note: 'noisy steps squashed into two commits',
+    note: 'two groups squashed · two commits kept',
   },
 };
 
@@ -152,81 +130,82 @@ function Column({ nodes, x, side }: { nodes: Node[]; x: number; side: 'before' |
   );
 }
 
-// Selective commit is a different move: partition a dirty worktree, not
-// reshape history. Show the four changes as uncommitted files, one pulled into
-// a commit on a new branch, the rest left dirty.
+// Selective commit is a partition, not a history rewrite: the validation work
+// (spread across three files) becomes one commit on a new branch, the rest stays
+// dirty. src/handler.ts straddles the split, so its hunks are drawn individually
+// — two committed, one left behind — to show a single file on both sides.
+const SELECT_IN = { fill: 'var(--tool-but-soft)', stroke: 'var(--tool-but)' };
+const SELECT_OUT = { fill: 'none', stroke: 'var(--border-strong)' };
+
 function SelectGraph() {
-  const changes = [
-    { label: 'validation', committed: true },
-    { label: 'logging' },
-    { label: 'config' },
-    { label: 'notes' },
+  const files = [
+    { name: 'handler.ts', hunks: ['in', 'in', 'out'] },
+    { name: 'handler.test', hunks: ['in'] },
+    { name: 'README', hunks: ['in'] },
+    { name: 'config.ts', hunks: ['out'] },
+    { name: 'notes', hunks: ['out'], untracked: true },
   ];
-  const rowY = (i: number) => 54 + i * 25;
+  const rowY = (i: number) => 48 + i * 27;
+  const CELL = 11;
+  const GAPC = 3;
+  const RIGHT = 174;
+  const midY = rowY(1); // centre of the committed rows (0..2)
   return (
     <figure className="commitgraph">
       <svg
-        viewBox="0 0 300 190"
+        viewBox="0 0 300 200"
         role="img"
-        aria-label="Selective commit: commit only the validation change on a new branch, leave logging, config and notes uncommitted"
+        aria-label="Selective commit: two validation hunks in handler.ts plus the test and README become one commit on a new branch; a logging hunk in handler.ts, the config change, and untracked notes stay uncommitted."
         preserveAspectRatio="xMidYMin meet"
       >
         <text x={12} y={16} className="cg-col">
           dirty worktree
         </text>
-        <rect
-          x={4}
-          y={34}
-          width={150}
-          height={118}
-          rx={8}
-          className="cg-box"
-        />
-        {changes.map((c, i) => {
+        <rect x={4} y={32} width={182} height={140} rx={8} className="cg-box" />
+        {files.map((f, i) => {
           const y = rowY(i);
-          const tone = c.committed ? 'result' : 'base';
+          const n = f.hunks.length;
+          const startX = RIGHT - (n * CELL + (n - 1) * GAPC);
           return (
-            <g key={c.label}>
-              <rect
-                x={17}
-                y={y - 5}
-                width={10}
-                height={10}
-                rx={2}
-                fill={c.committed ? 'var(--tool-but-soft)' : 'none'}
-                stroke={c.committed ? 'var(--tool-but)' : 'var(--border-strong)'}
-                strokeWidth={1.5}
-                strokeDasharray={c.committed ? undefined : '3 2'}
-              />
-              <text x={34} y={y + 1} className="cg-nodelabel" data-tone={tone} textAnchor="start">
-                {c.label}
+            <g key={f.name}>
+              <text x={14} y={y + 1} className="cg-nodelabel" data-tone="base" textAnchor="start">
+                {f.name}
               </text>
+              {f.hunks.map((h, j) => {
+                const c = h === 'in' ? SELECT_IN : SELECT_OUT;
+                return (
+                  <rect
+                    key={j}
+                    x={startX + j * (CELL + GAPC)}
+                    y={y - CELL / 2}
+                    width={CELL}
+                    height={CELL}
+                    rx={2}
+                    fill={c.fill}
+                    stroke={c.stroke}
+                    strokeWidth={1.5}
+                    strokeDasharray={f.untracked ? '3 2' : undefined}
+                  />
+                );
+              })}
             </g>
           );
         })}
 
-        {/* validation pulled out into a commit on a new branch */}
-        <line x1={158} y1={rowY(0)} x2={214} y2={rowY(0)} className="cg-arrow" />
-        <path d={`M218 ${rowY(0)} l-7 -4 l0 8 z`} className="cg-arrowhead" />
-        <line x1={228} y1={rowY(0)} x2={228} y2={rowY(0) + 22} className="cg-edge" />
-        <circle
-          cx={228}
-          cy={rowY(0)}
-          r={7}
-          fill="var(--tool-but)"
-          stroke="var(--tool-but)"
-          strokeWidth={1.5}
-        />
-        <circle cx={228} cy={rowY(0)} r={2.2} fill="var(--bg)" opacity={0.5} />
-        <text x={244} y={rowY(0) + 1} className="cg-nodelabel" data-tone="result" textAnchor="start">
-          commit
+        {/* the committed hunks collapse into one commit on a new branch */}
+        <line x1={190} y1={midY} x2={232} y2={midY} className="cg-arrow" />
+        <path d={`M236 ${midY} l-7 -4 l0 8 z`} className="cg-arrowhead" />
+        <circle cx={254} cy={midY} r={8} fill="var(--tool-but)" stroke="var(--tool-but)" strokeWidth={1.5} />
+        <circle cx={254} cy={midY} r={2.4} fill="var(--bg)" opacity={0.5} />
+        <text x={254} y={midY - 15} className="cg-col" textAnchor="middle">
+          1 commit
         </text>
-        <text x={228} y={rowY(0) + 36} className="cg-col" textAnchor="middle">
+        <text x={254} y={midY + 24} className="cg-col" textAnchor="middle">
           new branch
         </text>
 
-        <text x={8} y={176} className="cg-note">
-          one change committed · logging · config · notes stay dirty
+        <text x={8} y={192} className="cg-note">
+          amber hunks → one commit · hollow stays uncommitted
         </text>
       </svg>
     </figure>
