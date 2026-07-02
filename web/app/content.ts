@@ -73,11 +73,6 @@ export const METHOD = {
   ],
 };
 
-export const LIMITS = {
-  title: 'Limitations',
-  body: 'This is not a coding benchmark: every task is version-control work with the code already written, and the results say nothing about whether an agent writes good code. The five tasks cover common situations but are a sample, and real branches vary more than these fixtures. The results are a snapshot of specific tool, agent, and skill versions on one date, not a permanent ranking. The output-size figure approximates task-only output and is comparable only within one agent. Both agents are run to check whether the tool effect holds across them; they are not ranked against each other.',
-};
-
 export const LEDGER = {
   title: 'Failed runs',
   lede: 'Thirteen of 150 runs failed the grader. Every failure was Claude; most were Jujutsu, with two plain git misses and one GitButler miss.',

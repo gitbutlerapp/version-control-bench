@@ -575,7 +575,7 @@ section:first-of-type {
   color: var(--text);
   text-decoration: none;
 }
-.theme-toggle {
+.icon-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -589,9 +589,10 @@ section:first-of-type {
   cursor: pointer;
   transition: color 120ms ease, border-color 120ms ease, background-color 120ms ease;
 }
-.theme-toggle:hover {
+.icon-btn:hover {
   color: var(--text);
   border-color: var(--border-strong);
+  text-decoration: none;
 }
 .theme-icon {
   width: 16px;
@@ -1055,24 +1056,6 @@ section:first-of-type {
   border-radius: 999px;
   padding: 3px 11px;
 }
-.limits {
-  margin-top: var(--s-7);
-  padding-top: var(--s-6);
-  border-top: 1px solid var(--border);
-}
-.limits-title {
-  font-size: var(--fs-h3);
-  font-weight: 650;
-  line-height: var(--lh-heading);
-  margin-bottom: var(--s-3);
-}
-.limits-body {
-  color: var(--text-muted);
-  font-size: var(--fs-caption);
-  line-height: var(--lh-caption);
-  max-width: var(--measure);
-}
-
 /* =========================================================================
    provenance + footer
    ========================================================================= */
