@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Hanken_Grotesk, JetBrains_Mono } from 'next/font/google';
 import './globals.css';
+import { Umami } from './components/Umami';
 
 const hanken = Hanken_Grotesk({
   subsets: ['latin'],
@@ -52,6 +53,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT }} />
       </head>
       <body>{children}</body>
+      <Umami />
     </html>
   );
 }
