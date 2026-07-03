@@ -159,6 +159,10 @@ body {
   line-height: var(--lh-body);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  /* the matrix/ledger scroll inside their own wrappers; clip any residual
+     horizontal bleed so the page itself never scrolls sideways on mobile.
+     `clip` (not hidden) leaves the sticky bar's position: sticky intact. */
+  overflow-x: clip;
   /* faint graph-paper texture — the lab-notebook substrate (pre-dimmed) */
   background-image:
     linear-gradient(color-mix(in srgb, var(--border) 14%, transparent) 1px, transparent 1px),
@@ -281,6 +285,9 @@ section:first-of-type {
    results matrix — tasks x tools x (pass, time, cmds, KB)
    ========================================================================= */
 .matrix-wrap {
+  /* positioned so absolutely-placed children (the chips' .sr-only text)
+     anchor inside this scroller instead of poking the viewport wider */
+  position: relative;
   overflow-x: auto;
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
