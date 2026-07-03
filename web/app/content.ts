@@ -43,8 +43,6 @@ export const SCENARIOS_INTRO = {
 export const METHOD = {
   title: 'Method',
   lede: 'Correctness is scored by a hidden, deterministic grader on the final Git state; two different command sequences pass if they produce the same history. Every tool receives the same task and the same plain-English instruction, the tool name does not appear in the prompt, and setup is excluded from timing.',
-  disclosure:
-    'This benchmark is built and maintained by GitButler, one of the three tools measured; correctness is determined by the grader, not by GitButler, and the task definitions, the grader, and the per-run data are all public.',
   facts: [
     {
       term: 'Identical instruction across tools',

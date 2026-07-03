@@ -750,6 +750,16 @@ section:first-of-type {
 .passchip-glyph {
   font-size: 0.85em;
 }
+/* interactive chip (a miss you can click to jump to the failures table) */
+button.passchip {
+  cursor: pointer;
+  font-family: inherit;
+  transition: border-color 120ms ease;
+}
+button.passchip:hover,
+button.passchip:focus-visible {
+  border-color: currentColor;
+}
 
 /* =========================================================================
    scenarios
@@ -991,20 +1001,6 @@ section:first-of-type {
 /* =========================================================================
    methodology + limits + pills
    ========================================================================= */
-.method-disclosure {
-  max-width: var(--measure);
-  margin-bottom: var(--s-6);
-  padding: var(--s-3) var(--s-4);
-  border-left: 2px solid var(--border-strong);
-  background: var(--surface-inset);
-  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
-  color: var(--text-muted);
-  font-size: var(--fs-caption);
-}
-.method-disclosure .eyebrow {
-  display: block;
-  margin-bottom: var(--s-1);
-}
 .method-list {
   display: grid;
   grid-template-columns: 1fr 1fr;

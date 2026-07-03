@@ -11,11 +11,6 @@ export function Methodology({ data }: { data: ResultsData }) {
         <p className="lede">{METHOD.lede}</p>
       </div>
 
-      <p className="method-disclosure">
-        <span className="eyebrow">Disclosure</span>
-        {METHOD.disclosure}
-      </p>
-
       <dl className="method-list">
         {METHOD.facts.map((f) => (
           <div key={f.term} className="method-item">

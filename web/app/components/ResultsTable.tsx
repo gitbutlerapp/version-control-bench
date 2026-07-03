@@ -25,6 +25,11 @@ function openScenario(id: string) {
   el.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
+// jump to the failures table (from a pass chip that has a miss)
+function scrollToFailures() {
+  document.getElementById('failures')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
 // index of the lowest value across the tools (lower is better for time/cmds/kb).
 // Pass rate is shown per cell; it does not gate which value counts as best.
 function bestIdx(cells: (Cell | undefined)[], get: (c: Cell) => number): number {
@@ -55,7 +60,12 @@ function Group({ cell, best }: { cell: Cell | undefined; best: { t: boolean; c: 
   return (
     <>
       <td className="m-pass">
-        <PassChip pass={cell.pass} n={cell.n} size="sm" />
+        <PassChip
+          pass={cell.pass}
+          n={cell.n}
+          size="sm"
+          onActivate={cell.pass < cell.n ? scrollToFailures : undefined}
+        />
       </td>
       <td className="m-num" data-best={best.t}>
         {seconds(cell.mean_wall_ms)}
