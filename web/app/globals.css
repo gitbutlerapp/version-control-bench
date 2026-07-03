@@ -934,8 +934,16 @@ button.passchip:focus-visible {
 /* =========================================================================
    failed-runs ledger
    ========================================================================= */
+/* on narrow screens the 6 columns scroll rather than crush together */
+.ledger-wrap {
+  position: relative; /* same containment as .matrix-wrap for .sr-only children */
+  overflow-x: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
 .ledger {
   width: 100%;
+  min-width: 600px;
   border-collapse: collapse;
   font-size: var(--fs-caption);
 }

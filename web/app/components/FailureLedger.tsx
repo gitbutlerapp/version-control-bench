@@ -59,7 +59,8 @@ export function FailureLedger({ data }: { data: ResultsData }) {
         <p className="lede">{LEDGER.lede}</p>
       </div>
 
-      <table className="ledger">
+      <div className="ledger-wrap">
+        <table className="ledger">
         <thead>
           <tr>
             <th>Tool</th>
@@ -95,7 +96,8 @@ export function FailureLedger({ data }: { data: ResultsData }) {
             </tr>
           ))}
         </tbody>
-      </table>
+        </table>
+      </div>
 
       <p className="prose ledger-proportion">{LEDGER.proportionality}</p>
     </section>
