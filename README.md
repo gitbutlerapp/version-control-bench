@@ -133,9 +133,9 @@ The useful measurement block is `measurement`, not the older coarse `metrics` bl
 
 The human-facing results page is [docs/results/README.md](docs/results/README.md). It links each scenario to the plain-English [scenario guide](docs/scenarios.md) and compares `git`, `but+skill`, and `jj+skill` by agent.
 
-Latest full matrix: [docs/results/full-k5-2026-07-01.md](docs/results/full-k5-2026-07-01.md), all five pilots, `k=5`, Codex and Claude, `git`, `but+skill`, and `jj+skill`, 150 runs total.
+Latest full matrix: [docs/results/full-k7-2026-07-03.md](docs/results/full-k7-2026-07-03.md), all five pilots, `k=7`, Codex and Claude, `git`, `but+skill`, and `jj+skill`, 210 runs total.
 
-Headline from that batch: 137/150 runs passed. `but+skill` is still the strongest arm: it passed 25/25 with Codex and 24/25 with Claude, cut mean wall time by 69.7% for Codex and 61.8% for Claude versus plain `git`, and used far fewer task-relevant version-control commands. `jj+skill` stayed clean with Codex at 25/25, but Claude passed only 15/25, including 0/5 on split-commit.
+Headline from that batch: 193/210 runs passed the verifier. `but+skill` is now clean for both agents, passing 35/35 with Codex and 35/35 with Claude, while cutting mean wall time by 67.5% for Codex and 60.8% for Claude versus plain `git`. Plain `git` stayed clean with Codex but Claude passed only 28/35, including 2/7 on split-commit. `jj+skill` stayed clean with Codex at 35/35, but Claude passed 25/35.
 
 ## Docs
 

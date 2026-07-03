@@ -28,7 +28,7 @@ export const RESULTS = {
   title: 'Results matrix',
   lede: 'Each tool on each scenario, for the selected agent.',
   columns: {
-    pass: 'Reliability: the share of the five runs that produced the exact history specified by the instruction.',
+    pass: 'Reliability: the share of the seven runs that produced the exact history specified by the instruction.',
     time: 'Speed: mean wall-clock time per run, with setup excluded.',
     cmds: 'Count of version-control commands the agent ran per run. Fewer commands generally correspond to lower wall-clock time and less output.',
     kb: 'Efficiency: kilobytes of version-control output the agent read back per run (skill reads excluded), a proxy for token cost. Comparable within one agent only.',
@@ -67,17 +67,17 @@ export const METHOD = {
       body: 'jj 0.42.0, a colocated repository (jj and git operating on the same working copy), and the most-used external jj agent skill, installed before timing begins.',
     },
     {
-      term: 'Five runs per cell (k=5)',
-      body: 'Each agent–tool–task combination (a cell) ran five times. The numbers on this page are means over those five runs, not a single run.',
+      term: 'Seven runs per cell (k=7)',
+      body: 'Each agent–tool–task combination (a cell) ran seven times. The numbers on this page are means over those seven runs, not a single run.',
     },
   ],
 };
 
 export const LEDGER = {
   title: 'Failed runs',
-  lede: 'Thirteen of 150 runs failed the grader. Every failure was Claude; most were Jujutsu, with two plain git misses and one GitButler miss.',
+  lede: 'Seventeen of 210 runs failed the grader. Every grader failure was Claude; GitButler had zero verifier misses.',
   proportionality:
-    'Jujutsu had the widest correctness problem: Claude split-commit failed 5/5, multi-amend failed 3/5, and reorder failed 2/5. GitButler had one Claude selective-commit partition miss. Plain git had two Claude misses.',
+    'Plain git failed 7 verifier checks: Claude split-commit failed 5/7, selective commit failed 1/7, and multi-amend failed 1/7. Jujutsu failed 10: Claude split-commit failed 6/7, selective commit failed 2/7, multi-amend failed 1/7, and squash failed 1/7.',
 };
 
 export const AGENT_NOTE =

@@ -1,6 +1,6 @@
 # Pilot 1 `but+skill` Clean-Harness Reruns
 
-> Current results: this per-pilot rerun is historical context. The latest k=5 full-matrix test run is displayed in [full-k5-2026-07-01.md](full-k5-2026-07-01.md).
+> Current results: this per-pilot rerun is historical context. The latest full-matrix test run is displayed in [full-k7-2026-07-03.md](full-k7-2026-07-03.md).
 
 Date: 2026-06-25 and 2026-06-26
 

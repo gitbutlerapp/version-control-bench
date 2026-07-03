@@ -25,7 +25,7 @@ const REPO = resolve(__dirname, '..');
 
 // ---- source snapshots (the "current value") -------------------------------
 const DEFAULTS = {
-  aggregate: 'tmp/pilot-runs/full-k5-20260701-all-tools/aggregate.json',
+  aggregate: 'tmp/pilot-runs/full-k7-20260703-all-tools/aggregate.json',
   baseline: null, // legacy: git + but+skill
   jj: null, // legacy: jj+skill
   out: 'web/data/results.json',
@@ -135,6 +135,11 @@ const FAILURE_READS = {
     label: 'PARTITION_WRONG',
     read: 'The run committed or left behind the wrong subset of changes.',
   },
+  AGENT_TIMEOUT: {
+    severity: 'worse-miss',
+    label: 'AGENT_TIMEOUT',
+    read: 'The agent hit the runtime cap before producing an acceptable final state.',
+  },
 };
 
 // ---- helpers ---------------------------------------------------------------
@@ -228,6 +233,18 @@ function vsGit(cell, gitCell) {
 
 function unique(values) {
   return [...new Set(values.filter((v) => v != null))];
+}
+
+function perGroupK(rows) {
+  const counts = new Set();
+  for (const sc of SCENARIOS) {
+    for (const agent of ['codex', 'claude']) {
+      for (const arm of ARM_ORDER) {
+        counts.add(rows.filter((r) => r.task === sc.id && r.agent === agent && r.arm === arm).length);
+      }
+    }
+  }
+  return counts.size === 1 ? [...counts][0] : [...counts].sort((a, b) => a - b).join('/');
 }
 
 function rowsForArms(rows, arms) {
@@ -444,12 +461,13 @@ function build({ aggregate, baseline, jj, out }) {
   const total_runs = allRows.length;
   const total_passed = allRows.filter((r) => r.passed).length;
   const snapshotDate = new Date(source.generatedAt).toISOString().slice(0, 10);
+  const k = perGroupK(allRows);
 
   const data = {
     schema_version: 1,
     generated_at: new Date().toISOString(),
     meta: {
-      k: 5,
+      k,
       total_runs,
       total_passed,
       pass_rate: round((total_passed / total_runs) * 100, 1),
@@ -497,11 +515,12 @@ function build({ aggregate, baseline, jj, out }) {
 }
 
 function validate(d) {
+  const expectedRows = Number.isFinite(d.meta.k) ? d.meta.k * SCENARIOS.length * 2 * ARM_ORDER.length : d.rows.length;
   const armsSeen = new Set(d.cells_overall.map((c) => c.arm));
   for (const arm of ARM_ORDER) if (!armsSeen.has(arm)) throw new Error(`validate: arm ${arm} missing`);
   const agentsSeen = new Set(d.cells_overall.map((c) => c.agent));
   for (const a of ['codex', 'claude', 'both']) if (!agentsSeen.has(a)) throw new Error(`validate: agent ${a} missing`);
-  if (d.rows.length !== 150) throw new Error(`validate: expected 150 rows, got ${d.rows.length}`);
+  if (d.rows.length !== expectedRows) throw new Error(`validate: expected ${expectedRows} rows, got ${d.rows.length}`);
   if (d.cells_overall.length !== 9) throw new Error(`validate: expected 9 overall cells, got ${d.cells_overall.length}`);
   if (d.cells_by_scenario.length !== 45) throw new Error(`validate: expected 45 scenario cells, got ${d.cells_by_scenario.length}`);
   // honesty firewall: no 'both' cell may carry a KB number
@@ -510,8 +529,8 @@ function validate(d) {
       throw new Error(`validate: 'both' cell carries cross-agent KB (forbidden) for arm ${c.arm}`);
     }
   }
-  if (d.meta.total_runs !== 150) {
-    throw new Error(`validate: expected 150 runs, got ${d.meta.total_runs}`);
+  if (d.meta.total_runs !== expectedRows) {
+    throw new Error(`validate: expected ${expectedRows} runs, got ${d.meta.total_runs}`);
   }
 }
 
