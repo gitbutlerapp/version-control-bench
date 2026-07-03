@@ -315,7 +315,7 @@ section:first-of-type {
 }
 .matrix th,
 .matrix td {
-  padding: var(--s-3) var(--s-2);
+  padding: var(--s-3) var(--s-3);
   text-align: right;
   white-space: nowrap;
 }
@@ -326,7 +326,7 @@ section:first-of-type {
   padding-block: var(--s-4);
 }
 .matrix .m-corner {
-  width: 30%;
+  width: 18%;
   text-align: left;
   vertical-align: bottom;
   position: sticky;
