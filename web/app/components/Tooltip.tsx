@@ -62,7 +62,6 @@ export function Tooltip({ label, children, className, onActivate }: TooltipProps
             }
           : undefined
       }
-      aria-label={interactive ? `${label}, open details` : undefined}
     >
       {children}
       {pos &&

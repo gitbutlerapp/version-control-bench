@@ -53,7 +53,7 @@
   --border-strong: #38424f;
   --text: #e7eaef;
   --text-muted: #9aa4b2;
-  --text-faint: #626d7c;
+  --text-faint: #7e8898; /* AA (4.5:1) on all dark surfaces */
   --link: #82a8f2;
   --focus: #82a8f2;
 
@@ -97,7 +97,7 @@
   --border-strong: #c2ccd7;
   --text: #1a2029;
   --text-muted: #545f6d;
-  --text-faint: #7b8592;
+  --text-faint: #626c7a; /* AA (4.5:1) on white and the inset surfaces */
   --link: #2f66d0;
   --focus: #2f66d0;
 
@@ -1129,6 +1129,11 @@ button.passchip:focus-visible {
   max-width: var(--measure);
   font-size: var(--fs-caption);
   line-height: var(--lh-caption);
+}
+/* links inside footer prose sit in running text, so color alone can't mark them */
+.footer-bias a {
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 .footer-stamp {
   font-size: var(--fs-micro);
