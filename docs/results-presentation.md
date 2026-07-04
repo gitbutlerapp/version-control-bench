@@ -35,6 +35,17 @@ For each `(task, agent, arm)` group, report:
 
 For public claims, also add uncertainty intervals. For pilot work, 3-run means are fine for spotting large differences, not for making precise claims.
 
+## Uncertainty Rules
+
+The matrix report computes these automatically (`scripts/lib/stats.mjs`); public writeups must carry them through:
+
+- Every pass rate gets a Wilson 95% interval over the trials in that cell.
+- Trials of the same task are correlated, so never pool trials across tasks as if independent. Cross-task claims aggregate per-task scores; the sampling unit is the task.
+- Arm-versus-`git` comparisons use paired per-task differences with a t-based 95% CI (df = tasks - 1). If that interval crosses zero, say the direction is consistent but the task-population effect is not established; do not headline the pooled percentage alone.
+- Report `tasks all-k` (tasks where every trial passed) as the reliability gate; it is the per-task pass^k and the number that matters for unattended use.
+- Report median and p90 wall time alongside the mean; timeouts and long tails hide in means.
+- Scope claims to the tasks measured ("on these five operations"), not to version control in general, until the task set is large enough that the paired CIs are informative.
+
 ## What To Keep Out Of The Headline
 
 Do not headline:

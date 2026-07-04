@@ -12,6 +12,8 @@ The benchmark is maintained by GitButler, one of the three tools measured; the g
 
 Full matrix from 2026-07-03: 5 scenarios x 3 tools x 2 agents, seven runs per cell (k=7), 210 graded runs, 193 passed. GitButler passed all 70 of its runs while cutting mean wall time by roughly 68% (Codex) and 61% (Claude) versus plain `git`. All 17 grader failures were Claude runs on `git` or Jujutsu, concentrated on split-commit.
 
+With five scenarios the task-clustered 95% intervals on the wall-time deltas are wide (the direction is consistent across scenarios, but the effect size is measured on these operations only). The statistically solid findings are the reliability gap — GitButler is the only tool where both agents passed every run of every scenario — and the command-count reduction for Codex. Confidence intervals and paired per-scenario deltas are in the [full writeup](docs/results/full-k7-2026-07-03.md).
+
 Each cell shows pass rate, mean wall time, and mean version-control commands per run. **Bold** marks the fastest tool that passed every run of that scenario.
 
 ### Codex (gpt-5.5)
@@ -70,7 +72,7 @@ Each scenario is a pre-built Git repository (a commit history plus uncommitted c
 - **Deterministic grader.** Correctness is checked by a hidden, scripted verifier that inspects the final Git state: commit boundaries, branch topology, and what stayed uncommitted. It is not an LLM judge and does not compare commands against a reference — two different command sequences pass if they produce the same history.
 - **Timing boundary.** Fixture build, workspace prep, skill installation, and dirty-state application all happen before timing begins; the measured figures cover only the agent's work on the task.
 - **Git write restriction.** In GitButler and Jujutsu runs, raw git write commands are blocked so the agent must use the tool under test. Git calls a tool makes internally count as tool-internal work, not agent commands.
-- **k=7.** Every agent-tool-task cell ran seven times; reported numbers are means over those runs.
+- **k=7.** Every agent-tool-task cell ran seven times; reported numbers are means over those runs. Checked-in reports also carry Wilson 95% intervals on pass rates, paired per-scenario deltas with task-clustered CIs, and per-scenario pass^k ("passed all 7 runs").
 
 Full method docs: [benchmark design](docs/benchmark-design.md), [scoring and validation](docs/scoring-and-validation.md), [fairness and anti-cheat](docs/fairness-and-anti-cheat.md), [results presentation](docs/results-presentation.md).
 

@@ -4,6 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import { parseArgs } from "./lib/args.mjs";
+import { pairedMeanCI, quantile, wilsonInterval } from "./lib/stats.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
@@ -201,12 +202,18 @@ function summarizeGroup(rows) {
   const firstMutation = numeric(rows, "first_mutation_ms");
   const cold = numeric(rows, "cold_bytes");
   const warm = numeric(rows, "warm_bytes");
+  const pass = rows.filter((row) => row.passed).length;
+  const passCi = wilsonInterval(pass, rows.length);
   return {
     n: rows.length,
     completed: rows.filter((row) => row.completed).length,
-    pass: rows.filter((row) => row.passed).length,
+    pass,
+    pass_rate: rows.length > 0 ? pass / rows.length : null,
+    pass_ci_lo: passCi?.lo ?? null,
+    pass_ci_hi: passCi?.hi ?? null,
     mean_wall_ms: mean(wall),
     median_wall_ms: median(wall),
+    p90_wall_ms: quantile(wall, 0.9),
     max_wall_ms: max(wall),
     mean_task_vc: mean(numeric(rows, "task_vc")),
     mean_inspect: mean(numeric(rows, "inspect")),
@@ -237,6 +244,22 @@ function count(value, digits = 1) {
 
 function kb(bytes) {
   return Number.isFinite(bytes) ? String(round(bytes / 1024, 1)) : "n/a";
+}
+
+function pct(value, digits = 0) {
+  return Number.isFinite(value) ? `${round(value * 100, digits)}%` : "n/a";
+}
+
+function passCiCell(summary) {
+  if (!Number.isFinite(summary.pass_ci_lo)) return "n/a";
+  return `${pct(summary.pass_ci_lo)}-${pct(summary.pass_ci_hi)}`;
+}
+
+function pairedCell(stat, { scale = 1, unit = "", digits = 1 } = {}) {
+  if (!stat || !Number.isFinite(stat.mean)) return "n/a";
+  const fmt = (value) => `${value > 0 ? "+" : ""}${round(value * scale, digits)}${unit}`;
+  if (!Number.isFinite(stat.lo)) return fmt(stat.mean);
+  return `${fmt(stat.mean)} [${fmt(stat.lo)}, ${fmt(stat.hi)}]`;
 }
 
 function delta(newValue, baseValue) {
@@ -284,6 +307,52 @@ function aggregate(plans, batchDir, commandLine) {
       };
     }),
   };
+
+  // Task-clustered statistics: the trial samples within one task cell are
+  // correlated, so reliability claims aggregate per-task scores, and arm
+  // comparisons use paired per-task differences against the git arm.
+  for (const overall of summaries.overall) {
+    const cells = summaries.by_task.filter(
+      (cell) => cell.agent === overall.agent && cell.arm === overall.arm,
+    );
+    overall.task_count = cells.length;
+    overall.tasks_all_pass = cells.filter((cell) => cell.n > 0 && cell.pass === cell.n).length;
+  }
+
+  summaries.paired_vs_git = [];
+  const agents = unique(rows.map((row) => row.agent));
+  const arms = unique(rows.map((row) => row.arm)).filter((arm) => arm !== "git");
+  const taskIds = unique(rows.map((row) => row.task));
+  for (const agent of agents) {
+    for (const arm of arms) {
+      const passDeltas = [];
+      const wallDeltas = [];
+      const taskVcDeltas = [];
+      for (const task of taskIds) {
+        const git = summaryLookup(summaries.by_task, { task, agent, arm: "git" });
+        const candidate = summaryLookup(summaries.by_task, { task, agent, arm });
+        if (!git || !candidate || git.n === 0 || candidate.n === 0) continue;
+        passDeltas.push(candidate.pass / candidate.n - git.pass / git.n);
+        wallDeltas.push(
+          Number.isFinite(candidate.mean_wall_ms) && Number.isFinite(git.mean_wall_ms)
+            ? candidate.mean_wall_ms - git.mean_wall_ms
+            : NaN,
+        );
+        taskVcDeltas.push(
+          Number.isFinite(candidate.mean_task_vc) && Number.isFinite(git.mean_task_vc)
+            ? candidate.mean_task_vc - git.mean_task_vc
+            : NaN,
+        );
+      }
+      summaries.paired_vs_git.push({
+        agent,
+        arm,
+        pass_rate_delta: pairedMeanCI(passDeltas),
+        wall_ms_delta: pairedMeanCI(wallDeltas),
+        task_vc_delta: pairedMeanCI(taskVcDeltas),
+      });
+    }
+  }
 
   const aggregateJson = {
     batch: rel(batchDir),
@@ -362,8 +431,11 @@ function renderReport(data) {
       `\`${summary.arm}\``,
       String(summary.n),
       `${summary.pass}/${summary.n}`,
+      passCiCell(summary),
+      Number.isFinite(summary.task_count) ? `${summary.tasks_all_pass}/${summary.task_count}` : "n/a",
       seconds(summary.mean_wall_ms),
       seconds(summary.median_wall_ms),
+      seconds(summary.p90_wall_ms),
       seconds(summary.max_wall_ms),
       count(summary.mean_task_vc),
       count(summary.mean_inspect),
@@ -397,6 +469,7 @@ function renderReport(data) {
       title(summary.agent),
       `\`${summary.arm}\``,
       `${summary.pass}/${summary.n}`,
+      passCiCell(summary),
       seconds(summary.mean_wall_ms),
       seconds(summary.median_wall_ms),
       seconds(summary.max_wall_ms),
@@ -452,7 +525,7 @@ function renderReport(data) {
     "## Overall",
     "",
     markdownTable(
-      ["Agent", "Arm", "n", "Pass", "Mean Wall", "Median Wall", "Max Wall", "Task VC", "Inspect", "Mutate", "Failed Task VC", "Parser", "Cold KB", "Warm KB"],
+      ["Agent", "Arm", "n", "Pass", "Pass 95% CI", "Tasks all-k", "Mean Wall", "Median Wall", "P90 Wall", "Max Wall", "Task VC", "Inspect", "Mutate", "Failed Task VC", "Parser", "Cold KB", "Warm KB"],
       overallRows,
     ),
     "",
@@ -465,10 +538,26 @@ function renderReport(data) {
       overallDeltaRows,
     ),
     "",
+    "## Paired Per-Task Deltas vs `git`",
+    "",
+    "Each task contributes one paired difference (arm minus `git`, same agent and task); cells show the mean paired difference with a t-based 95% CI over tasks. Trials within a task are correlated, so this task-clustered comparison is the statistically meaningful one.",
+    "",
+    markdownTable(
+      ["Agent", "Arm", "Pass Rate Delta (pp)", "Mean Wall Delta", "Task VC Delta", "Tasks"],
+      (summaries.paired_vs_git ?? []).map((entry) => [
+        title(entry.agent),
+        `\`${entry.arm}\``,
+        pairedCell(entry.pass_rate_delta, { scale: 100, unit: " pp", digits: 1 }),
+        pairedCell(entry.wall_ms_delta, { scale: 1 / 1000, unit: "s", digits: 1 }),
+        pairedCell(entry.task_vc_delta, { digits: 1 }),
+        String(entry.wall_ms_delta?.n ?? entry.pass_rate_delta?.n ?? 0),
+      ]),
+    ),
+    "",
     "## By Task",
     "",
     markdownTable(
-      ["Task", "Agent", "Arm", "Pass", "Mean Wall", "Median Wall", "Max Wall", "Task VC", "Inspect", "Mutate", "Failed Task VC", "Warm KB"],
+      ["Task", "Agent", "Arm", "Pass", "Pass 95% CI", "Mean Wall", "Median Wall", "Max Wall", "Task VC", "Inspect", "Mutate", "Failed Task VC", "Warm KB"],
       byTaskRows,
     ),
     "",
@@ -503,6 +592,9 @@ function renderReport(data) {
     "",
     "## Notes",
     "",
+    "- Pass-rate intervals are Wilson 95% intervals over the trials in the cell; with small n they are intentionally wide.",
+    "- Trials of the same task are correlated, so cross-task claims use task-level aggregation: the paired-deltas table pairs per-task means (df = tasks - 1), and per-cell CIs should not be read as evidence about version-control work beyond these tasks.",
+    "- \"Tasks all-k\" counts tasks where every trial passed (per-task pass^k) - the reliability gate for unattended use.",
     "- Pre-run fixture setup, tool setup, applying task branches, skill installation, local agent instruction files, and dirty-state application are excluded from measured agent duration and command metrics.",
     "- This report uses task-relevant VC command counts, not tool-internal commands or agent platform probes, for the headline command comparison.",
     "- Claude transcript bytes and Codex transcript bytes are not directly comparable; read transcript deltas within the same agent.",
