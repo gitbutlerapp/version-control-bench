@@ -144,7 +144,8 @@ function rowFromPlan(plan) {
     warm_bytes: transcript.warm_estimated_total_bytes ?? null,
     skill_output_bytes: transcript.skill_reference_output_bytes ?? null,
     task_vc_runtime_ms: taskRuntime,
-    observed_model: result?.observed_model ?? result?.model ?? null,
+    configured_model: result?.model ?? null,
+    observed_model: result?.observed_model ?? result?.agent_output?.observed_model ?? result?.model ?? null,
     setup_hash: result?.agent_instructions?.setup_block_sha256 ?? null,
     binary_hash: toolBinary?.sha256 ?? null,
     binary_dirty: toolBinary?.source_git?.dirty ?? null,
@@ -532,7 +533,21 @@ function unique(values) {
 
 function provenanceLines(rows) {
   const lines = [];
+  const agents = unique(rows.map((row) => row.agent));
+  if (agents.length > 0) {
+    lines.push("### Agents");
+    for (const agent of agents) {
+      const agentRows = rows.filter((row) => row.agent === agent && row.completed);
+      if (agentRows.length === 0) continue;
+      const configured = unique(agentRows.map((row) => row.configured_model ? `\`${row.configured_model}\`` : null)).join(", ") || "n/a";
+      const observed = unique(agentRows.map((row) => row.observed_model ? `\`${row.observed_model}\`` : null)).join(", ") || "n/a";
+      lines.push(`- ${title(agent)} configured model: ${configured}`);
+      lines.push(`- ${title(agent)} observed model: ${observed}`);
+    }
+  }
+
   const arms = unique(rows.map((row) => row.arm)).filter((arm) => arm !== "git");
+  if (lines.length > 0 && arms.length > 0) lines.push("");
   for (const arm of arms) {
     const armRows = rows.filter((row) => row.arm === arm && row.completed);
     if (armRows.length === 0) continue;

@@ -6,6 +6,8 @@ Short answer: yes, GitButler is improving against plain `git`. In this k=7 run, 
 
 The current view is one full 2026-07-03 batch: 210 planned runs across five scenarios, Codex and Claude, and three arms: `git`, `but+skill`, and `jj+skill`.
 
+Models: Codex used `gpt-5.5`; Claude used `claude-opus-4-1-20250805` according to Claude Code session metadata. The raw aggregate predates model capture and records Claude as unknown.
+
 ## Current Scorecard
 
 | Agent | Arm | Pass | Mean wall | Median wall | Max wall | Task VC commands | Failed task VC commands |

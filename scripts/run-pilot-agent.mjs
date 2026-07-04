@@ -10,6 +10,7 @@ import { run } from "./lib/process.mjs";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
 const DEFAULT_CODEX_MODEL = "gpt-5.5";
+const DEFAULT_CLAUDE_MODEL = "opus";
 const DEFAULT_JJ_SKILL = {
   package: "onevcat/skills@onevcat-jj",
   name: "onevcat-jj",
@@ -705,7 +706,7 @@ function runAgent(agent, workspace, prompt, env, model, timeoutMs) {
     args.push(prompt);
   } else if (agent === "claude") {
     cmd = "claude";
-    args = ["-p", "--permission-mode", "bypassPermissions", "--output-format", "text"];
+    args = ["-p", "--permission-mode", "bypassPermissions", "--output-format", "json"];
     if (env.VCB_CLAUDE_CLEAN_CONFIG === "true" && env.VCB_CLAUDE_SETTINGS) {
       args.push("--settings", env.VCB_CLAUDE_SETTINGS, "--strict-mcp-config");
     }
@@ -741,6 +742,90 @@ function runAgent(agent, workspace, prompt, env, model, timeoutMs) {
 
 function parseAgentModel(agentResult) {
   return agentResult.stderr.match(/^model:\s*(.+)$/m)?.[1] ?? null;
+}
+
+function parseJsonObject(text) {
+  try {
+    const parsed = JSON.parse(text);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function usageTokenTotal(usage) {
+  if (!usage || typeof usage !== "object") return 0;
+  return [
+    "inputTokens",
+    "outputTokens",
+    "cacheReadInputTokens",
+    "cacheCreationInputTokens",
+    "webSearchRequests",
+  ].reduce((sum, key) => {
+    const value = usage[key];
+    return sum + (Number.isFinite(value) ? value : 0);
+  }, 0);
+}
+
+function primaryModelFromUsage(modelUsage) {
+  if (!modelUsage || typeof modelUsage !== "object") return null;
+  const entries = Object.entries(modelUsage)
+    .map(([model, usage]) => ({
+      model,
+      cost: Number.isFinite(usage?.costUSD) ? usage.costUSD : 0,
+      tokens: usageTokenTotal(usage),
+    }))
+    .sort((a, b) => (b.cost - a.cost) || (b.tokens - a.tokens) || a.model.localeCompare(b.model));
+
+  return entries[0]?.model ?? null;
+}
+
+function parseAgentOutput(agent, agentResult) {
+  if (agent !== "claude") {
+    return {
+      output_format: "text",
+      observed_model: parseAgentModel(agentResult),
+      observed_model_source: "stderr",
+      transcript_stdout: agentResult.stdout,
+    };
+  }
+
+  const parsed = parseJsonObject(agentResult.stdout);
+  if (!parsed) {
+    return {
+      output_format: "json",
+      parse_error: true,
+      observed_model: parseAgentModel(agentResult),
+      observed_model_source: "stderr",
+      transcript_stdout: agentResult.stdout,
+    };
+  }
+
+  return {
+    output_format: "json",
+    parse_error: false,
+    observed_model: primaryModelFromUsage(parsed.modelUsage) ?? parseAgentModel(agentResult),
+    observed_model_source: parsed.modelUsage ? "modelUsage" : "stderr",
+    transcript_stdout: typeof parsed.result === "string" ? parsed.result : "",
+    result_text_bytes: typeof parsed.result === "string" ? Buffer.byteLength(parsed.result) : 0,
+    type: parsed.type ?? null,
+    subtype: parsed.subtype ?? null,
+    is_error: parsed.is_error ?? null,
+    stop_reason: parsed.stop_reason ?? null,
+    session_id: parsed.session_id ?? null,
+    total_cost_usd: parsed.total_cost_usd ?? null,
+    usage: parsed.usage ?? null,
+    model_usage: parsed.modelUsage ?? null,
+    errors: parsed.errors ?? null,
+    permission_denials: parsed.permission_denials ?? null,
+  };
+}
+
+function agentResultForTranscript(agentResult, agentOutput) {
+  return {
+    ...agentResult,
+    stdout: agentOutput.transcript_stdout ?? agentResult.stdout,
+  };
 }
 
 function verify(workspace) {
@@ -1479,7 +1564,7 @@ if (args.get("self-test-metrics") === "true") {
 const taskId = args.get("task") ?? "pilot-1-selective-validation";
 const agent = args.get("agent") ?? "codex";
 const arm = args.get("arm") ?? "git";
-const model = args.get("model") ?? (agent === "codex" ? DEFAULT_CODEX_MODEL : "");
+const model = args.get("model") ?? (agent === "codex" ? DEFAULT_CODEX_MODEL : DEFAULT_CLAUDE_MODEL);
 const timeoutMs = Number(args.get("timeout-ms") ?? 900000);
 const realBut = executablePath(args.get("but-bin"), "but");
 const realJj = executablePath(args.get("jj-bin"), "jj");
@@ -1542,14 +1627,19 @@ if (claudeSettings) {
 const agentResult = runAgent(agent, workspace, prompt, env, model, timeoutMs);
 writeFileSync(path.join(runDir, "agent-stdout.txt"), agentResult.stdout);
 writeFileSync(path.join(runDir, "agent-stderr.txt"), agentResult.stderr);
-const observedModel = parseAgentModel(agentResult);
+const agentOutput = parseAgentOutput(agent, agentResult);
+if (agentOutput.output_format === "json" && !agentOutput.parse_error) {
+  writeFileSync(path.join(runDir, "agent-output.json"), agentResult.stdout);
+}
+const observedModel = agentOutput.observed_model;
+const transcriptAgentResult = agentResultForTranscript(agentResult, agentOutput);
 
 const verifierResult = verify(workspace);
 const trace = markImplicitToolInternal(parseTrace(tracePath));
-const metrics = traceMetrics(trace, prompt, agentResult);
+const metrics = traceMetrics(trace, prompt, transcriptAgentResult);
 const activeSkillDir = arm === "but+skill" ? skillDir : arm === "jj+skill" ? resolvedJjSkill.dir : null;
 const activeSkillName = arm.endsWith("+skill") ? setup.name : null;
-const measurement = measurementBreakdown(trace, prompt, agentResult, activeSkillDir, activeSkillName);
+const measurement = measurementBreakdown(trace, prompt, transcriptAgentResult, activeSkillDir, activeSkillName);
 const skillFile = path.join(activeSkillDir ?? skillDir, "SKILL.md");
 const butBinaryMetadata = arm === "but+skill"
   ? {
@@ -1645,6 +1735,7 @@ const result = {
     cmd: agentResult.cmd,
     args: agentResult.args,
   },
+  agent_output: agentOutput,
   verifier: verifierResult,
   run_failure_class: runFailureClass,
   metrics,

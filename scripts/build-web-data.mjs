@@ -235,6 +235,11 @@ function unique(values) {
   return [...new Set(values.filter((v) => v != null))];
 }
 
+function observedModelForAgent(rows, agent) {
+  const models = unique(rows.filter((r) => r.agent === agent).map((r) => r.observed_model));
+  return models.length > 0 ? models.join(', ') : null;
+}
+
 function perGroupK(rows) {
   const counts = new Set();
   for (const sc of SCENARIOS) {
@@ -475,7 +480,7 @@ function build({ aggregate, baseline, jj, out }) {
       agents: [
         ...AGENTS.map((a) => ({
           ...a,
-          observed_model: a.id === 'codex' ? 'gpt-5.5' : null,
+          observed_model: observedModelForAgent(allRows, a.id),
         })),
         { id: 'both', label: 'Both', note: 'Codex + Claude, averaged' },
       ],

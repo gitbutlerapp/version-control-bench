@@ -25,7 +25,7 @@ Each cell shows pass rate, mean wall time, and mean version-control commands per
 | Squash commits | 7/7 · 34.1s · 11 cmds | 7/7 · 43.3s · 11 cmds | **7/7 · 24.3s · 3 cmds** |
 | **All scenarios** | 35/35 · 89.4s · 23 cmds | 35/35 · 119.0s · 21 cmds | **35/35 · 29.0s · 4 cmds** |
 
-### Claude Code
+### Claude Code (claude-opus-4-1-20250805)
 
 | Scenario | git | Jujutsu | GitButler |
 | --- | --- | --- | --- |
@@ -119,7 +119,7 @@ npm run pilot:agent -- --task pilot-5-squash-commits --agent claude --arm 'but+s
 npm run pilot:agent -- --task pilot-5-squash-commits --agent claude --arm 'jj+skill'
 ```
 
-Defaults are `--task pilot-1-selective-validation`, `--agent codex`, `--arm git`, and Codex model `gpt-5.5`. Use `--model <name>` to override.
+Defaults are `--task pilot-1-selective-validation`, `--agent codex`, `--arm git`, Codex model `gpt-5.5`, and Claude model alias `opus` (latest Opus). Use `--model <name>` to override.
 
 The supported arms are:
 
@@ -162,6 +162,7 @@ npm run pilot:agent -- --agent codex --arm git --codex-clean-config false
 ### Outputs
 
 Run artifacts are written under `tmp/pilot-runs/` and ignored by Git. A run directory contains the sandbox workspace, `result.json`, the command trace, generated instruction files, and verifier output.
+Claude runs also write the raw JSON CLI result to `agent-output.json`; `result.json` records the configured model alias and the concrete observed model from Claude's `modelUsage`.
 
 The useful measurement block is `measurement`, not the older coarse `metrics` block. It separates:
 

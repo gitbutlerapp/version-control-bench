@@ -143,6 +143,7 @@ Adapters should normalize:
 - timeout behavior
 - transcript location
 - token usage if exposed
+- concrete model usage if exposed
 - command/tool traces
 - final answer text
 
