@@ -22,6 +22,7 @@
     "pilot5:verify": "node scripts/verify-pilot5.mjs",
     "pilot5:check": "node scripts/run-pilot5-checks.mjs",
     "matrix:run": "node scripts/run-full-matrix.mjs",
+    "runs:export": "node scripts/export-batch-artifacts.mjs",
     "web:data": "node scripts/build-web-data.mjs"
   },
   "engines": {

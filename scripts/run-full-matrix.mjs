@@ -147,6 +147,7 @@ function rowFromPlan(plan) {
     task_vc_runtime_ms: taskRuntime,
     configured_model: result?.model ?? null,
     observed_model: result?.observed_model ?? result?.agent_output?.observed_model ?? result?.model ?? null,
+    agent_cli_version: result?.agent_cli_version ?? null,
     setup_hash: result?.agent_instructions?.setup_block_sha256 ?? null,
     binary_hash: toolBinary?.sha256 ?? null,
     binary_dirty: toolBinary?.source_git?.dirty ?? null,
@@ -633,8 +634,10 @@ function provenanceLines(rows) {
       if (agentRows.length === 0) continue;
       const configured = unique(agentRows.map((row) => row.configured_model ? `\`${row.configured_model}\`` : null)).join(", ") || "n/a";
       const observed = unique(agentRows.map((row) => row.observed_model ? `\`${row.observed_model}\`` : null)).join(", ") || "n/a";
+      const cliVersion = unique(agentRows.map((row) => row.agent_cli_version ? `\`${row.agent_cli_version}\`` : null)).join(", ") || "n/a";
       lines.push(`- ${title(agent)} configured model: ${configured}`);
       lines.push(`- ${title(agent)} observed model: ${observed}`);
+      lines.push(`- ${title(agent)} CLI version: ${cliVersion}`);
     }
   }
 

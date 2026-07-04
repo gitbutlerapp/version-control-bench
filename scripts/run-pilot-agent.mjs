@@ -702,6 +702,13 @@ function buildPrompt() {
   ].join("\n");
 }
 
+function agentCliVersion(agent) {
+  const cmd = agent === "codex" ? "codex" : "claude";
+  const probe = run(cmd, ["--version"], { check: false });
+  if (probe.status !== 0) return null;
+  return `${probe.stdout}${probe.stderr}`.trim().split("\n")[0] || null;
+}
+
 function runAgent(agent, workspace, prompt, env, model, timeoutMs) {
   const start = Date.now();
   let cmd;
@@ -1722,6 +1729,7 @@ const result = {
   arm,
   model: model || null,
   observed_model: observedModel,
+  agent_cli_version: agentCliVersion(agent),
   agent_config: {
     codex_clean_config: agent === "codex" ? codexCleanConfig : null,
     codex_ephemeral: agent === "codex" ? codexCleanConfig : null,

@@ -164,6 +164,8 @@ npm run pilot:agent -- --agent codex --arm git --codex-clean-config false
 ### Outputs
 
 Run artifacts are written under `tmp/pilot-runs/` and ignored by Git. A run directory contains the sandbox workspace, `result.json`, the command trace, generated instruction files, and verifier output.
+
+`npm run runs:export -- --batch <batch-name>` packages the publishable evidence for a batch — per-run agent transcripts, command traces, prompts, `result.json`, runner logs, and a final Git-state snapshot per run — into a tarball under `tmp/exports/` (the k=7 batch exports to ~2 MB). The export scans for credential-shaped strings and aborts if any are found. Batches referenced in public results should have their artifact bundle attached to a GitHub release so every reported number can be traced to raw evidence.
 Claude runs also write the raw JSON CLI result to `agent-output.json`; `result.json` records the configured model alias and the concrete observed model from Claude's `modelUsage`.
 
 The useful measurement block is `measurement`, not the older coarse `metrics` block. It separates:
