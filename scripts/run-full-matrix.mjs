@@ -700,6 +700,8 @@ const resume = args.get("resume") !== "false";
 const buildBut = args.get("build-but") !== "false" && arms.includes("but+skill");
 const failOnFailures = args.get("fail-on-failures") === "true";
 const timeoutMs = args.get("timeout-ms") ?? "900000";
+const codexModel = args.get("codex-model") ?? null;
+const claudeModel = args.get("claude-model") ?? null;
 const gitbutlerRoot = path.resolve(args.get("gitbutler-root") ?? "/Users/kiril/src/gitbutler");
 const butBin = path.resolve(args.get("but-bin") ?? path.join(gitbutlerRoot, "target/release/but"));
 const skillDir = path.resolve(args.get("skill-dir") ?? path.join(gitbutlerRoot, "crates/but/skill"));
@@ -751,6 +753,8 @@ for (const plan of plans) {
     "--run-id", plan.run_id,
     "--out", plan.run_dir,
   ];
+  const planModel = plan.agent === "codex" ? codexModel : claudeModel;
+  if (planModel) runArgs.push("--model", planModel);
   if (jjBin) runArgs.push("--jj-bin", jjBin);
   if (jjSkillDir) runArgs.push("--jj-skill-dir", jjSkillDir);
   if (jjSkillPackage) runArgs.push("--jj-skill-package", jjSkillPackage);

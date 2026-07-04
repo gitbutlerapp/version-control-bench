@@ -121,7 +121,7 @@ npm run pilot:agent -- --task pilot-5-squash-commits --agent claude --arm 'but+s
 npm run pilot:agent -- --task pilot-5-squash-commits --agent claude --arm 'jj+skill'
 ```
 
-Defaults are `--task pilot-1-selective-validation`, `--agent codex`, `--arm git`, Codex model `gpt-5.5`, and Claude model alias `opus` (latest Opus). Use `--model <name>` to override.
+Defaults are `--task pilot-1-selective-validation`, `--agent codex`, `--arm git`, Codex model `gpt-5.5`, and Claude model `claude-opus-4-8` (a versioned model ID, so reruns hit the same model; the runner warns if you pass a floating alias like `opus`). Use `--model <name>` to override, or `--codex-model` / `--claude-model` on the matrix runner. The published k=7 results predate this default and used `claude-opus-4-1-20250805`.
 
 The supported arms are:
 
@@ -147,7 +147,7 @@ Use `--skill-dir <path>` to test a different GitButler skill directory.
 
 The `jj+skill` arm uses the `jj` binary found on `PATH` by default. Override it with `--jj-bin <path>`.
 
-By default, the runner fetches the external `onevcat/skills@onevcat-jj` skill from `https://raw.githubusercontent.com/onevcat/skills/master/skills/onevcat-jj/SKILL.md`. Use `--jj-skill-dir <path>` to use a local copy, or `--jj-skill-package`, `--jj-skill-name`, and `--jj-skill-url` to point at another public skill.
+By default, the runner fetches the external `onevcat/skills@onevcat-jj` skill pinned to upstream commit `4955f542` and verifies the fetched bytes against a recorded SHA-256, so every run uses identical skill content. Use `--jj-skill-dir <path>` to use a local copy, or `--jj-skill-package`, `--jj-skill-name`, and `--jj-skill-url` to point at another public skill (`--jj-skill-sha256 <hash|none>` controls the integrity check for custom URLs).
 
 ### Codex isolation
 

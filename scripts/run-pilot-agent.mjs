@@ -10,11 +10,18 @@ import { run } from "./lib/process.mjs";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
 const DEFAULT_CODEX_MODEL = "gpt-5.5";
-const DEFAULT_CLAUDE_MODEL = "opus";
+// Versioned model ID, not the floating `opus` alias: reruns of a published
+// batch must hit the same model. Current-generation Claude models have no
+// dated snapshots; the versioned ID is the pin. Override with --model.
+const DEFAULT_CLAUDE_MODEL = "claude-opus-4-8";
 const DEFAULT_JJ_SKILL = {
   package: "onevcat/skills@onevcat-jj",
   name: "onevcat-jj",
-  source_url: "https://raw.githubusercontent.com/onevcat/skills/master/skills/onevcat-jj/SKILL.md",
+  // Pinned to the last upstream commit touching the skill so runs are
+  // reproducible; the fetched bytes are verified against expected_sha256.
+  source_rev: "4955f5422d992db58ddb3652ec1c1b552405b39d",
+  source_url: "https://raw.githubusercontent.com/onevcat/skills/4955f5422d992db58ddb3652ec1c1b552405b39d/skills/onevcat-jj/SKILL.md",
+  expected_sha256: "e0364004187a1769adc0b532befe346fd4b372bb1aab2768b9ebb694f2d13687",
   selection_note: "Top direct jj result from `npx skills find jj` on 2026-06-29; the skills CLI showed 279 installs.",
 };
 
@@ -563,6 +570,18 @@ function fetchJjSkillSource(runDir, sourceMetadata) {
   const fetched = run("curl", ["-fsSL", sourceMetadata.source_url], { cwd: repoRoot, check: false });
   if (fetched.status !== 0 || !fetched.stdout.trim()) {
     throw new Error(`Failed to fetch jj skill from ${sourceMetadata.source_url}\n${fetched.stderr}`);
+  }
+
+  if (sourceMetadata.expected_sha256) {
+    const actual = sha256Text(fetched.stdout);
+    if (actual !== sourceMetadata.expected_sha256) {
+      throw new Error(
+        `jj skill integrity check failed for ${sourceMetadata.source_url}\n` +
+          `expected sha256 ${sourceMetadata.expected_sha256}\n` +
+          `actual   sha256 ${actual}\n` +
+          `Pass --jj-skill-sha256 (or --jj-skill-sha256 none) when intentionally using different skill content.`,
+      );
+    }
   }
 
   writeFileSync(skillFile, fetched.stdout);
@@ -1565,15 +1584,27 @@ const taskId = args.get("task") ?? "pilot-1-selective-validation";
 const agent = args.get("agent") ?? "codex";
 const arm = args.get("arm") ?? "git";
 const model = args.get("model") ?? (agent === "codex" ? DEFAULT_CODEX_MODEL : DEFAULT_CLAUDE_MODEL);
+if (agent === "claude" && !/\d/.test(model)) {
+  console.warn(`Warning: Claude model "${model}" is a floating alias, not a versioned model ID; the run will not be reproducible across model updates.`);
+}
 const timeoutMs = Number(args.get("timeout-ms") ?? 900000);
 const realBut = executablePath(args.get("but-bin"), "but");
 const realJj = executablePath(args.get("jj-bin"), "jj");
 const skillDir = path.resolve(args.get("skill-dir") ?? "/Users/kiril/src/gitbutler/crates/but/skill");
 const configuredJjSkillDir = args.get("jj-skill-dir") ? path.resolve(args.get("jj-skill-dir")) : null;
+const jjSkillUrlArg = args.get("jj-skill-url") ?? null;
+const jjSkillSha256Arg = args.get("jj-skill-sha256") ?? null;
 const jjSkillSource = {
   package: args.get("jj-skill-package") ?? DEFAULT_JJ_SKILL.package,
   name: args.get("jj-skill-name") ?? DEFAULT_JJ_SKILL.name,
-  source_url: args.get("jj-skill-url") ?? DEFAULT_JJ_SKILL.source_url,
+  source_rev: jjSkillUrlArg ? null : DEFAULT_JJ_SKILL.source_rev,
+  source_url: jjSkillUrlArg ?? DEFAULT_JJ_SKILL.source_url,
+  // A custom URL disables the default integrity pin unless a hash is given;
+  // pass --jj-skill-sha256 none to skip the check explicitly.
+  expected_sha256:
+    jjSkillSha256Arg === "none"
+      ? null
+      : jjSkillSha256Arg ?? (jjSkillUrlArg ? null : DEFAULT_JJ_SKILL.expected_sha256),
   selection_note: args.get("jj-skill-selection-note") ?? DEFAULT_JJ_SKILL.selection_note,
 };
 const codexCleanConfig = agent === "codex" ? args.get("codex-clean-config") !== "false" : false;
@@ -1666,6 +1697,8 @@ const skillMetadata = activeSkillDir
       source_dir: activeSkillDir,
       source_package: setup.source?.package ?? null,
       source_url: setup.source?.source_url ?? null,
+      source_rev: setup.source?.source_rev ?? null,
+      source_expected_sha256: setup.source?.expected_sha256 ?? null,
       source_selection_note: setup.source?.selection_note ?? null,
       source_fetched_at: setup.source?.fetched_at ?? null,
       configured_dir: setup.source?.configured_dir ?? null,
