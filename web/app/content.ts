@@ -137,6 +137,23 @@ export const EYEBROWS = {
   provenance: 'About',
 };
 
+// Every full-matrix batch, newest first. Links go to the checked-in writeups
+// so the page shows the benchmark is versioned and re-run, not a one-shot.
+const resultDocUrl = (name: string) => `${REPO_URL}/blob/main/docs/results/${name}`;
+export const HISTORY = {
+  title: 'Results history',
+  lede: 'Every full-matrix batch is written up and checked in; the page above always shows the latest.',
+  entries: [
+    { date: '2026-07-03', scope: 'k=7 · 3 tools · 2 agents', passed: '193/210', url: resultDocUrl('full-k7-2026-07-03.md'), current: true },
+    { date: '2026-07-01', scope: 'k=5 · 3 tools · 2 agents', passed: '137/150', url: resultDocUrl('full-k5-2026-07-01.md') },
+    { date: '2026-06-29', scope: 'k=5 · 3 tools · 2 agents', passed: '142/150', url: resultDocUrl('full-k5-2026-06-29.md') },
+    { date: '2026-06-28', scope: 'k=5 · git + GitButler', passed: '100/100', url: resultDocUrl('full-k5-2026-06-28.md') },
+    { date: '2026-06-27', scope: 'k=5 · git + GitButler', passed: '99/100', url: resultDocUrl('full-k5-2026-06-27.md') },
+    { date: '2026-06-26', scope: 'k=5 · git + GitButler', passed: '95/100', url: resultDocUrl('full-k5-2026-06-26.md') },
+    { date: '2026-06-22', scope: 'k=3 · git + GitButler', passed: '60/60', url: resultDocUrl('full-k3-2026-06-22.md') },
+  ],
+};
+
 // Neighbors in the benchmark landscape. Named generously: they answer
 // different questions, and saying how earns the comparison back.
 export const RELATED = {
@@ -168,6 +185,14 @@ export const RELATED = {
       read: 'General terminal agents across many task types; a handful touch version control.',
     },
   ],
+};
+
+// The k=7 batch predates per-run model capture for Claude; the model is known
+// from Claude Code session metadata (see docs/results/full-k7-2026-07-03.md).
+// Once a batch with per-run capture lands, observed_model populates and this
+// fallback goes unused.
+export const MODEL_FALLBACK: Record<string, string> = {
+  claude: 'claude-opus-4-1-20250805 (from session metadata)',
 };
 
 // Small inline strings used across components.

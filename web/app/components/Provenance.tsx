@@ -1,6 +1,6 @@
 import type { ResultsData } from '@/lib/types';
 import { dateLabel } from '@/lib/format';
-import { EYEBROWS, MICRO, RELATED } from '../content';
+import { EYEBROWS, HISTORY, MICRO, MODEL_FALLBACK, RELATED } from '../content';
 
 const REPO_URL = 'https://github.com/gitbutlerapp/version-control-bench';
 const DATA_URL = `${REPO_URL}/blob/main/web/data/results.json`;
@@ -19,6 +19,29 @@ export function Provenance({ data }: { data: ResultsData }) {
       </div>
 
       <div className="prov-grid">
+        <div className="prov-card">
+          <div className="prov-card-head">
+            <span className="eyebrow">agents</span>
+            <span className="faint mono">k={data.meta.k} per cell</span>
+          </div>
+          <dl className="prov-kv mono">
+            {data.meta.agents
+              .filter((a) => a.id !== 'both')
+              .map((a) => (
+                <div key={a.id}>
+                  <dt>{a.label} model</dt>
+                  <dd className="prov-hash">
+                    {a.observed_model ?? MODEL_FALLBACK[a.id] ?? '—'}
+                    {a.agent_cli_version ? ` · ${a.agent_cli_version}` : ''}
+                  </dd>
+                </div>
+              ))}
+            <div>
+              <dt>grader</dt>
+              <dd className="prov-hash">deterministic git-state verifier, no LLM judge</dd>
+            </div>
+          </dl>
+        </div>
         {data.source_snapshots.map((s) => (
           <div key={`${s.batch}:${s.arms.join('-')}`} className="prov-card">
             <div className="prov-card-head">
@@ -53,6 +76,22 @@ export function Provenance({ data }: { data: ResultsData }) {
           <a href={DATA_URL}>derived results.json ↗</a>
           <a href={REPO_URL}>benchmark source ↗</a>
         </div>
+      </div>
+
+      <div className="related">
+        <h3>{HISTORY.title}</h3>
+        <p className="lede">{HISTORY.lede}</p>
+        <ul className="history-list mono">
+          {HISTORY.entries.map((entry) => (
+            <li key={entry.date}>
+              <a href={entry.url} target="_blank" rel="noopener noreferrer">
+                {entry.date}
+              </a>{' '}
+              · {entry.scope} · {entry.passed} passed
+              {entry.current ? <span className="history-current"> · shown above</span> : null}
+            </li>
+          ))}
+        </ul>
       </div>
 
       <div className="related">

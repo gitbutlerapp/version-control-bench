@@ -250,6 +250,11 @@ function observedModelForAgent(rows, agent) {
   return models.length > 0 ? models.join(', ') : null;
 }
 
+function cliVersionForAgent(rows, agent) {
+  const versions = unique(rows.filter((r) => r.agent === agent).map((r) => r.agent_cli_version));
+  return versions.length > 0 ? versions.join(', ') : null;
+}
+
 function perGroupK(rows) {
   const counts = new Set();
   for (const sc of SCENARIOS) {
@@ -545,6 +550,7 @@ function build({ aggregate, baseline, jj, out }) {
         ...AGENTS.map((a) => ({
           ...a,
           observed_model: observedModelForAgent(allRows, a.id),
+          agent_cli_version: cliVersionForAgent(allRows, a.id),
         })),
         { id: 'both', label: 'Both', note: 'Codex + Claude, averaged' },
       ],

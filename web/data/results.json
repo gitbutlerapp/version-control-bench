@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-07-04T10:03:52.865Z",
+  "generated_at": "2026-07-04T11:21:01.381Z",
   "meta": {
     "k": 7,
     "total_runs": 210,
@@ -11,12 +11,14 @@
       {
         "id": "codex",
         "label": "Codex",
-        "observed_model": "gpt-5.5"
+        "observed_model": "gpt-5.5",
+        "agent_cli_version": null
       },
       {
         "id": "claude",
         "label": "Claude",
-        "observed_model": null
+        "observed_model": null,
+        "agent_cli_version": null
       },
       {
         "id": "both",

@@ -1,8 +1,17 @@
 import { SCENARIOS_INTRO, EYEBROWS, MICRO, taskDefUrl } from '../content';
 import { CommitGraph } from './CommitGraph';
+import { RunStrip } from './RunStrip';
 import type { ResultsData, ScenarioMeta } from '@/lib/types';
 
-function ScenarioSection({ scenario, index }: { scenario: ScenarioMeta; index: number }) {
+function ScenarioSection({
+  scenario,
+  index,
+  data,
+}: {
+  scenario: ScenarioMeta;
+  index: number;
+  data: ResultsData;
+}) {
   return (
     <article className="scenario-block" id={scenario.id}>
       <div className="scenario-text">
@@ -22,6 +31,7 @@ function ScenarioSection({ scenario, index }: { scenario: ScenarioMeta; index: n
       </div>
       <div className="scenario-illo">
         <CommitGraph scenario={scenario} />
+        <RunStrip data={data} scenarioId={scenario.id} />
       </div>
     </article>
   );
@@ -37,7 +47,7 @@ export function Scenarios({ data }: { data: ResultsData }) {
       </div>
       <div className="scenario-list">
         {data.meta.scenarios.map((s, i) => (
-          <ScenarioSection key={s.id} scenario={s} index={i} />
+          <ScenarioSection key={s.id} scenario={s} index={i} data={data} />
         ))}
       </div>
     </section>

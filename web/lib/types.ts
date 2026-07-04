@@ -86,7 +86,22 @@ export interface AgentMeta {
   id: AgentId;
   label: string;
   observed_model?: string | null;
+  agent_cli_version?: string | null;
   note?: string;
+}
+
+// One graded run, slimmed for the page (distribution + verification only).
+export interface RunRow {
+  scenario: string;
+  agent: RealAgentId;
+  arm: ArmId;
+  rep: number;
+  passed: boolean;
+  failure: string | null;
+  wall_ms: number;
+  task_vc: number;
+  cold_bytes: number | null;
+  warm_bytes: number | null;
 }
 
 export interface SourceSnapshot {
@@ -119,5 +134,5 @@ export interface ResultsData {
   source_snapshots: SourceSnapshot[];
   cells_overall: Cell[];
   cells_by_scenario: Cell[];
-  rows: unknown[];
+  rows: RunRow[];
 }

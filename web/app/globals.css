@@ -489,6 +489,48 @@ section:first-of-type {
   max-width: 70ch;
 }
 
+/* Per-run wall-time strip in each scenario card. */
+.runstrip {
+  margin: var(--s-4) 0 0;
+}
+.runstrip svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+.runstrip-label,
+.runstrip-max {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  fill: var(--text-muted);
+}
+.runstrip-axis {
+  stroke: var(--border, currentColor);
+  stroke-width: 1;
+  opacity: 0.25;
+}
+.runstrip-caption {
+  font-size: var(--fs-micro);
+  margin-top: var(--s-1);
+}
+
+/* Results-history list in the About section. */
+.history-list {
+  list-style: none;
+  padding: 0;
+  margin: var(--s-3) 0 0;
+  display: grid;
+  gap: var(--s-1);
+  font-size: var(--fs-micro);
+  color: var(--text-muted);
+}
+.history-list a {
+  color: var(--text);
+}
+.history-current {
+  color: var(--text);
+}
+
 /* Related-benchmarks block at the end of the About section. */
 .related {
   margin-top: var(--s-6);

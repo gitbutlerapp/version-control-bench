@@ -208,10 +208,20 @@ function StatisticalRead({ data }: { data: ResultsData }) {
   const { agent } = useView();
   const armMeta = Object.fromEntries(data.meta.arms.map((a) => [a.id, a]));
   const comparisonArms = data.meta.arm_order.filter((arm) => arm !== 'git');
+  const allK = data.meta.arm_order
+    .map((arm) => {
+      const c = overallCell(data, agent, arm);
+      return c ? `${armMeta[arm]?.label ?? arm} ${c.tasks_all_pass}/${c.task_count}` : null;
+    })
+    .filter(Boolean)
+    .join(' · ');
 
   return (
     <details className="stat-read">
       <summary>Statistical read: paired per-scenario deltas vs git (95% CI)</summary>
+      <p>
+        Scenarios where every run passed (the reliability gate): <span className="num">{allK}</span>
+      </p>
       <ul>
         {comparisonArms.map((arm) => {
           const paired = overallCell(data, agent, arm)?.paired_vs_git;
