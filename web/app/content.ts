@@ -42,7 +42,7 @@ export const SCENARIOS_INTRO = {
 
 export const METHOD = {
   title: 'Method',
-  lede: 'Correctness is scored by a hidden, deterministic grader on the final Git state; two different command sequences pass if they produce the same history. Every tool receives the same task and the same plain-English instruction, the tool name does not appear in the prompt, and setup is excluded from timing.',
+  lede: 'This benchmark is built and maintained by GitButler, one of the three tools it measures — read everything below with that in mind, and check rather than trust: tasks, grader, harness, and per-run evidence are public. Correctness is scored by a hidden, deterministic grader on the final Git state; two different command sequences pass if they produce the same history. Every tool receives the same task and the same plain-English instruction, the tool name does not appear in the prompt, and setup is excluded from timing.',
   facts: [
     {
       term: 'Identical instruction across tools',
@@ -75,6 +75,47 @@ export const METHOD = {
   ],
 };
 
+// Known limits, stated so they are priced in rather than discovered. Scope
+// critiques are welcome; honesty critiques should find nothing to add.
+export const LIMITS = {
+  title: 'Limitations',
+  lede: 'Every benchmark measures a slice. These are the known limits of this one.',
+  items: [
+    {
+      term: 'Built by a contestant',
+      body: 'GitButler funds and maintains this benchmark and is one of the three tools measured. Treat every design choice as potentially biased, and check rather than trust: the tasks, grader, harness, and per-run evidence are public, and any cell can be re-run from the repository.',
+    },
+    {
+      term: 'Five scenarios',
+      body: 'Five operations is a small sample of version-control work. Per-cell pass intervals are wide, and most cross-scenario effect sizes (the statistical read above) do not reach significance. Claims on this page are about these five operations, not version control in general. The task set is growing.',
+    },
+    {
+      term: 'Skill asymmetry',
+      body: 'GitButler runs with its first-party agent skill; Jujutsu runs with the most-installed community skill, pinned to a fixed revision and verified by hash; git runs bare, as the tool agents already know best. A better skill for any arm would change its numbers. Improvements to any arm’s configuration are welcome as pull requests — each tool should be measured at its community’s best agent setup.',
+    },
+    {
+      term: 'Training data favors git',
+      body: 'The models have seen far more git than Jujutsu or GitButler in training. The deck is stacked toward the baseline: challenger wins are stronger evidence than they look, and challenger losses are partly unfamiliarity.',
+    },
+    {
+      term: 'Synthetic fixtures',
+      body: 'Scenarios are small, script-built TypeScript repositories. That keeps runs deterministic and contamination-resistant, but real repositories are bigger and noisier. Scenarios derived from real repositories are planned.',
+    },
+    {
+      term: 'Codex is at the ceiling',
+      body: 'Codex passed every run of every scenario, so for Codex this benchmark currently separates the tools only on speed and efficiency. Harder scenarios are needed before the reliability comparison says anything about stronger agents.',
+    },
+    {
+      term: 'Versions, not verdicts',
+      body: 'Each result is a property of a specific agent version, model, tool build, and skill revision, all recorded in provenance. Newer models can change the picture; the benchmark is re-run as they ship.',
+    },
+    {
+      term: 'What a pass does not measure',
+      body: 'The grader checks the final Git state only. Commit-message quality, human ergonomics, merge and remote workflows, and long-horizon multi-branch work are not measured yet.',
+    },
+  ],
+};
+
 export const LEDGER = {
   title: 'Failed runs',
   lede: 'Seventeen of 210 runs failed the grader. Every grader failure was Claude; GitButler had zero verifier misses.',
@@ -91,6 +132,7 @@ export const EYEBROWS = {
   method: 'Method',
   proof: 'Results',
   failures: 'Failures',
+  limitations: 'Limitations',
   provenance: 'About',
 };
 
