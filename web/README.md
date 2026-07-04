@@ -32,6 +32,15 @@ batch names, so staleness is visible on the page. The script validates the
 shape (rows = k x scenarios x agents x arms, 9 overall cells, 45 scenario
 cells) and fails loudly if the source snapshot is missing.
 
+The social/OG card (`app/opengraph-image.tsx`) is a pass-rate chart rendered
+at build time from the same `results.json`, so it regenerates on every deploy
+— committing fresh data and landing is all it takes to keep the share image
+current. Satori quirks to respect when editing it: every element with more
+than one child needs explicit `display: flex`, keep each text node a single
+string (template literals, no adjacent JSX expressions), and stick to
+characters the default font covers (no ✓/emoji — glyph fallback tries a
+network fetch and fails the render).
+
 ## Develop
 
 ```bash
