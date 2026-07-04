@@ -19,6 +19,7 @@
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, resolve, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { pairedMeanCI, wilsonInterval } from './lib/stats.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO = resolve(__dirname, '..');
@@ -163,6 +164,13 @@ function readPrompt(scenarioId) {
   return readFileSync(p, 'utf8').trim();
 }
 
+// Wilson 95% interval on a pass count, in display percent.
+function passCi(pass, n) {
+  const ci = wilsonInterval(pass, n);
+  if (!ci) return { pass_ci_lo: null, pass_ci_hi: null };
+  return { pass_ci_lo: round(ci.lo * 100, 0), pass_ci_hi: round(ci.hi * 100, 0) };
+}
+
 // Build one normalized cell from a raw summary object (overall or by_task).
 function cellFromSummary(s) {
   return {
@@ -171,6 +179,7 @@ function cellFromSummary(s) {
     n: s.n,
     pass: s.pass,
     pass_rate: round((s.pass / s.n) * 100, 1),
+    ...passCi(s.pass, s.n),
     clean: s.pass === s.n,
     mean_wall_ms: Math.round(s.mean_wall_ms),
     median_wall_ms: Math.round(s.median_wall_ms),
@@ -197,6 +206,7 @@ function bothCell(codex, claude, extra = {}) {
     n,
     pass,
     pass_rate: round((pass / n) * 100, 1),
+    ...passCi(pass, n),
     clean: pass === n,
     mean_wall_ms: Math.round(avg(codex.mean_wall_ms, claude.mean_wall_ms)),
     median_wall_ms: null, // a median of two means is meaningless; omit
@@ -396,6 +406,60 @@ function build({ aggregate, baseline, jj, out }) {
   };
   for (const c of cells_overall) c.vs_git = vsGit(c, overallGit[c.agent]);
 
+  // ---- task-clustered statistics on overall cells ---------------------------
+  // Trials within a scenario are correlated, so per-scenario scores are the
+  // sampling unit: tasks_all_pass counts scenarios where every run passed
+  // (per-scenario pass^k), and paired_vs_git holds mean paired per-scenario
+  // differences vs the same agent's git arm with t-based 95% CIs.
+  const taskSummary = (task, agent, arm) =>
+    allByTask.find((s) => s.task === task && s.agent === agent && s.arm === arm);
+  const roundStat = (stat, scale = 1, digits = 1) =>
+    stat == null
+      ? null
+      : {
+          mean: round(stat.mean * scale, digits),
+          lo: stat.lo == null ? null : round(stat.lo * scale, digits),
+          hi: stat.hi == null ? null : round(stat.hi * scale, digits),
+          n: stat.n,
+        };
+  for (const c of cells_overall) {
+    c.task_count = SCENARIOS.length;
+    if (c.agent === 'both') {
+      c.tasks_all_pass = SCENARIOS.filter((sc) =>
+        ['codex', 'claude'].every((agent) => {
+          const s = taskSummary(sc.id, agent, c.arm);
+          return s && s.pass === s.n;
+        }),
+      ).length;
+      c.paired_vs_git = null;
+      continue;
+    }
+    c.tasks_all_pass = SCENARIOS.filter((sc) => {
+      const s = taskSummary(sc.id, c.agent, c.arm);
+      return s && s.pass === s.n;
+    }).length;
+    if (c.arm === 'git') {
+      c.paired_vs_git = null;
+      continue;
+    }
+    const passDeltas = [];
+    const wallDeltas = [];
+    const opsDeltas = [];
+    for (const sc of SCENARIOS) {
+      const base = taskSummary(sc.id, c.agent, 'git');
+      const cand = taskSummary(sc.id, c.agent, c.arm);
+      if (!base || !cand) continue;
+      passDeltas.push(cand.pass / cand.n - base.pass / base.n);
+      wallDeltas.push(cand.mean_wall_ms - base.mean_wall_ms);
+      opsDeltas.push(cand.mean_task_vc - base.mean_task_vc);
+    }
+    c.paired_vs_git = {
+      pass_rate_pp: roundStat(pairedMeanCI(passDeltas), 100, 1),
+      wall_ms: roundStat(pairedMeanCI(wallDeltas), 1, 0),
+      task_vc: roundStat(pairedMeanCI(opsDeltas), 1, 1),
+    };
+  }
+
   // ---- per-scenario cells --------------------------------------------------
   const byTaskKey = {};
   for (const s of allByTask) byTaskKey[`${s.task}|${s.agent}|${s.arm}`] = s;
@@ -504,6 +568,8 @@ function build({ aggregate, baseline, jj, out }) {
       kb_comparable_within_agent_only: true,
       kb_note:
         'warm_bytes subtracts visible skill/reference reads: a token-cost proxy, not a token counter. Claude and Codex record transcripts in different formats, so KB is only comparable between tools within the same agent.',
+      stats_note:
+        'Pass rates carry Wilson 95% intervals over the runs in the cell. Trials of the same scenario are correlated, so cross-scenario comparisons pair per-scenario means against the same agent’s git arm with t-based 95% CIs (df = scenarios − 1); with five scenarios those intervals are wide. tasks_all_pass counts scenarios where every run passed (per-scenario pass^k).',
       generator: 'node scripts/build-web-data.mjs',
     },
     source_snapshots: source.sourceSnapshots,

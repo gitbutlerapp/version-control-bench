@@ -459,6 +459,36 @@ section:first-of-type {
   font-weight: 700;
 }
 
+/* Task-clustered paired-deltas disclosure under the results matrix. */
+.stat-read {
+  margin-top: var(--s-3);
+  font-size: var(--fs-micro);
+  color: var(--text-muted);
+}
+.stat-read summary {
+  cursor: pointer;
+  width: fit-content;
+  color: var(--text);
+}
+.stat-read ul {
+  list-style: none;
+  padding: 0;
+  margin: var(--s-2) 0;
+  display: grid;
+  gap: var(--s-1);
+}
+.stat-read li strong {
+  color: var(--text);
+}
+.stat-read .num {
+  font-family: var(--font-mono);
+  color: var(--text);
+}
+.stat-read p {
+  margin: var(--s-2) 0 0;
+  max-width: 70ch;
+}
+
 /* =========================================================================
    tooltips (portal-rendered, fixed-positioned to escape overflow clips)
    ========================================================================= */

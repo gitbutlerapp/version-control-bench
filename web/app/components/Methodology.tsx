@@ -22,7 +22,9 @@ export function Methodology({ data }: { data: ResultsData }) {
 
       <div className="pills" aria-label="Test parameters">
         <span className="pill mono">k={m.k}</span>
-        <span className="pill mono">n=25 per cell</span>
+        <span className="pill mono">
+          n={m.total_runs / (m.arm_order.length * 2)} per tool–agent
+        </span>
         <span className="pill mono">oracle: git-state</span>
         <span className="pill mono">jj 0.42.0</span>
         <span className="pill mono">{m.total_runs} runs</span>

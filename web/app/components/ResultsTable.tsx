@@ -7,7 +7,7 @@ import { PassChip } from './Bars';
 import { Tooltip } from './Tooltip';
 import type { ArmId, Cell, ResultsData } from '@/lib/types';
 import { TOOL_VAR, overallCell, scenarioCell } from '@/lib/selectors';
-import { count, kb, seconds } from '@/lib/format';
+import { count, kb, pairedRange, seconds, secondsLabel } from '@/lib/format';
 
 interface Row {
   key: string;
@@ -63,6 +63,8 @@ function Group({ cell, best }: { cell: Cell | undefined; best: { t: boolean; c: 
         <PassChip
           pass={cell.pass}
           n={cell.n}
+          ciLo={cell.pass_ci_lo}
+          ciHi={cell.pass_ci_hi}
           size="sm"
           onActivate={cell.pass < cell.n ? scrollToFailures : undefined}
         />
@@ -189,10 +191,51 @@ export function ResultsTable({ data }: { data: ResultsData }) {
         <li>
           <span className="legend-bold">bold</span> = best value in each column
         </li>
+        <li>hover a pass chip for its Wilson 95% interval</li>
         <li>KB is comparable within one agent only</li>
       </ul>
+      <StatisticalRead data={data} />
       <AgentCaption />
     </section>
+  );
+}
+
+// The task-clustered read of the overall row: mean paired per-scenario deltas
+// vs the same agent's git arm with 95% CIs. This is the honest version of the
+// headline percentages — with five scenarios most intervals cross zero, and
+// saying so on the page beats a critic saying it first.
+function StatisticalRead({ data }: { data: ResultsData }) {
+  const { agent } = useView();
+  const armMeta = Object.fromEntries(data.meta.arms.map((a) => [a.id, a]));
+  const comparisonArms = data.meta.arm_order.filter((arm) => arm !== 'git');
+
+  return (
+    <details className="stat-read">
+      <summary>Statistical read: paired per-scenario deltas vs git (95% CI)</summary>
+      <ul>
+        {comparisonArms.map((arm) => {
+          const paired = overallCell(data, agent, arm)?.paired_vs_git;
+          if (!paired) return null;
+          return (
+            <li key={arm}>
+              <strong>{armMeta[arm]?.label ?? arm}</strong>: wall{' '}
+              <span className="num">{pairedRange(paired.wall_ms, (v) => secondsLabel(v))}</span> ·
+              commands <span className="num">{pairedRange(paired.task_vc, (v) => count(v))}</span>{' '}
+              · pass rate{' '}
+              <span className="num">
+                {pairedRange(paired.pass_rate_pp, (v) => `${Math.round(v * 10) / 10}pp`)}
+              </span>{' '}
+              <span className="faint">over {paired.wall_ms?.n ?? 0} scenarios</span>
+            </li>
+          );
+        })}
+      </ul>
+      <p className="faint">
+        Each scenario contributes one paired difference; intervals are t-based with df = scenarios
+        − 1. An interval crossing zero means the direction is consistent but the effect size is
+        not established on this task set.
+      </p>
+    </details>
   );
 }
 

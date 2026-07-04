@@ -68,6 +68,10 @@ export const METHOD = {
       term: 'Seven runs per cell (k=7)',
       body: 'Each agent–tool–task combination (a cell) ran seven times. The numbers on this page are means over those seven runs, not a single run.',
     },
+    {
+      term: 'Uncertainty',
+      body: 'Pass rates carry Wilson 95% intervals (hover any pass chip). Runs of the same scenario are correlated, so cross-scenario claims pair per-scenario deltas against the same agent’s git runs; with five scenarios those intervals are wide, and the "statistical read" under the results matrix shows them. Wall-time deltas are consistent in direction across scenarios, but their effect size is measured on these five operations only.',
+    },
   ],
 };
 

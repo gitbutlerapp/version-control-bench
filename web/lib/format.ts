@@ -45,6 +45,22 @@ export function passFraction(pass: number, n: number): string {
   return `${pass}/${n}`;
 }
 
+export function ciRange(lo: number | null, hi: number | null): string {
+  if (lo == null || hi == null) return '—';
+  return `${Math.round(lo)}–${Math.round(hi)}%`;
+}
+
+// "−60.4s [−123.5s, +2.8s]" style paired-delta rendering.
+export function pairedRange(
+  stat: { mean: number; lo: number | null; hi: number | null } | null | undefined,
+  fmt: (v: number) => string,
+): string {
+  if (!stat) return '—';
+  const signed = (v: number) => (v > 0 ? `+${fmt(v)}` : v < 0 ? `−${fmt(Math.abs(v))}` : fmt(v));
+  if (stat.lo == null || stat.hi == null) return signed(stat.mean);
+  return `${signed(stat.mean)} [${signed(stat.lo)}, ${signed(stat.hi)}]`;
+}
+
 export function dateLabel(iso: string): string {
   // keep it stable & locale-free: YYYY-MM-DD
   return iso.slice(0, 10);

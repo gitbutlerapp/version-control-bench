@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-07-03T07:13:46.338Z",
+  "generated_at": "2026-07-04T10:03:52.865Z",
   "meta": {
     "k": 7,
     "total_runs": 210,
     "total_passed": 193,
     "pass_rate": 91.9,
-    "snapshot_date": "2026-07-03",
+    "snapshot_date": "2026-07-04",
     "agents": [
       {
         "id": "codex",
@@ -118,6 +118,7 @@
     },
     "kb_comparable_within_agent_only": true,
     "kb_note": "warm_bytes subtracts visible skill/reference reads: a token-cost proxy, not a token counter. Claude and Codex record transcripts in different formats, so KB is only comparable between tools within the same agent.",
+    "stats_note": "Pass rates carry Wilson 95% intervals over the runs in the cell. Trials of the same scenario are correlated, so cross-scenario comparisons pair per-scenario means against the same agent’s git arm with t-based 95% CIs (df = scenarios − 1); with five scenarios those intervals are wide. tasks_all_pass counts scenarios where every run passed (per-scenario pass^k).",
     "generator": "node scripts/build-web-data.mjs"
   },
   "source_snapshots": [
@@ -127,7 +128,7 @@
         "git",
         "but+skill"
       ],
-      "generated_at": "2026-07-03T07:07:11.017Z",
+      "generated_at": "2026-07-04T09:27:52.443Z",
       "runs": 140,
       "provenance": {
         "setup_hash": "e68d505c5f060b89692c253e8dddb689fb42c5a61fc001bdce0a8dc383db76b2",
@@ -142,7 +143,7 @@
       "arms": [
         "jj+skill"
       ],
-      "generated_at": "2026-07-03T07:07:11.017Z",
+      "generated_at": "2026-07-04T09:27:52.443Z",
       "runs": 70,
       "provenance": {
         "setup_hash": "b440ab7d0e70159b81f573267df5c284bf387e006dbc7c8dee83cb897443c91f",
@@ -161,6 +162,8 @@
       "n": 35,
       "pass": 35,
       "pass_rate": 100,
+      "pass_ci_lo": 90,
+      "pass_ci_hi": 100,
       "clean": true,
       "mean_wall_ms": 89398,
       "median_wall_ms": 72311,
@@ -170,7 +173,10 @@
       "mean_mutate": 7.6,
       "mean_cold_bytes": 24260,
       "mean_warm_bytes": 24260,
-      "vs_git": null
+      "vs_git": null,
+      "task_count": 5,
+      "tasks_all_pass": 5,
+      "paired_vs_git": null
     },
     {
       "agent": "codex",
@@ -178,6 +184,8 @@
       "n": 35,
       "pass": 35,
       "pass_rate": 100,
+      "pass_ci_lo": 90,
+      "pass_ci_hi": 100,
       "clean": true,
       "mean_wall_ms": 119046,
       "median_wall_ms": 92184,
@@ -194,6 +202,28 @@
         "ops_ratio": 1.12,
         "passrate_delta": 0,
         "kb_pct": 88.9
+      },
+      "task_count": 5,
+      "tasks_all_pass": 5,
+      "paired_vs_git": {
+        "pass_rate_pp": {
+          "mean": 0,
+          "lo": 0,
+          "hi": 0,
+          "n": 5
+        },
+        "wall_ms": {
+          "mean": 29649,
+          "lo": -2587,
+          "hi": 61885,
+          "n": 5
+        },
+        "task_vc": {
+          "mean": -2.3,
+          "lo": -14.3,
+          "hi": 9.7,
+          "n": 5
+        }
       }
     },
     {
@@ -202,6 +232,8 @@
       "n": 35,
       "pass": 35,
       "pass_rate": 100,
+      "pass_ci_lo": 90,
+      "pass_ci_hi": 100,
       "clean": true,
       "mean_wall_ms": 29034,
       "median_wall_ms": 25299,
@@ -218,6 +250,28 @@
         "ops_ratio": 6.08,
         "passrate_delta": 0,
         "kb_pct": -51.3
+      },
+      "task_count": 5,
+      "tasks_all_pass": 5,
+      "paired_vs_git": {
+        "pass_rate_pp": {
+          "mean": 0,
+          "lo": 0,
+          "hi": 0,
+          "n": 5
+        },
+        "wall_ms": {
+          "mean": -60363,
+          "lo": -123527,
+          "hi": 2801,
+          "n": 5
+        },
+        "task_vc": {
+          "mean": -19.3,
+          "lo": -34.3,
+          "hi": -4.2,
+          "n": 5
+        }
       }
     },
     {
@@ -226,6 +280,8 @@
       "n": 35,
       "pass": 28,
       "pass_rate": 80,
+      "pass_ci_lo": 64,
+      "pass_ci_hi": 90,
       "clean": false,
       "mean_wall_ms": 248404,
       "median_wall_ms": 175067,
@@ -235,7 +291,10 @@
       "mean_mutate": 11.7,
       "mean_cold_bytes": 1425,
       "mean_warm_bytes": 1425,
-      "vs_git": null
+      "vs_git": null,
+      "task_count": 5,
+      "tasks_all_pass": 2,
+      "paired_vs_git": null
     },
     {
       "agent": "claude",
@@ -243,6 +302,8 @@
       "n": 35,
       "pass": 25,
       "pass_rate": 71.4,
+      "pass_ci_lo": 55,
+      "pass_ci_hi": 84,
       "clean": false,
       "mean_wall_ms": 282244,
       "median_wall_ms": 177565,
@@ -259,6 +320,28 @@
         "ops_ratio": 0.92,
         "passrate_delta": -8.6,
         "kb_pct": 3.6
+      },
+      "task_count": 5,
+      "tasks_all_pass": 1,
+      "paired_vs_git": {
+        "pass_rate_pp": {
+          "mean": -8.6,
+          "lo": -18.3,
+          "hi": 1.1,
+          "n": 5
+        },
+        "wall_ms": {
+          "mean": 33840,
+          "lo": -56623,
+          "hi": 124303,
+          "n": 5
+        },
+        "task_vc": {
+          "mean": 2.1,
+          "lo": -15.9,
+          "hi": 20.1,
+          "n": 5
+        }
       }
     },
     {
@@ -267,6 +350,8 @@
       "n": 35,
       "pass": 35,
       "pass_rate": 100,
+      "pass_ci_lo": 90,
+      "pass_ci_hi": 100,
       "clean": true,
       "mean_wall_ms": 97476,
       "median_wall_ms": 88142,
@@ -283,6 +368,28 @@
         "ops_ratio": 2.41,
         "passrate_delta": 20,
         "kb_pct": 5.9
+      },
+      "task_count": 5,
+      "tasks_all_pass": 5,
+      "paired_vs_git": {
+        "pass_rate_pp": {
+          "mean": 20,
+          "lo": -16.8,
+          "hi": 56.8,
+          "n": 5
+        },
+        "wall_ms": {
+          "mean": -150928,
+          "lo": -407629,
+          "hi": 105772,
+          "n": 5
+        },
+        "task_vc": {
+          "mean": -13.8,
+          "lo": -39.4,
+          "hi": 11.7,
+          "n": 5
+        }
       }
     },
     {
@@ -291,6 +398,8 @@
       "n": 70,
       "pass": 63,
       "pass_rate": 90,
+      "pass_ci_lo": 81,
+      "pass_ci_hi": 95,
       "clean": false,
       "mean_wall_ms": 168901,
       "median_wall_ms": null,
@@ -300,7 +409,10 @@
       "mean_mutate": 9.6,
       "mean_cold_bytes": null,
       "mean_warm_bytes": null,
-      "vs_git": null
+      "vs_git": null,
+      "task_count": 5,
+      "tasks_all_pass": 2,
+      "paired_vs_git": null
     },
     {
       "agent": "both",
@@ -308,6 +420,8 @@
       "n": 70,
       "pass": 60,
       "pass_rate": 85.7,
+      "pass_ci_lo": 76,
+      "pass_ci_hi": 92,
       "clean": false,
       "mean_wall_ms": 200645,
       "median_wall_ms": null,
@@ -324,7 +438,10 @@
         "ops_ratio": 1.01,
         "passrate_delta": -4.3,
         "kb_pct": null
-      }
+      },
+      "task_count": 5,
+      "tasks_all_pass": 1,
+      "paired_vs_git": null
     },
     {
       "agent": "both",
@@ -332,6 +449,8 @@
       "n": 70,
       "pass": 70,
       "pass_rate": 100,
+      "pass_ci_lo": 95,
+      "pass_ci_hi": 100,
       "clean": true,
       "mean_wall_ms": 63255,
       "median_wall_ms": null,
@@ -348,7 +467,10 @@
         "ops_ratio": 3.44,
         "passrate_delta": 10,
         "kb_pct": null
-      }
+      },
+      "task_count": 5,
+      "tasks_all_pass": 5,
+      "paired_vs_git": null
     }
   ],
   "cells_by_scenario": [
@@ -358,6 +480,8 @@
       "n": 7,
       "pass": 7,
       "pass_rate": 100,
+      "pass_ci_lo": 65,
+      "pass_ci_hi": 100,
       "clean": true,
       "mean_wall_ms": 67808,
       "median_wall_ms": 66136,
@@ -377,6 +501,8 @@
       "n": 7,
       "pass": 7,
       "pass_rate": 100,
+      "pass_ci_lo": 65,
+      "pass_ci_hi": 100,
       "clean": true,
       "mean_wall_ms": 99154,
       "median_wall_ms": 99969,
@@ -403,6 +529,8 @@
       "n": 7,
       "pass": 7,
       "pass_rate": 100,
+      "pass_ci_lo": 65,
+      "pass_ci_hi": 100,
       "clean": true,
       "mean_wall_ms": 30758,
       "median_wall_ms": 18455,
@@ -429,6 +557,8 @@
       "n": 7,
       "pass": 6,
       "pass_rate": 85.7,
+      "pass_ci_lo": 49,
+      "pass_ci_hi": 97,
       "clean": false,
       "mean_wall_ms": 169865,
       "median_wall_ms": 157294,
@@ -455,6 +585,8 @@
       "n": 7,
       "pass": 5,
       "pass_rate": 71.4,
+      "pass_ci_lo": 36,
+      "pass_ci_hi": 92,
       "clean": false,
       "mean_wall_ms": 172324,
       "median_wall_ms": 170204,
@@ -494,6 +626,8 @@
       "n": 7,
       "pass": 7,
       "pass_rate": 100,
+      "pass_ci_lo": 65,
+      "pass_ci_hi": 100,
       "clean": true,
       "mean_wall_ms": 52274,
       "median_wall_ms": 46547,
@@ -520,6 +654,8 @@
       "n": 14,
       "pass": 13,
       "pass_rate": 92.9,
+      "pass_ci_lo": 69,
+      "pass_ci_hi": 99,
       "clean": false,
       "mean_wall_ms": 118837,
       "median_wall_ms": null,
@@ -546,6 +682,8 @@
       "n": 14,
       "pass": 12,
       "pass_rate": 85.7,
+      "pass_ci_lo": 60,
+      "pass_ci_hi": 96,
       "clean": false,
       "mean_wall_ms": 135739,
       "median_wall_ms": null,
@@ -585,6 +723,8 @@
       "n": 14,
       "pass": 14,
       "pass_rate": 100,
+      "pass_ci_lo": 78,
+      "pass_ci_hi": 100,
       "clean": true,
       "mean_wall_ms": 41516,
       "median_wall_ms": null,
@@ -611,6 +751,8 @@
       "n": 7,
       "pass": 7,
       "pass_rate": 100,
+      "pass_ci_lo": 65,
+      "pass_ci_hi": 100,
       "clean": true,
       "mean_wall_ms": 174433,
       "median_wall_ms": 177798,
@@ -630,6 +772,8 @@
       "n": 7,
       "pass": 7,
       "pass_rate": 100,
+      "pass_ci_lo": 65,
+      "pass_ci_hi": 100,
       "clean": true,
       "mean_wall_ms": 208474,
       "median_wall_ms": 114277,
@@ -656,6 +800,8 @@
       "n": 7,
       "pass": 7,
       "pass_rate": 100,
+      "pass_ci_lo": 65,
+      "pass_ci_hi": 100,
       "clean": true,
       "mean_wall_ms": 36472,
       "median_wall_ms": 33588,
@@ -682,6 +828,8 @@
       "n": 7,
       "pass": 6,
       "pass_rate": 85.7,
+      "pass_ci_lo": 49,
+      "pass_ci_hi": 97,
       "clean": false,
       "mean_wall_ms": 598102,
       "median_wall_ms": 495733,
@@ -708,6 +856,8 @@
       "n": 7,
       "pass": 6,
       "pass_rate": 85.7,
+      "pass_ci_lo": 49,
+      "pass_ci_hi": 97,
       "clean": false,
       "mean_wall_ms": 585467,
       "median_wall_ms": 555354,
@@ -741,6 +891,8 @@
       "n": 7,
       "pass": 7,
       "pass_rate": 100,
+      "pass_ci_lo": 65,
+      "pass_ci_hi": 100,
       "clean": true,
       "mean_wall_ms": 97483,
       "median_wall_ms": 88142,
@@ -767,6 +919,8 @@
       "n": 14,
       "pass": 13,
       "pass_rate": 92.9,
+      "pass_ci_lo": 69,
+      "pass_ci_hi": 99,
       "clean": false,
       "mean_wall_ms": 386268,
       "median_wall_ms": null,
@@ -793,6 +947,8 @@
       "n": 14,
       "pass": 13,
       "pass_rate": 92.9,
+      "pass_ci_lo": 69,
+      "pass_ci_hi": 99,
       "clean": false,
       "mean_wall_ms": 396971,
       "median_wall_ms": null,
@@ -826,6 +982,8 @@
       "n": 14,
       "pass": 14,
       "pass_rate": 100,
+      "pass_ci_lo": 78,
+      "pass_ci_hi": 100,
       "clean": true,
       "mean_wall_ms": 66978,
       "median_wall_ms": null,
@@ -852,6 +1010,8 @@
       "n": 7,
       "pass": 7,
       "pass_rate": 100,
+      "pass_ci_lo": 65,
+      "pass_ci_hi": 100,
       "clean": true,
       "mean_wall_ms": 116247,
       "median_wall_ms": 122948,
@@ -871,6 +1031,8 @@
       "n": 7,
       "pass": 7,
       "pass_rate": 100,
+      "pass_ci_lo": 65,
+      "pass_ci_hi": 100,
       "clean": true,
       "mean_wall_ms": 185887,
       "median_wall_ms": 177334,
@@ -897,6 +1059,8 @@
       "n": 7,
       "pass": 7,
       "pass_rate": 100,
+      "pass_ci_lo": 65,
+      "pass_ci_hi": 100,
       "clean": true,
       "mean_wall_ms": 33013,
       "median_wall_ms": 30768,
@@ -923,6 +1087,8 @@
       "n": 7,
       "pass": 2,
       "pass_rate": 28.6,
+      "pass_ci_lo": 8,
+      "pass_ci_hi": 64,
       "clean": false,
       "mean_wall_ms": 294408,
       "median_wall_ms": 304463,
@@ -949,6 +1115,8 @@
       "n": 7,
       "pass": 1,
       "pass_rate": 14.3,
+      "pass_ci_lo": 3,
+      "pass_ci_hi": 51,
       "clean": false,
       "mean_wall_ms": 456354,
       "median_wall_ms": 432759,
@@ -988,6 +1156,8 @@
       "n": 7,
       "pass": 7,
       "pass_rate": 100,
+      "pass_ci_lo": 65,
+      "pass_ci_hi": 100,
       "clean": true,
       "mean_wall_ms": 157483,
       "median_wall_ms": 160526,
@@ -1014,6 +1184,8 @@
       "n": 14,
       "pass": 9,
       "pass_rate": 64.3,
+      "pass_ci_lo": 39,
+      "pass_ci_hi": 84,
       "clean": false,
       "mean_wall_ms": 205328,
       "median_wall_ms": null,
@@ -1040,6 +1212,8 @@
       "n": 14,
       "pass": 8,
       "pass_rate": 57.1,
+      "pass_ci_lo": 33,
+      "pass_ci_hi": 79,
       "clean": false,
       "mean_wall_ms": 321121,
       "median_wall_ms": null,
@@ -1079,6 +1253,8 @@
       "n": 14,
       "pass": 14,
       "pass_rate": 100,
+      "pass_ci_lo": 78,
+      "pass_ci_hi": 100,
       "clean": true,
       "mean_wall_ms": 95248,
       "median_wall_ms": null,
@@ -1105,6 +1281,8 @@
       "n": 7,
       "pass": 7,
       "pass_rate": 100,
+      "pass_ci_lo": 65,
+      "pass_ci_hi": 100,
       "clean": true,
       "mean_wall_ms": 54404,
       "median_wall_ms": 46689,
@@ -1124,6 +1302,8 @@
       "n": 7,
       "pass": 7,
       "pass_rate": 100,
+      "pass_ci_lo": 65,
+      "pass_ci_hi": 100,
       "clean": true,
       "mean_wall_ms": 58380,
       "median_wall_ms": 51975,
@@ -1150,6 +1330,8 @@
       "n": 7,
       "pass": 7,
       "pass_rate": 100,
+      "pass_ci_lo": 65,
+      "pass_ci_hi": 100,
       "clean": true,
       "mean_wall_ms": 20580,
       "median_wall_ms": 20081,
@@ -1176,6 +1358,8 @@
       "n": 7,
       "pass": 7,
       "pass_rate": 100,
+      "pass_ci_lo": 65,
+      "pass_ci_hi": 100,
       "clean": true,
       "mean_wall_ms": 68033,
       "median_wall_ms": 63200,
@@ -1195,6 +1379,8 @@
       "n": 7,
       "pass": 7,
       "pass_rate": 100,
+      "pass_ci_lo": 65,
+      "pass_ci_hi": 100,
       "clean": true,
       "mean_wall_ms": 91253,
       "median_wall_ms": 82245,
@@ -1221,6 +1407,8 @@
       "n": 7,
       "pass": 7,
       "pass_rate": 100,
+      "pass_ci_lo": 65,
+      "pass_ci_hi": 100,
       "clean": true,
       "mean_wall_ms": 97603,
       "median_wall_ms": 101935,
@@ -1247,6 +1435,8 @@
       "n": 14,
       "pass": 14,
       "pass_rate": 100,
+      "pass_ci_lo": 78,
+      "pass_ci_hi": 100,
       "clean": true,
       "mean_wall_ms": 61219,
       "median_wall_ms": null,
@@ -1266,6 +1456,8 @@
       "n": 14,
       "pass": 14,
       "pass_rate": 100,
+      "pass_ci_lo": 78,
+      "pass_ci_hi": 100,
       "clean": true,
       "mean_wall_ms": 74817,
       "median_wall_ms": null,
@@ -1292,6 +1484,8 @@
       "n": 14,
       "pass": 14,
       "pass_rate": 100,
+      "pass_ci_lo": 78,
+      "pass_ci_hi": 100,
       "clean": true,
       "mean_wall_ms": 59092,
       "median_wall_ms": null,
@@ -1318,6 +1512,8 @@
       "n": 7,
       "pass": 7,
       "pass_rate": 100,
+      "pass_ci_lo": 65,
+      "pass_ci_hi": 100,
       "clean": true,
       "mean_wall_ms": 34095,
       "median_wall_ms": 31484,
@@ -1337,6 +1533,8 @@
       "n": 7,
       "pass": 7,
       "pass_rate": 100,
+      "pass_ci_lo": 65,
+      "pass_ci_hi": 100,
       "clean": true,
       "mean_wall_ms": 43337,
       "median_wall_ms": 39062,
@@ -1363,6 +1561,8 @@
       "n": 7,
       "pass": 7,
       "pass_rate": 100,
+      "pass_ci_lo": 65,
+      "pass_ci_hi": 100,
       "clean": true,
       "mean_wall_ms": 24349,
       "median_wall_ms": 22486,
@@ -1389,6 +1589,8 @@
       "n": 7,
       "pass": 7,
       "pass_rate": 100,
+      "pass_ci_lo": 65,
+      "pass_ci_hi": 100,
       "clean": true,
       "mean_wall_ms": 111610,
       "median_wall_ms": 91591,
@@ -1408,6 +1610,8 @@
       "n": 7,
       "pass": 6,
       "pass_rate": 85.7,
+      "pass_ci_lo": 49,
+      "pass_ci_hi": 97,
       "clean": false,
       "mean_wall_ms": 105820,
       "median_wall_ms": 105799,
@@ -1441,6 +1645,8 @@
       "n": 7,
       "pass": 7,
       "pass_rate": 100,
+      "pass_ci_lo": 65,
+      "pass_ci_hi": 100,
       "clean": true,
       "mean_wall_ms": 82535,
       "median_wall_ms": 72012,
@@ -1467,6 +1673,8 @@
       "n": 14,
       "pass": 14,
       "pass_rate": 100,
+      "pass_ci_lo": 78,
+      "pass_ci_hi": 100,
       "clean": true,
       "mean_wall_ms": 72853,
       "median_wall_ms": null,
@@ -1486,6 +1694,8 @@
       "n": 14,
       "pass": 13,
       "pass_rate": 92.9,
+      "pass_ci_lo": 69,
+      "pass_ci_hi": 99,
       "clean": false,
       "mean_wall_ms": 74579,
       "median_wall_ms": null,
@@ -1519,6 +1729,8 @@
       "n": 14,
       "pass": 14,
       "pass_rate": 100,
+      "pass_ci_lo": 78,
+      "pass_ci_hi": 100,
       "clean": true,
       "mean_wall_ms": 53442,
       "median_wall_ms": null,

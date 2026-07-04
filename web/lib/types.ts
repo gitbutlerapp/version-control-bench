@@ -21,6 +21,21 @@ export interface Failure {
   read: string;
 }
 
+// Mean paired per-scenario difference vs the same agent's git arm, with a
+// t-based 95% CI over scenarios (lo/hi null when only one scenario).
+export interface PairedStat {
+  mean: number;
+  lo: number | null;
+  hi: number | null;
+  n: number;
+}
+
+export interface PairedVsGit {
+  pass_rate_pp: PairedStat | null;
+  wall_ms: PairedStat | null;
+  task_vc: PairedStat | null;
+}
+
 export interface Cell {
   agent: AgentId;
   arm: ArmId;
@@ -28,7 +43,13 @@ export interface Cell {
   n: number;
   pass: number;
   pass_rate: number;
+  pass_ci_lo: number | null;
+  pass_ci_hi: number | null;
   clean: boolean;
+  // overall cells only
+  task_count?: number;
+  tasks_all_pass?: number;
+  paired_vs_git?: PairedVsGit | null;
   mean_wall_ms: number;
   median_wall_ms: number | null;
   max_wall_ms: number;
@@ -92,6 +113,7 @@ export interface ResultsData {
     comparability: Record<string, { cross_agent: boolean; within_agent: boolean }>;
     kb_comparable_within_agent_only: boolean;
     kb_note: string;
+    stats_note: string;
     generator: string;
   };
   source_snapshots: SourceSnapshot[];
