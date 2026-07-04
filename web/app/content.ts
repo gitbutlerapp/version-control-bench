@@ -17,8 +17,9 @@ export const TOOL_URL: Record<string, string> = {
 export const HERO = {
   title: 'A version-control benchmark for coding agents',
   intro: [
-    'Coding agents do a growing share of version-control work. This benchmark measures how Claude Code and Codex handle five common version-control tasks with git, Jujutsu, and GitButler.',
-    'Each tool is scored on reliability, speed, and efficiency, judged on the resulting Git history rather than the commands used to produce it.',
+    'Which version-control tool should you give your coding agent? This benchmark holds the agents fixed — Claude Code and Codex — and varies the toolset: plain git, Jujutsu, and GitButler, each scored on reliability, speed, and efficiency across five common version-control operations. Other benchmarks fix the tool and compare models; this one fixes the agents and compares the tools.',
+    'The sharpest finding in the latest run: Claude Code failed to split a commit correctly with plain git in five of seven attempts, and with Jujutsu in six of seven. With GitButler it succeeded in all seven. Codex passed every run with every tool, so for Codex the tools differ only in speed and command count.',
+    'Every run is judged by a deterministic grader on the resulting Git history, not on the commands used to produce it. This is not a coding benchmark — the file changes exist before the agent starts — and not a Claude-versus-Codex comparison.',
   ],
 };
 
@@ -134,6 +135,39 @@ export const EYEBROWS = {
   failures: 'Failures',
   limitations: 'Limitations',
   provenance: 'About',
+};
+
+// Neighbors in the benchmark landscape. Named generously: they answer
+// different questions, and saying how earns the comparison back.
+export const RELATED = {
+  title: 'How this relates to other benchmarks',
+  lede: 'Most benchmarks in this space fix the tool and compare models. This one fixes the agents and compares the tools — the question a team faces once the agent is already chosen.',
+  items: [
+    {
+      name: 'jj-benchmark',
+      by: 'TabbyML',
+      url: 'https://github.com/TabbyML/jj-benchmark',
+      read: 'Fixes one tool (Jujutsu) and compares models on operating it.',
+    },
+    {
+      name: 'GitBench',
+      by: 'GitKraken',
+      url: 'https://gitbench.gitkraken.com/',
+      read: 'Single-turn git question answering across models; no multi-turn tool use.',
+    },
+    {
+      name: 'GitGoodBench',
+      by: 'JetBrains Research',
+      url: 'https://github.com/JetBrains-Research/git-good-bench',
+      read: 'Scores models on git tasks mined from real repositories.',
+    },
+    {
+      name: 'Terminal-Bench',
+      by: 'Stanford / Laude Institute',
+      url: 'https://www.tbench.ai/',
+      read: 'General terminal agents across many task types; a handful touch version control.',
+    },
+  ],
 };
 
 // Small inline strings used across components.

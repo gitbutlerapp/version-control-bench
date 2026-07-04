@@ -1,18 +1,20 @@
 # version-control-bench
 
-**A version-control benchmark for coding agents.** Live results: [vcbench.dev](https://vcbench.dev/)
+**Which version-control tool should you give your coding agent?** Live results: [vcbench.dev](https://vcbench.dev/)
 
-Coding agents do a growing share of version-control work. This benchmark measures how Claude Code and Codex handle five common version-control tasks with three tools: plain `git`, Jujutsu (`jj+skill`), and GitButler (`but+skill`).
+This benchmark holds the agents fixed — Claude Code and Codex — and varies the toolset: plain `git`, Jujutsu (`jj+skill`), and GitButler (`but+skill`), each scored on reliability, speed, and efficiency across five common version-control operations. Most benchmarks in this space fix the tool and compare models; this one fixes the agents and compares the tools — a measurement of agent–tool fit (what the industry has started calling agent experience) rather than a model leaderboard.
 
-This is not a coding benchmark. The file changes already exist before the agent starts; the agent's job is to produce the right Git-visible state — commit boundaries, branch topology, what stays uncommitted, protected history. Each tool is scored on reliability, speed, and efficiency, judged on the resulting Git history rather than the commands used to produce it.
+This is not a coding benchmark. The file changes already exist before the agent starts; the agent's job is to produce the right Git-visible state — commit boundaries, branch topology, what stays uncommitted, protected history. A deterministic grader judges the resulting Git history, never the commands used to produce it. And it is not a Claude-versus-Codex comparison: both agents run so the tool effect can be checked across them.
 
-The benchmark is maintained by GitButler, one of the three tools measured; the grader is deterministic and all data and task definitions are public in this repo.
+The benchmark is maintained by GitButler, one of the three tools measured. Read everything here with that in mind, and check rather than trust: the grader is deterministic, and the tasks, harness, per-run evidence, and data are public in this repo.
 
 ## Latest results
 
-Full matrix from 2026-07-03: 5 scenarios x 3 tools x 2 agents, seven runs per cell (k=7), 210 graded runs, 193 passed. GitButler passed all 70 of its runs while cutting mean wall time by roughly 68% (Codex) and 61% (Claude) versus plain `git`. All 17 grader failures were Claude runs on `git` or Jujutsu, concentrated on split-commit.
+Full matrix from 2026-07-03 (Codex on `gpt-5.5`, Claude Code on `claude-opus-4-1-20250805`): 5 scenarios x 3 tools x 2 agents, seven runs per cell (k=7), 210 graded runs, 193 passed.
 
-With five scenarios the task-clustered 95% intervals on the wall-time deltas are wide (the direction is consistent across scenarios, but the effect size is measured on these operations only). The statistically solid findings are the reliability gap — GitButler is the only tool where both agents passed every run of every scenario — and the command-count reduction for Codex. Confidence intervals and paired per-scenario deltas are in the [full writeup](docs/results/full-k7-2026-07-03.md).
+The sharpest finding: **Claude Code failed to split a commit correctly with plain `git` in 5 of 7 runs, and with Jujutsu in 6 of 7 — with GitButler it succeeded in all 7.** GitButler was the only tool where both agents passed every run of every scenario (70/70); all 17 grader failures were Claude runs on `git` or Jujutsu, concentrated on split-commit. Codex passed everything with every tool, so for Codex the tools differ only in speed and efficiency: GitButler cut mean wall time by roughly 68% and version-control commands by 84% versus plain `git`, while Jujutsu ran slower than `git` for both agents. The tables keep the losses visible too — plain `git` beat GitButler outright on Claude's reorder-commits.
+
+With five scenarios the task-clustered 95% intervals on the wall-time deltas are wide (the direction is consistent across scenarios, but the effect size is measured on these operations only). The statistically solid findings are the reliability gap and the command-count reduction for Codex. Confidence intervals and paired per-scenario deltas are in the [full writeup](docs/results/full-k7-2026-07-03.md).
 
 Each cell shows pass rate, mean wall time, and mean version-control commands per run. **Bold** marks the fastest tool that passed every run of that scenario.
 
@@ -176,6 +178,17 @@ The useful measurement block is `measurement`, not the older coarse `metrics` bl
 - command timing
 - cold and warm-estimated transcript bytes
 - warning and skill/reference output bytes
+
+## Relation to other benchmarks
+
+Neighboring benchmarks answer different questions, mostly of the form "given this tool, which model operates it best":
+
+- [jj-benchmark](https://github.com/TabbyML/jj-benchmark) (TabbyML) fixes one tool — Jujutsu — and compares models on operating it.
+- [GitBench](https://gitbench.gitkraken.com/) (GitKraken) is single-turn git question answering across models, without multi-turn tool use.
+- [GitGoodBench](https://github.com/JetBrains-Research/git-good-bench) (JetBrains Research, ACL 2025) scores models on git tasks mined from real repositories.
+- [Terminal-Bench](https://www.tbench.ai/) (Stanford / Laude Institute) measures general terminal agents across many task types; a handful touch version control.
+
+vcbench inverts the axis: the agents are fixed and the toolset varies, because that is the choice a team faces once the agent is already picked.
 
 ## Docs
 

@@ -1,6 +1,6 @@
 import type { ResultsData } from '@/lib/types';
 import { dateLabel } from '@/lib/format';
-import { EYEBROWS, MICRO } from '../content';
+import { EYEBROWS, MICRO, RELATED } from '../content';
 
 const REPO_URL = 'https://github.com/gitbutlerapp/version-control-bench';
 const DATA_URL = `${REPO_URL}/blob/main/web/data/results.json`;
@@ -53,6 +53,21 @@ export function Provenance({ data }: { data: ResultsData }) {
           <a href={DATA_URL}>derived results.json ↗</a>
           <a href={REPO_URL}>benchmark source ↗</a>
         </div>
+      </div>
+
+      <div className="related">
+        <h3>{RELATED.title}</h3>
+        <p className="lede">{RELATED.lede}</p>
+        <ul className="related-list">
+          {RELATED.items.map((r) => (
+            <li key={r.name}>
+              <a href={r.url} target="_blank" rel="noopener noreferrer">
+                {r.name}
+              </a>{' '}
+              <span className="faint">({r.by})</span> — {r.read}
+            </li>
+          ))}
+        </ul>
       </div>
     </section>
   );

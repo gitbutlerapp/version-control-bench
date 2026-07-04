@@ -489,6 +489,31 @@ section:first-of-type {
   max-width: 70ch;
 }
 
+/* Related-benchmarks block at the end of the About section. */
+.related {
+  margin-top: var(--s-6);
+}
+.related h3 {
+  font-size: var(--fs-body);
+  margin: 0 0 var(--s-2);
+}
+.related .lede {
+  max-width: 70ch;
+}
+.related-list {
+  list-style: none;
+  padding: 0;
+  margin: var(--s-3) 0 0;
+  display: grid;
+  gap: var(--s-2);
+  font-size: var(--fs-small, var(--fs-micro));
+  color: var(--text-muted);
+  max-width: 78ch;
+}
+.related-list a {
+  color: var(--text);
+}
+
 /* =========================================================================
    tooltips (portal-rendered, fixed-positioned to escape overflow clips)
    ========================================================================= */
