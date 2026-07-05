@@ -1383,6 +1383,11 @@ button.passchip:focus-visible {
   .hero-intro p {
     font-size: var(--fs-body);
   }
+  /* the run-shape half of the stamp wraps the eyebrow to two lines and the
+     intro already states it in words — keep the date + provenance stamp */
+  .hero-eyebrow-shape {
+    display: none;
+  }
 }
 
 @media (max-width: 760px) {

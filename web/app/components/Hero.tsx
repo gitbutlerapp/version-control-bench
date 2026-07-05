@@ -5,10 +5,12 @@ export function Hero({ data }: { data: ResultsData }) {
   const m = data.meta;
   return (
     <header className="hero" id="top">
-      {/* one stamp line: run shape, date, and the provenance jump */}
+      {/* one stamp line: run shape, date, and the provenance jump. On phones
+          the shape summary is hidden — the intro states it in words — leaving
+          a single short line of stamp. */}
       <p className="eyebrow hero-eyebrow">
-        3 tools · 2 agents · 5 scenarios · k={m.k} · {m.snapshot_date} ·{' '}
-        <a href="#provenance">provenance ↓</a>
+        <span className="hero-eyebrow-shape">3 tools · 2 agents · 5 scenarios · </span>
+        k={m.k} · {m.snapshot_date} · <a href="#provenance">provenance ↓</a>
       </p>
       <h1 className="hero-title">{HERO.title}</h1>
 
