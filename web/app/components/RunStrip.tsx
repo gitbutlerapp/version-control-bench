@@ -1,18 +1,22 @@
 'use client';
 
+import { useEffect, useRef, useState } from 'react';
 import { useView } from '../state/ViewContext';
-import type { ArmId, ResultsData, RunRow } from '@/lib/types';
+import type { ArmId, ResultsData } from '@/lib/types';
 import { TOOL_COLOR } from '@/lib/selectors';
 
 // One dot per run on a shared time axis: the distribution the matrix means
-// summarize. Hollow dots failed grading; the tick marks the median. Kept
-// deliberately small — a compact inline sparkline, no axes machinery. The
-// figure is width-capped in CSS so it doesn't scale up to the full table.
-const W = 560;
-const ROW_H = 22;
-const PAD_L = 30;
-const PAD_R = 40;
-const R = 3.5;
+// summarize. Hollow dots failed grading; the tick marks the median.
+//
+// The SVG viewBox width is set to the measured pixel width of the container so
+// the render scale stays 1:1 — dots and labels keep a constant size while the
+// axis stretches to fill whatever horizontal space is available (rather than a
+// fixed viewBox scaling everything up when the strip gets wider).
+const ROW_H = 22; // px
+const PAD_L = 34;
+const PAD_R = 52;
+const R = 3.2;
+const DEFAULT_W = 720;
 
 function median(values: number[]): number {
   const sorted = [...values].sort((a, b) => a - b);
@@ -23,19 +27,35 @@ const ARM_SHORT: Record<ArmId, string> = { git: 'git', 'jj+skill': 'jj', 'but+sk
 
 export function RunStrip({ data, scenarioId }: { data: ResultsData; scenarioId: string }) {
   const { agent } = useView();
+  const wrapRef = useRef<HTMLElement>(null);
+  const [w, setW] = useState(DEFAULT_W);
+
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver((entries) => {
+      const cw = entries[0]?.contentRect.width;
+      if (cw && cw > 0) setW(cw);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
   const arms = data.meta.arm_order;
   const runs = data.rows.filter((r) => r.scenario === scenarioId && r.agent === agent);
   if (runs.length === 0) return null;
 
   const maxMs = Math.max(...runs.map((r) => r.wall_ms));
-  const x = (ms: number) => PAD_L + (ms / maxMs) * (W - PAD_L - PAD_R);
+  const x = (ms: number) => PAD_L + (ms / maxMs) * (w - PAD_L - PAD_R);
   const height = arms.length * ROW_H + 6;
   const agentLabel = data.meta.agents.find((a) => a.id === agent)?.label ?? agent;
 
   return (
-    <figure className="runstrip">
+    <figure className="runstrip" ref={wrapRef}>
       <svg
-        viewBox={`0 0 ${W} ${height}`}
+        viewBox={`0 0 ${w} ${height}`}
+        width={w}
+        height={height}
         role="img"
         aria-label={`Wall-clock time of each ${agentLabel} run on this scenario, one dot per run`}
       >
@@ -50,13 +70,7 @@ export function RunStrip({ data, scenarioId }: { data: ResultsData; scenarioId: 
               <text className="runstrip-label" x={PAD_L - 8} y={y + 3.5} textAnchor="end">
                 {ARM_SHORT[arm]}
               </text>
-              <line
-                className="runstrip-axis"
-                x1={PAD_L}
-                x2={W - PAD_R}
-                y1={y}
-                y2={y}
-              />
+              <line className="runstrip-axis" x1={PAD_L} x2={w - PAD_R} y1={y} y2={y} />
               <line
                 x1={x(med)}
                 x2={x(med)}
@@ -82,8 +96,8 @@ export function RunStrip({ data, scenarioId }: { data: ResultsData; scenarioId: 
                   </title>
                 </circle>
               ))}
-              <text className="runstrip-max" x={W - PAD_R + 8} y={y + 3.5}>
-                {i === 0 ? `${Math.round(maxMs / 1000)}s →` : ''}
+              <text className="runstrip-max" x={w - PAD_R + 8} y={y + 3.5}>
+                {i === 0 ? `${Math.round(maxMs / 1000)}s` : ''}
               </text>
             </g>
           );

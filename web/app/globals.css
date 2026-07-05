@@ -534,12 +534,13 @@ section:first-of-type {
   color: var(--text);
 }
 
-/* Per-run wall-time strip (shown inside an expanded matrix row). Width-capped
-   so the SVG renders near its natural size instead of stretching across the
-   full table and scaling every dot and label up with it. */
+/* Per-run wall-time strip (shown inside an expanded matrix row). The SVG's
+   viewBox tracks the measured container width (see RunStrip), so widening it
+   spreads the dots without scaling them; the cap just keeps it from getting
+   sparse on very wide viewports. */
 .runstrip {
   margin: 0;
-  max-width: 460px;
+  max-width: 1000px;
 }
 .runstrip svg {
   width: 100%;
