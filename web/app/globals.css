@@ -1089,14 +1089,20 @@ button.passchip:focus-visible {
   line-height: var(--lh-body);
   max-width: var(--measure);
 }
+/* The crux: a labeled callout, not a second paragraph. The micro label says
+   why the box exists; the amber rule ties it to the graphs' accent language. */
 .scenario-crux {
-  margin-top: var(--s-3);
+  margin-top: var(--s-4);
+  padding-left: var(--s-3);
+  border-left: 2px solid color-mix(in srgb, var(--tool-but) 60%, transparent);
+  max-width: var(--measure);
+  display: grid;
+  gap: var(--s-1);
+}
+.scenario-crux-text {
   color: var(--text);
   font-size: var(--fs-caption);
   line-height: var(--lh-caption);
-  padding-left: var(--s-3);
-  border-left: 2px solid var(--border-strong);
-  max-width: var(--measure);
 }
 .scenario-prompt {
   margin-top: var(--s-4);
@@ -1200,11 +1206,6 @@ button.passchip:focus-visible {
 .cg-nodelabel[data-tone='ghost'] {
   fill: var(--text-faint);
 }
-.cg-note {
-  fill: var(--text-muted);
-  font-size: 10px;
-  font-family: var(--font-sans);
-}
 .cg-arrow {
   stroke: var(--border-strong);
   stroke-width: 1.5;
@@ -1212,10 +1213,14 @@ button.passchip:focus-visible {
 .cg-arrowhead {
   fill: var(--border-strong);
 }
-.cg-leftovers {
-  fill: var(--text-muted);
-  font-size: 10px;
+/* HTML caption under the graph: constant size regardless of how the SVG
+   scales, wraps on narrow screens, same annotation voice as the run strip. */
+.cg-caption {
+  margin-top: var(--s-2);
   font-family: var(--font-mono);
+  font-size: var(--fs-micro);
+  line-height: 1.7;
+  color: var(--text-faint);
 }
 
 /* =========================================================================

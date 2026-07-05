@@ -11,7 +11,10 @@ function ScenarioSection({ scenario, index }: { scenario: ScenarioMeta; index: n
           <h3 className="scenario-title">{scenario.title}</h3>
         </div>
         <p className="scenario-situation-text">{scenario.situation}</p>
-        <p className="scenario-crux">{scenario.crux}</p>
+        <div className="scenario-crux">
+          <p className="eyebrow">The crux</p>
+          <p className="scenario-crux-text">{scenario.crux}</p>
+        </div>
         <details className="scenario-prompt">
           <summary>{MICRO.promptLabel}</summary>
           <blockquote className="mono">{scenario.prompt}</blockquote>

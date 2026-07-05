@@ -153,7 +153,7 @@ function SelectGraph() {
   return (
     <figure className="commitgraph">
       <svg
-        viewBox="0 0 300 200"
+        viewBox="0 0 300 180"
         role="img"
         aria-label="Selective commit: two validation hunks in handler.ts plus the test and README become one commit on a new branch; a logging hunk in handler.ts, the config change, and untracked notes stay uncommitted."
         preserveAspectRatio="xMidYMin meet"
@@ -203,11 +203,10 @@ function SelectGraph() {
         <text x={254} y={midY + 24} className="cg-col" textAnchor="middle">
           new branch
         </text>
-
-        <text x={8} y={192} className="cg-note">
-          amber hunks → one commit · hollow stays uncommitted
-        </text>
       </svg>
+      <figcaption className="cg-caption">
+        amber hunks → one commit · hollow stays uncommitted
+      </figcaption>
     </figure>
   );
 }
@@ -226,7 +225,7 @@ function AmendGraph() {
   return (
     <figure className="commitgraph">
       <svg
-        viewBox="0 0 300 204"
+        viewBox="0 0 300 168"
         role="img"
         aria-label="Multi-amend: each dirty fix is folded into the existing commit it belongs to; debug and config changes stay uncommitted"
         preserveAspectRatio="xMidYMin meet"
@@ -296,13 +295,11 @@ function AmendGraph() {
           );
         })}
 
-        <text x={8} y={178} className="cg-note">
-          each fix amended into the commit it belongs to
-        </text>
-        <text x={8} y={196} className="cg-leftovers">
-          ↳ debug · config notes stay dirty
-        </text>
       </svg>
+      <figcaption className="cg-caption">
+        each fix amended into its commit
+        <br />↳ debug · config notes stay dirty
+      </figcaption>
     </figure>
   );
 }
@@ -314,9 +311,7 @@ export function CommitGraph({ scenario }: { scenario: ScenarioMeta }) {
   const rows = Math.max(spec.before.length, spec.after.length);
   const nodesBottom = TOP + (rows - 1) * GAP;
   const midY = TOP + ((rows - 1) * GAP) / 2;
-  const noteY = nodesBottom + 30;
-  const leftoversY = noteY + (spec.note ? 18 : 0);
-  const height = (spec.leftovers ? leftoversY : spec.note ? noteY : nodesBottom) + 12;
+  const height = nodesBottom + 16;
   const arrowX = (COL_BEFORE + COL_AFTER) / 2;
 
   return (
@@ -336,18 +331,17 @@ export function CommitGraph({ scenario }: { scenario: ScenarioMeta }) {
 
         <Column nodes={spec.before} x={COL_BEFORE} side="before" />
         <Column nodes={spec.after} x={COL_AFTER} side="after" />
-
-        {spec.note && (
-          <text x={arrowX} y={noteY} textAnchor="middle" className="cg-note">
-            {spec.note}
-          </text>
-        )}
-        {spec.leftovers && (
-          <text x={arrowX} y={leftoversY} textAnchor="middle" className="cg-leftovers">
-            ↳ stays uncommitted: {spec.leftovers}
-          </text>
-        )}
       </svg>
+      {(spec.note || spec.leftovers) && (
+        <figcaption className="cg-caption">
+          {spec.note}
+          {spec.leftovers && (
+            <>
+              <br />↳ stays uncommitted: {spec.leftovers}
+            </>
+          )}
+        </figcaption>
+      )}
     </figure>
   );
 }
