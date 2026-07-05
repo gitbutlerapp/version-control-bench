@@ -19,7 +19,7 @@ export function Hero({ data }: { data: ResultsData }) {
 
       <p className="hero-prov faint mono">
         data generated {dateLabel(data.generated_at)} · {m.total_runs} graded runs ·{' '}
-        {data.source_snapshots.length} source snapshots · <a href="#provenance">provenance ↓</a>
+        <a href="#provenance">provenance ↓</a>
       </p>
     </header>
   );

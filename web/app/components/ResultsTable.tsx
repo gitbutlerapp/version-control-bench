@@ -222,11 +222,11 @@ export function ResultsTable({ data }: { data: ResultsData }) {
 
       <ul className="matrix-legend">
         <li>
-          <PassChip pass={5} n={5} size="sm" /> pass rate (reliability first): a wrong history
-          fails regardless of speed
+          <PassChip pass={5} n={5} size="sm" /> pass rate — a wrong history fails, no matter how
+          fast
         </li>
         <li>
-          <span className="legend-bold">bold</span> = best value in each column
+          <span className="legend-bold">bold</span> = best of the three tools in that row
         </li>
         <li>click a scenario to see its per-run times</li>
         <li>hover a pass chip for its Wilson 95% interval</li>
@@ -280,8 +280,7 @@ function StatisticalRead({ data }: { data: ResultsData }) {
       </ul>
       <p className="faint">
         Each scenario contributes one paired difference; intervals are t-based with df = scenarios
-        − 1. An interval crossing zero means the direction is consistent but the effect size is
-        not established on this task set.
+        − 1. An interval crossing zero means the effect is not established on this scenario set.
       </p>
     </details>
   );

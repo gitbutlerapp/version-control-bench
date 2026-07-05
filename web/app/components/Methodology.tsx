@@ -25,7 +25,7 @@ export function Methodology({ data }: { data: ResultsData }) {
         <span className="pill mono">
           n={m.total_runs / (m.arm_order.length * 2)} per tool–agent
         </span>
-        <span className="pill mono">oracle: git-state</span>
+        <span className="pill mono">grader: git-state</span>
         <span className="pill mono">jj 0.42.0</span>
         <span className="pill mono">{m.total_runs} runs</span>
       </div>

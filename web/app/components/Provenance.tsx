@@ -65,7 +65,6 @@ export function Provenance({ data }: { data: ResultsData }) {
             <dd>
               k={m.k} · {m.total_runs} runs · {m.snapshot_date} ·{' '}
               <a href={DATA_URL}>results.json ↗</a> · <a href={REPO_URL}>source ↗</a>
-              <span className="faint"> (full hashes in the aggregate)</span>
             </dd>
           </div>
         </dl>
@@ -118,8 +117,8 @@ export function Footer({ data }: { data: ResultsData }) {
           measured. The grader is deterministic and the data is <a href={DATA_URL}>on GitHub</a>.
         </p>
         <p className="footer-stamp mono faint">
-          data generated {dateLabel(data.generated_at)} · {m.total_passed}/{m.total_runs} passed ·{' '}
-          {m.total_runs} runs across {m.scenarios.length} chores, 2 agents, 3 tools
+          data generated {dateLabel(data.generated_at)} · {m.total_passed}/{m.total_runs} runs
+          passed · {m.scenarios.length} scenarios × {m.arm_order.length} tools × 2 agents
         </p>
       </div>
     </footer>

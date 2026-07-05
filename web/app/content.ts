@@ -30,7 +30,7 @@ export const RESULTS = {
   columns: {
     pass: 'Reliability: share of runs that produced the exact history the instruction asked for.',
     time: 'Speed: mean wall-clock time per run, setup excluded.',
-    cmds: 'Version-control commands the agent ran per run. Fewer usually means less time and less output.',
+    cmds: 'Version-control commands the agent ran per run — fewer usually means less time and output.',
     kb: 'Efficiency: kilobytes of version-control output the agent read back per run (skill reads excluded) — a token-cost proxy, comparable within one agent only.',
   },
 };
@@ -50,7 +50,7 @@ export const METHOD = {
     },
     {
       term: 'Deterministic grader',
-      body: 'A hidden, scripted check that returns the same verdict for the same final state — no LLM judge. It inspects commit boundaries, branch topology, and what stayed uncommitted, and does not compare commands against a reference: two command sequences pass if they produce the same history.',
+      body: 'A hidden, scripted check that returns the same verdict for the same final state — no LLM judge. It inspects commit boundaries, branch topology, and what stayed uncommitted; it never compares commands against a reference.',
     },
     {
       term: 'Timing boundary',
@@ -78,7 +78,7 @@ export const LEDGER = {
 };
 
 export const AGENT_NOTE =
-  'Both agents are run to check whether the tool effect holds across them. This is not a Claude-versus-Codex comparison.';
+  'Both agents run the same matrix to check the tool effect holds across models — not a Claude-versus-Codex comparison.';
 
 // Section kicker labels (rendered uppercase mono above each heading).
 export const EYEBROWS = {
@@ -94,7 +94,6 @@ export const EYEBROWS = {
 const resultDocUrl = (name: string) => `${REPO_URL}/blob/main/docs/results/${name}`;
 export const HISTORY = {
   title: 'Results history',
-  lede: 'Every full-matrix batch is written up and checked in; the page above always shows the latest.',
   entries: [
     { date: '2026-07-05', scope: 'k=8 · Opus 4.8 · GPT-5.5', passed: '239/240', url: resultDocUrl('full-k8-2026-07-05.md'), current: true },
     { date: '2026-07-03', scope: 'k=7 · Opus 4.1 · GPT-5.5', passed: '193/210', url: resultDocUrl('full-k7-2026-07-03.md') },
@@ -111,7 +110,7 @@ export const HISTORY = {
 // different questions, and saying how earns the comparison back.
 export const RELATED = {
   title: 'How this relates to other benchmarks',
-  lede: 'Most benchmarks in this space fix the tool and compare models. This one fixes the agents and compares the tools — the question a team faces once the agent is already chosen.',
+  lede: 'Most benchmarks here hold the tool constant and compare models; this one holds the agents constant and compares the tools — the question a team faces once the agent is chosen.',
   items: [
     {
       name: 'jj-benchmark',
@@ -151,10 +150,5 @@ export const MODEL_FALLBACK: Record<string, string> = {
 // Small inline strings used across components.
 export const MICRO = {
   promptLabel: 'Instruction given to the agent',
-  lowerIsBetter: 'lower is better',
   reproduceTitle: 'About this benchmark',
-  reproduceLede:
-    'The numbers above are derived from the latest full-matrix aggregate. The source snapshot and commands that produced them are listed below.',
-  footerNote:
-    'Maintained by GitButler, one of the three tools measured; the grader is deterministic and the data is public.',
 };
