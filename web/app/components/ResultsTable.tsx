@@ -116,6 +116,89 @@ export function ResultsTable({ data }: { data: ResultsData }) {
     });
   const colSpan = 1 + arms.length * 4;
 
+  // Phone rendering: the wide table needs sideways scrolling that hides two of
+  // the three tools, so under 640px each scenario becomes a card with tools as
+  // rows and metrics as columns — the tool comparison fits the screen whole.
+  // Which of the two renders is shown is a pure CSS media query.
+  const renderCard = (row: Row) => {
+    const b = bestsFor(row.cells);
+    const isOpen = row.sid ? openSet.has(row.sid) : false;
+    return (
+      <section className="mcard" key={row.key} data-overall={row.overall || undefined}>
+        {row.sid ? (
+          <button
+            type="button"
+            className="m-expand mcard-head"
+            aria-expanded={isOpen}
+            onClick={() => toggle(row.sid!)}
+          >
+            <span className="m-caret" data-open={isOpen} aria-hidden>
+              ▸
+            </span>
+            <span>{row.label}</span>
+          </button>
+        ) : (
+          <p className="mcard-head">{row.label}</p>
+        )}
+        <table className="mcard-table">
+          <thead>
+            <tr>
+              <th />
+              <th scope="col">pass</th>
+              <th scope="col">time</th>
+              <th scope="col">cmds</th>
+              <th scope="col">KB</th>
+            </tr>
+          </thead>
+          <tbody>
+            {row.cells.map((cell, ai) => {
+              const arm = arms[ai];
+              return (
+                <tr key={arm}>
+                  <th scope="row">
+                    <span
+                      className="mcard-tool"
+                      style={{ ['--tool' as string]: `var(--tool-${TOOL_VAR[arm as ArmId]})` }}
+                    >
+                      {armMeta[arm]?.label ?? arm}
+                    </span>
+                  </th>
+                  {cell ? (
+                    <>
+                      <td className="mcard-pass">
+                        <PassChip
+                          pass={cell.pass}
+                          n={cell.n}
+                          ciLo={cell.pass_ci_lo}
+                          ciHi={cell.pass_ci_hi}
+                          size="sm"
+                        />
+                      </td>
+                      <td data-best={b.t === ai}>
+                        {seconds(cell.mean_wall_ms)}
+                        <span className="m-unit">s</span>
+                      </td>
+                      <td data-best={b.c === ai}>{count(cell.mean_task_vc)}</td>
+                      <td data-best={b.k === ai}>{kb(cell.mean_warm_bytes)}</td>
+                    </>
+                  ) : (
+                    <>
+                      <td>—</td>
+                      <td>—</td>
+                      <td>—</td>
+                      <td>—</td>
+                    </>
+                  )}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+        {isOpen && row.sid && <RunStrip data={data} scenarioId={row.sid} />}
+      </section>
+    );
+  };
+
   const renderRow = (row: Row, isOpen = false) => {
     const b = bestsFor(row.cells);
     return (
@@ -223,13 +306,15 @@ export function ResultsTable({ data }: { data: ResultsData }) {
         </table>
       </div>
 
+      <div className="matrix-cards">{[...rows, overallRow].map(renderCard)}</div>
+
       <ul className="matrix-legend">
         <li>
           <PassChip pass={5} n={5} size="sm" /> pass rate — a wrong history fails, no matter how
           fast
         </li>
         <li>
-          <span className="legend-bold">bold</span> = best of the three tools in that row
+          <span className="legend-bold">bold</span> = best of the three tools
         </li>
         <li>click a scenario to see its per-run times</li>
         <li>hover a pass chip for its Wilson 95% interval</li>

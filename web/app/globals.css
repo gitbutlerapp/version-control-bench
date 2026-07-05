@@ -438,6 +438,85 @@ section:first-of-type {
   color: var(--text);
 }
 
+/* Phone rendering of the matrix: one card per scenario, tools as rows and
+   metrics as columns, so the tool comparison fits the screen without sideways
+   scrolling. Hidden on wide viewports; the table hides on narrow ones. */
+.matrix-cards {
+  display: none;
+}
+.mcard {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--s-3) var(--s-4) var(--s-4);
+}
+.mcard[data-overall] {
+  border-color: var(--border-strong);
+}
+.mcard-head {
+  font-weight: 620;
+  color: var(--text);
+  margin-bottom: var(--s-1);
+}
+.mcard-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-caption);
+  line-height: 1.4;
+}
+.mcard-table th,
+.mcard-table td {
+  padding: var(--s-2) 0 var(--s-2) var(--s-3);
+  text-align: right;
+  white-space: nowrap;
+}
+.mcard-table thead th {
+  font-size: var(--fs-micro);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-label);
+  color: var(--text-muted);
+  font-weight: 500;
+  border-bottom: 1px solid var(--border);
+}
+.mcard-table tbody th {
+  text-align: left;
+  padding-left: 0;
+  font-family: var(--font-sans);
+  font-weight: 550;
+  color: var(--text);
+}
+.mcard-table tbody tr + tr th,
+.mcard-table tbody tr + tr td {
+  border-top: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+}
+.mcard-tool {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.mcard-tool::before {
+  content: '';
+  width: 3px;
+  height: 12px;
+  border-radius: 2px;
+  background: var(--tool);
+}
+.mcard-table td {
+  color: var(--text-muted);
+}
+.mcard-table td[data-best='true'] {
+  color: var(--text);
+  font-weight: 700;
+}
+.mcard-pass {
+  text-align: center;
+}
+.mcard .runstrip {
+  margin-top: var(--s-3);
+}
+
 .matrix-legend {
   list-style: none;
   display: flex;
@@ -1387,6 +1466,14 @@ button.passchip:focus-visible {
      intro already states it in words — keep the date + provenance stamp */
   .hero-eyebrow-shape {
     display: none;
+  }
+  /* swap the wide matrix for the stacked per-scenario cards */
+  .matrix-wrap {
+    display: none;
+  }
+  .matrix-cards {
+    display: grid;
+    gap: var(--s-3);
   }
 }
 
