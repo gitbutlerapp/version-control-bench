@@ -17,8 +17,8 @@ export const TOOL_URL: Record<string, string> = {
 export const HERO = {
   title: 'A version-control benchmark for coding agents',
   intro: [
-    'Which version-control tool should you give your coding agent? This benchmark fixes the agents — Claude Code and Codex — and compares three toolsets across five version-control operations: plain git, Jujutsu, and GitButler. It is the inverse of benchmarks that compare models on a fixed tool.',
-    'On today’s frontier models all three are reliable — 239 of 240 runs passed — so the separator is speed, not correctness: GitButler ran about 60% faster than git with roughly 80% fewer commands, while Jujutsu was slower than git for both.',
+    'Which version-control tool should you give your coding agent? Claude Code and Codex run the same five version-control tasks three ways — with plain git, with Jujutsu, and with GitButler. Only the tool changes.',
+    'All three turn out reliable — 239 of 240 runs passed — so the separator is speed: GitButler ran about 60% faster than git with roughly 80% fewer commands; Jujutsu ran slower than git.',
   ],
 };
 
