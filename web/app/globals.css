@@ -505,7 +505,7 @@ section:first-of-type {
 }
 .m-caret {
   display: inline-block;
-  font-size: 10px;
+  font-size: 14px;
   line-height: 1;
   color: var(--text-muted);
   transition: transform 0.15s ease;
