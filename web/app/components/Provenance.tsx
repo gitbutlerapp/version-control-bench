@@ -33,41 +33,48 @@ export function Provenance({ data }: { data: ResultsData }) {
         <h2>{MICRO.reproduceTitle}</h2>
       </div>
 
-      <dl className="prov mono">
-        {agents.map((a) => (
-          <div key={a.id}>
-            <dt>{a.label}</dt>
+      <details className="about-disclose">
+        <summary>
+          Provenance <span className="about-count">models · tools · hashes</span>
+        </summary>
+        <dl className="prov mono">
+          {agents.map((a) => (
+            <div key={a.id}>
+              <dt>{a.label}</dt>
+              <dd>
+                {a.observed_model ?? MODEL_FALLBACK[a.id] ?? '?'}
+                {a.agent_cli_version ? ` · ${a.agent_cli_version}` : ''}
+              </dd>
+            </div>
+          ))}
+          <div>
+            <dt>grader</dt>
+            <dd>deterministic git-state verifier · no LLM judge</dd>
+          </div>
+          {data.source_snapshots.map((s) => {
+            const { label, body } = snapshotSummary(s);
+            return (
+              <div key={`${s.batch}:${s.arms.join('-')}`}>
+                <dt>{label}</dt>
+                <dd>{body}</dd>
+              </div>
+            );
+          })}
+          <div>
+            <dt>batch</dt>
             <dd>
-              {a.observed_model ?? MODEL_FALLBACK[a.id] ?? '?'}
-              {a.agent_cli_version ? ` · ${a.agent_cli_version}` : ''}
+              k={m.k} · {m.total_runs} runs · {m.snapshot_date} ·{' '}
+              <a href={DATA_URL}>results.json ↗</a> · <a href={REPO_URL}>source ↗</a>
+              <span className="faint"> (full hashes in the aggregate)</span>
             </dd>
           </div>
-        ))}
-        <div>
-          <dt>grader</dt>
-          <dd>deterministic git-state verifier · no LLM judge</dd>
-        </div>
-        {data.source_snapshots.map((s) => {
-          const { label, body } = snapshotSummary(s);
-          return (
-            <div key={`${s.batch}:${s.arms.join('-')}`}>
-              <dt>{label}</dt>
-              <dd>{body}</dd>
-            </div>
-          );
-        })}
-        <div>
-          <dt>batch</dt>
-          <dd>
-            k={m.k} · {m.total_runs} runs · {m.snapshot_date} ·{' '}
-            <a href={DATA_URL}>results.json ↗</a> · <a href={REPO_URL}>source ↗</a>
-            <span className="faint"> (full hashes in the aggregate)</span>
-          </dd>
-        </div>
-      </dl>
+        </dl>
+      </details>
 
-      <div className="prov-block">
-        <h3>{HISTORY.title}</h3>
+      <details className="about-disclose">
+        <summary>
+          {HISTORY.title} <span className="about-count">{HISTORY.entries.length} batches</span>
+        </summary>
         <ul className="history-list mono">
           {HISTORY.entries.map((entry) => (
             <li key={entry.date}>
@@ -79,10 +86,13 @@ export function Provenance({ data }: { data: ResultsData }) {
             </li>
           ))}
         </ul>
-      </div>
+      </details>
 
-      <div className="prov-block">
-        <h3>{RELATED.title}</h3>
+      <details className="about-disclose">
+        <summary>
+          Related benchmarks <span className="about-count">{RELATED.items.length}</span>
+        </summary>
+        <p className="faint about-lede">{RELATED.lede}</p>
         <ul className="related-list">
           {RELATED.items.map((r) => (
             <li key={r.name}>
@@ -93,7 +103,7 @@ export function Provenance({ data }: { data: ResultsData }) {
             </li>
           ))}
         </ul>
-      </div>
+      </details>
     </section>
   );
 }

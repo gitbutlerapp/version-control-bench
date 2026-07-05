@@ -1256,11 +1256,48 @@ button.passchip:focus-visible {
 .prov a {
   color: var(--text);
 }
-.prov-block {
-  margin-top: var(--s-5);
+/* Collapsible About sub-sections — compact by default, expand on demand. */
+.about-disclose {
+  border-top: 1px solid var(--border);
 }
-.prov-block h3 {
-  font-size: var(--fs-body);
+.about-disclose:last-of-type {
+  border-bottom: 1px solid var(--border);
+}
+.about-disclose > summary {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: var(--s-3) 0;
+  font-weight: 600;
+  color: var(--text);
+}
+.about-disclose > summary::-webkit-details-marker {
+  display: none;
+}
+.about-disclose > summary::before {
+  content: '▸';
+  font-size: 12px;
+  color: var(--text-muted);
+  transition: transform 0.15s ease;
+  align-self: center;
+}
+.about-disclose[open] > summary::before {
+  transform: rotate(90deg);
+}
+.about-count {
+  color: var(--text-faint);
+  font-weight: 400;
+  font-size: var(--fs-micro);
+}
+.about-disclose > dl,
+.about-disclose > ul,
+.about-disclose > .about-lede {
+  padding-bottom: var(--s-4);
+}
+.about-lede {
+  max-width: 74ch;
   margin: 0 0 var(--s-2);
 }
 .footer {
