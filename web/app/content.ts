@@ -26,7 +26,6 @@ export const HERO = {
 export const RESULTS = {
   eyebrow: 'Results',
   title: 'Results matrix',
-  lede: 'Each tool on each scenario, for the selected agent.',
   columns: {
     pass: 'Reliability: share of runs that produced the exact history the instruction asked for.',
     time: 'Speed: mean wall-clock time per run, setup excluded.',

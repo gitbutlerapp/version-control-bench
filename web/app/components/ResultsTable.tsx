@@ -159,7 +159,6 @@ export function ResultsTable({ data }: { data: ResultsData }) {
         </div>
         <AgentToggle />
       </div>
-      <p className="lede">{RESULTS.lede}</p>
 
       <div className="matrix-wrap">
         <table className="matrix">

@@ -844,7 +844,7 @@ section:first-of-type {
    ========================================================================= */
 .hero {
   padding-top: var(--s-6);
-  padding-bottom: var(--s-5);
+  padding-bottom: var(--s-4);
 }
 .hero-eyebrow {
   margin-bottom: var(--s-3);
@@ -872,9 +872,14 @@ section:first-of-type {
   color: var(--text);
 }
 
-.hero-prov {
-  margin-top: var(--s-4);
-  font-size: var(--fs-micro);
+.hero-eyebrow a {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: var(--border-strong);
+  text-underline-offset: 3px;
+}
+.hero-eyebrow a:hover {
+  color: var(--text-muted);
 }
 
 /* =========================================================================
@@ -894,14 +899,7 @@ section:first-of-type {
 .results-head .section-head {
   margin-bottom: 0;
 }
-.results-head + .lede {
-  color: var(--text-muted);
-  max-width: var(--measure-lead);
-  font-size: var(--fs-lead);
-  margin-top: var(--s-2);
-}
-.results-head,
-.results-head + .lede {
+.results-head {
   margin-bottom: var(--s-4);
 }
 .agent-caption {
@@ -1379,6 +1377,11 @@ button.passchip:focus-visible {
   }
   .scenario-block {
     padding-block: var(--s-6);
+  }
+  /* lead-size intro costs ~3 extra lines on a phone; body size reads the
+     same and gets the matrix onto the first screen */
+  .hero-intro p {
+    font-size: var(--fs-body);
   }
 }
 
