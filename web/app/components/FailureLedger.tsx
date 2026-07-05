@@ -47,16 +47,33 @@ function buildRows(data: ResultsData): LedgerRow[] {
   return rows;
 }
 
+// One-line summary derived from the data, so it tracks each batch.
+function ledgerLede(data: ResultsData, failed: number): string {
+  const m = data.meta;
+  if (failed === 0) return LEDGER.emptyLede;
+  const armMisses = ['git', 'jj+skill', 'but+skill']
+    .map((arm) => {
+      const n = data.cells_by_scenario
+        .filter((c) => c.arm === arm && c.agent !== 'both')
+        .reduce((s, c) => s + (c.failures?.reduce((a, f) => a + f.count, 0) ?? 0), 0);
+      const label = m.arms.find((a) => a.id === arm)?.label ?? arm;
+      return n === 0 ? `${label} none` : `${label} ${n}`;
+    })
+    .join(', ');
+  return `${failed} of ${m.total_runs} runs failed the grader (${armMisses}).`;
+}
+
 export function FailureLedger({ data }: { data: ResultsData }) {
   const rows = buildRows(data);
   const armLabel = Object.fromEntries(data.meta.arms.map((a) => [a.id, a.label]));
+  const failed = data.meta.total_runs - data.meta.total_passed;
 
   return (
     <section id="failures">
       <div className="section-head">
         <p className="eyebrow">{EYEBROWS.failures}</p>
         <h2>{LEDGER.title}</h2>
-        <p className="lede">{LEDGER.lede}</p>
+        <p className="lede">{ledgerLede(data, failed)}</p>
       </div>
 
       <div className="ledger-wrap">
@@ -90,7 +107,7 @@ export function FailureLedger({ data }: { data: ResultsData }) {
                 </span>
               </td>
               <td className="ta-r num">
-                {r.count}/5
+                {r.count}/{data.meta.k}
               </td>
               <td className="muted">{r.read}</td>
             </tr>
@@ -98,8 +115,6 @@ export function FailureLedger({ data }: { data: ResultsData }) {
         </tbody>
         </table>
       </div>
-
-      <p className="prose ledger-proportion">{LEDGER.proportionality}</p>
     </section>
   );
 }

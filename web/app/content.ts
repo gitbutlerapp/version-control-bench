@@ -17,9 +17,9 @@ export const TOOL_URL: Record<string, string> = {
 export const HERO = {
   title: 'A version-control benchmark for coding agents',
   intro: [
-    'Which version-control tool should you give your coding agent? This benchmark holds the agents fixed — Claude Code and Codex — and varies the toolset: plain git, Jujutsu, and GitButler, each scored on reliability, speed, and efficiency across five common version-control operations. Other benchmarks fix the tool and compare models; this one fixes the agents and compares the tools.',
-    'On the current frontier models, all three tools are reliable on these operations: 239 of 240 graded runs passed. Reliability is no longer the separator — speed and command count are. GitButler finished roughly 60% faster than plain git with about 80% fewer version-control commands; Jujutsu ran slower than plain git for both agents. The single failure was one Codex run splitting a commit with Jujutsu.',
-    'It looked different a model generation ago: with the previous Opus, Claude failed to split a commit correctly with plain git in most attempts while GitButler handled it every time. That reliability gap closed as the model improved — the kind of shift this benchmark exists to track. Every run is judged by a deterministic grader on the resulting Git history; this is not a coding benchmark, and not a Claude-versus-Codex comparison.',
+    'Which version-control tool should you give your coding agent? This benchmark fixes the agents — Claude Code and Codex — and varies the toolset: plain git, Jujutsu, and GitButler, across five common version-control operations. Other benchmarks fix the tool and compare models; this one does the reverse.',
+    'On today’s frontier models all three are reliable — 239 of 240 runs passed — so the separator is speed, not correctness. GitButler finished about 60% faster than git with roughly 80% fewer commands; Jujutsu ran slower than git for both agents.',
+    'A model generation ago it was a reliability story: the previous Opus failed split-commit with git most of the time while GitButler passed every run. That gap closed as the model improved — the shift this benchmark exists to track. Every run is graded on the resulting Git history, not the commands used; it is not a coding benchmark, and not Claude versus Codex.',
   ],
 };
 
@@ -29,49 +29,49 @@ export const RESULTS = {
   title: 'Results matrix',
   lede: 'Each tool on each scenario, for the selected agent.',
   columns: {
-    pass: 'Reliability: the share of the seven runs that produced the exact history specified by the instruction.',
-    time: 'Speed: mean wall-clock time per run, with setup excluded.',
-    cmds: 'Count of version-control commands the agent ran per run. Fewer commands generally correspond to lower wall-clock time and less output.',
-    kb: 'Efficiency: kilobytes of version-control output the agent read back per run (skill reads excluded), a proxy for token cost. Comparable within one agent only.',
+    pass: 'Reliability: share of runs that produced the exact history the instruction asked for.',
+    time: 'Speed: mean wall-clock time per run, setup excluded.',
+    cmds: 'Version-control commands the agent ran per run. Fewer usually means less time and less output.',
+    kb: 'Efficiency: kilobytes of version-control output the agent read back per run (skill reads excluded) — a token-cost proxy, comparable within one agent only.',
   },
 };
 
 export const SCENARIOS_INTRO = {
   title: 'Scenarios',
-  lede: 'Each scenario is a pre-built Git repository (a commit history plus uncommitted changes) and a plain-English instruction describing the intended result. No code is generated during a run; only the version-control operation is measured.',
+  lede: 'Each scenario is a pre-built Git repository plus a plain-English instruction. No code is written during a run — only the version-control operation is measured.',
 };
 
 export const METHOD = {
   title: 'Method',
-  lede: 'This benchmark is built and maintained by GitButler, one of the three tools it measures — read everything below with that in mind, and check rather than trust: tasks, grader, harness, and per-run evidence are public. Correctness is scored by a hidden, deterministic grader on the final Git state; two different command sequences pass if they produce the same history. Every tool receives the same task and the same plain-English instruction, the tool name does not appear in the prompt, and setup is excluded from timing.',
+  lede: 'GitButler builds and maintains this benchmark and is one of the three tools it measures — check rather than trust; the tasks, grader, harness, and per-run evidence are public. A hidden, deterministic grader scores the final Git state, so two different command sequences pass if they produce the same history. Every tool gets the same task and the same plain-English instruction, the tool’s name never appears in the prompt, and setup is excluded from timing.',
   facts: [
     {
       term: 'Identical instruction across tools',
-      body: 'Each task ships as one prepared repository (the fixture) with one plain-English instruction ("commit just the input validation work on a new branch, leave the rest uncommitted"). The tool\'s name does not appear in the prompt. The agent decides how to carry out the instruction.',
+      body: 'Each task is one prepared repository plus one plain-English instruction ("commit just the input-validation work on a new branch, leave the rest uncommitted"). The tool’s name never appears; the agent decides how to carry it out.',
     },
     {
       term: 'Deterministic grader',
-      body: "Correctness is checked by a hidden, deterministic grader: a scripted check that returns the same verdict for the same final state. It inspects the resulting Git state: commit boundaries, branch topology (which commits sit on which branch, in what order), and what stayed uncommitted. It is not an LLM judge, and it does not compare the agent's commands against a reference sequence: two different command sequences pass if they produce the same history.",
+      body: 'A hidden, scripted check that returns the same verdict for the same final state — no LLM judge. It inspects commit boundaries, branch topology, and what stayed uncommitted, and does not compare commands against a reference: two command sequences pass if they produce the same history.',
     },
     {
       term: 'Timing boundary',
-      body: "Building the fixture, preparing the workspace, installing each tool's skill (an instruction file documenting the tool's commands), and placing the uncommitted changes in the working tree all happen before timing begins. The measured figures cover only the agent's work on the task.",
+      body: 'Fixture build, workspace prep, skill install, and placing the uncommitted changes all happen before timing starts. The figures cover only the agent’s work on the task.',
     },
     {
       term: 'Git write restriction',
-      body: "In runs using GitButler or Jujutsu, raw git write commands are blocked, so the agent must use the tool under test. When the tool calls git internally, that is the tool's own work and does not count against the agent.",
+      body: 'In GitButler and Jujutsu runs, raw git write commands are blocked, so the agent must use the tool under test. Git the tool calls internally is the tool’s own work, not the agent’s.',
     },
     {
       term: 'Jujutsu setup',
-      body: 'jj 0.42.0, a colocated repository (jj and git operating on the same working copy), and the most-used external jj agent skill, installed before timing begins.',
+      body: 'jj 0.42.0, a colocated repository (jj and git on the same working copy), and the most-installed external jj skill, all in place before timing.',
     },
     {
-      term: 'Seven runs per cell (k=7)',
-      body: 'Each agent–tool–task combination (a cell) ran seven times. The numbers on this page are means over those seven runs, not a single run.',
+      term: 'Repeated runs per cell',
+      body: 'Each agent–tool–scenario cell runs several times (k, shown above); the figures are means over those runs, with a Wilson 95% interval on each pass rate.',
     },
     {
       term: 'Uncertainty',
-      body: 'Pass rates carry Wilson 95% intervals (hover any pass chip). Runs of the same scenario are correlated, so cross-scenario claims pair per-scenario deltas against the same agent’s git runs; with five scenarios those intervals are wide, and the "statistical read" under the results matrix shows them. Wall-time deltas are consistent in direction across scenarios, but their effect size is measured on these five operations only.',
+      body: 'Runs of the same scenario are correlated, so cross-scenario claims pair per-scenario deltas against the same agent’s git runs; the "statistical read" under the matrix shows them. With five scenarios those intervals are wide — directions are consistent, but effect sizes hold for these operations only.',
     },
   ],
 };
@@ -84,44 +84,43 @@ export const LIMITS = {
   items: [
     {
       term: 'Built by a contestant',
-      body: 'GitButler funds and maintains this benchmark and is one of the three tools measured. Treat every design choice as potentially biased, and check rather than trust: the tasks, grader, harness, and per-run evidence are public, and any cell can be re-run from the repository.',
+      body: 'GitButler funds and maintains this benchmark and is one of the three tools measured. Treat every design choice as potentially biased — and check: the tasks, grader, harness, and per-run evidence are public, and any cell can be re-run.',
     },
     {
       term: 'Five scenarios',
-      body: 'Five operations is a small sample of version-control work. Per-cell pass intervals are wide, and most cross-scenario effect sizes (the statistical read above) do not reach significance. Claims on this page are about these five operations, not version control in general. The task set is growing.',
+      body: 'Five operations is a small sample. Pass intervals are wide and most cross-scenario effects don’t reach significance, so claims here are about these operations, not version control in general. The task set is growing.',
     },
     {
       term: 'Skill asymmetry',
-      body: 'GitButler runs with its first-party agent skill; Jujutsu runs with the most-installed community skill, pinned to a fixed revision and verified by hash; git runs bare, as the tool agents already know best. A better skill for any arm would change its numbers. Improvements to any arm’s configuration are welcome as pull requests — each tool should be measured at its community’s best agent setup.',
+      body: 'GitButler runs with its first-party skill; Jujutsu with the most-installed community skill (pinned and hash-verified); git runs bare, as agents already know it best. A better skill for any arm would move its numbers — improvements are welcome as pull requests.',
     },
     {
       term: 'Training data favors git',
-      body: 'The models have seen far more git than Jujutsu or GitButler in training. The deck is stacked toward the baseline: challenger wins are stronger evidence than they look, and challenger losses are partly unfamiliarity.',
+      body: 'Models have seen far more git than Jujutsu or GitButler. The deck is stacked toward the baseline: challenger wins are stronger than they look, and challenger losses are partly unfamiliarity.',
     },
     {
       term: 'Synthetic fixtures',
-      body: 'Scenarios are small, script-built TypeScript repositories. That keeps runs deterministic and contamination-resistant, but real repositories are bigger and noisier. Scenarios derived from real repositories are planned.',
+      body: 'Scenarios are small, script-built TypeScript repositories — deterministic and contamination-resistant, but smaller and cleaner than real ones. Real-repository scenarios are planned.',
     },
     {
       term: 'Both agents are at the ceiling',
-      body: 'On the current frontier models, 239 of 240 runs passed, so the benchmark now separates the tools almost entirely on speed and efficiency, not reliability. The reliability differences it once showed have been closed by better models. Harder scenarios are needed before the reliability comparison says anything about frontier agents; that work is the current priority.',
+      body: 'With 239 of 240 runs passing, the benchmark now separates the tools almost entirely on speed and efficiency, not reliability — better models closed the reliability differences it once showed. Harder scenarios are the priority before the reliability comparison says anything about frontier agents.',
     },
     {
       term: 'Versions, not verdicts',
-      body: 'Each result is a property of a specific agent version, model, tool build, and skill revision, all recorded in provenance. Newer models can change the picture; the benchmark is re-run as they ship.',
+      body: 'Each result belongs to a specific agent version, model, tool build, and skill revision (all in provenance). Newer models can change the picture; the benchmark is re-run as they ship.',
     },
     {
       term: 'What a pass does not measure',
-      body: 'The grader checks the final Git state only. Commit-message quality, human ergonomics, merge and remote workflows, and long-horizon multi-branch work are not measured yet.',
+      body: 'The grader checks the final Git state only — not commit-message quality, human ergonomics, merge and remote workflows, or long-horizon multi-branch work.',
     },
   ],
 };
 
 export const LEDGER = {
   title: 'Failed runs',
-  lede: 'Seventeen of 210 runs failed the grader. Every grader failure was Claude; GitButler had zero verifier misses.',
-  proportionality:
-    'Plain git failed 7 verifier checks: Claude split-commit failed 5/7, selective commit failed 1/7, and multi-amend failed 1/7. Jujutsu failed 10: Claude split-commit failed 6/7, selective commit failed 2/7, multi-amend failed 1/7, and squash failed 1/7.',
+  // lede is derived from the data in the component so it never goes stale.
+  emptyLede: 'No runs failed the grader in this batch.',
 };
 
 export const AGENT_NOTE =
