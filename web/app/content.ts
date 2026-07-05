@@ -18,8 +18,8 @@ export const HERO = {
   title: 'A version-control benchmark for coding agents',
   intro: [
     'Which version-control tool should you give your coding agent? This benchmark holds the agents fixed — Claude Code and Codex — and varies the toolset: plain git, Jujutsu, and GitButler, each scored on reliability, speed, and efficiency across five common version-control operations. Other benchmarks fix the tool and compare models; this one fixes the agents and compares the tools.',
-    'The sharpest finding in the latest run: Claude Code failed to split a commit correctly with plain git in five of seven attempts, and with Jujutsu in six of seven. With GitButler it succeeded in all seven. Codex passed every run with every tool, so for Codex the tools differ only in speed and command count.',
-    'Every run is judged by a deterministic grader on the resulting Git history, not on the commands used to produce it. This is not a coding benchmark — the file changes exist before the agent starts — and not a Claude-versus-Codex comparison.',
+    'On the current frontier models, all three tools are reliable on these operations: 239 of 240 graded runs passed. Reliability is no longer the separator — speed and command count are. GitButler finished roughly 60% faster than plain git with about 80% fewer version-control commands; Jujutsu ran slower than plain git for both agents. The single failure was one Codex run splitting a commit with Jujutsu.',
+    'It looked different a model generation ago: with the previous Opus, Claude failed to split a commit correctly with plain git in most attempts while GitButler handled it every time. That reliability gap closed as the model improved — the kind of shift this benchmark exists to track. Every run is judged by a deterministic grader on the resulting Git history; this is not a coding benchmark, and not a Claude-versus-Codex comparison.',
   ],
 };
 
@@ -103,8 +103,8 @@ export const LIMITS = {
       body: 'Scenarios are small, script-built TypeScript repositories. That keeps runs deterministic and contamination-resistant, but real repositories are bigger and noisier. Scenarios derived from real repositories are planned.',
     },
     {
-      term: 'Codex is at the ceiling',
-      body: 'Codex passed every run of every scenario, so for Codex this benchmark currently separates the tools only on speed and efficiency. Harder scenarios are needed before the reliability comparison says anything about stronger agents.',
+      term: 'Both agents are at the ceiling',
+      body: 'On the current frontier models, 239 of 240 runs passed, so the benchmark now separates the tools almost entirely on speed and efficiency, not reliability. The reliability differences it once showed have been closed by better models. Harder scenarios are needed before the reliability comparison says anything about frontier agents; that work is the current priority.',
     },
     {
       term: 'Versions, not verdicts',
@@ -144,7 +144,8 @@ export const HISTORY = {
   title: 'Results history',
   lede: 'Every full-matrix batch is written up and checked in; the page above always shows the latest.',
   entries: [
-    { date: '2026-07-03', scope: 'k=7 · 3 tools · 2 agents', passed: '193/210', url: resultDocUrl('full-k7-2026-07-03.md'), current: true },
+    { date: '2026-07-05', scope: 'k=8 · Opus 4.8 · GPT-5.5', passed: '239/240', url: resultDocUrl('full-k8-2026-07-05.md'), current: true },
+    { date: '2026-07-03', scope: 'k=7 · Opus 4.1 · GPT-5.5', passed: '193/210', url: resultDocUrl('full-k7-2026-07-03.md') },
     { date: '2026-07-01', scope: 'k=5 · 3 tools · 2 agents', passed: '137/150', url: resultDocUrl('full-k5-2026-07-01.md') },
     { date: '2026-06-29', scope: 'k=5 · 3 tools · 2 agents', passed: '142/150', url: resultDocUrl('full-k5-2026-06-29.md') },
     { date: '2026-06-28', scope: 'k=5 · git + GitButler', passed: '100/100', url: resultDocUrl('full-k5-2026-06-28.md') },

@@ -10,11 +10,13 @@ The benchmark is maintained by GitButler, one of the three tools measured. Read 
 
 ## Latest results
 
-Full matrix from 2026-07-03 (Codex on `gpt-5.5`, Claude Code on `claude-opus-4-1-20250805`): 5 scenarios x 3 tools x 2 agents, seven runs per cell (k=7), 210 graded runs, 193 passed.
+Full matrix from 2026-07-05 (Codex on `gpt-5.5`, Claude Code on `claude-opus-4-8`): 5 scenarios x 3 tools x 2 agents, eight runs per cell (k=8), 240 graded runs, 239 passed.
 
-The sharpest finding: **Claude Code failed to split a commit correctly with plain `git` in 5 of 7 runs, and with Jujutsu in 6 of 7 — with GitButler it succeeded in all 7.** GitButler was the only tool where both agents passed every run of every scenario (70/70); all 17 grader failures were Claude runs on `git` or Jujutsu, concentrated on split-commit. Codex passed everything with every tool, so for Codex the tools differ only in speed and efficiency: GitButler cut mean wall time by roughly 68% and version-control commands by 84% versus plain `git`, while Jujutsu ran slower than `git` for both agents. The tables keep the losses visible too — plain `git` beat GitButler outright on Claude's reorder-commits.
+**On the current frontier models all three tools are reliable on these operations — 239 of 240 runs passed — so speed and efficiency are the separator, not reliability.** GitButler finished roughly 60% faster than plain `git` with about 80% fewer version-control commands (Claude 40.5s vs 108.6s, Codex 27.7s vs 77.6s); Jujutsu ran slower than plain `git` for both agents (Claude 172.2s, Codex 116.2s). The one failure in the whole matrix was a single Codex run splitting a commit with Jujutsu.
 
-With five scenarios the task-clustered 95% intervals on the wall-time deltas are wide (the direction is consistent across scenarios, but the effect size is measured on these operations only). The statistically solid findings are the reliability gap and the command-count reduction for Codex. Confidence intervals and paired per-scenario deltas are in the [full writeup](docs/results/full-k7-2026-07-03.md).
+This is a change from the previous batch: on `claude-opus-4-1-20250805` (k=7, 2026-07-03), Claude failed split-commit in 5 of 7 runs with `git` and 6 of 7 with Jujutsu while GitButler passed every run — that reliability gap closed as the model improved, which is the kind of shift this benchmark exists to track. With both agents now near the ceiling, harder scenarios are the priority before the reliability comparison says anything about frontier agents.
+
+With five scenarios the task-clustered 95% intervals on the wall-time deltas are wide (the direction is consistent across scenarios, but the effect size is measured on these operations only); the command-count reduction for GitButler is the tightest effect. Confidence intervals and paired per-scenario deltas are in the [full writeup](docs/results/full-k8-2026-07-05.md).
 
 Each cell shows pass rate, mean wall time, and mean version-control commands per run. **Bold** marks the fastest tool that passed every run of that scenario.
 
