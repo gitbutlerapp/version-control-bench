@@ -6,21 +6,37 @@ import type { ArmId, ResultsData } from '@/lib/types';
 import { TOOL_COLOR } from '@/lib/selectors';
 
 // One dot per run on a shared time axis: the distribution the matrix means
-// summarize. Hollow dots failed grading; the tick marks the median.
+// summarize. Hollow dots failed grading; the tick marks the median. Light
+// gridlines give the axis a readable scale.
 //
-// The SVG viewBox width is set to the measured pixel width of the container so
-// the render scale stays 1:1 — dots and labels keep a constant size while the
-// axis stretches to fill whatever horizontal space is available (rather than a
-// fixed viewBox scaling everything up when the strip gets wider).
+// The SVG viewBox width tracks the measured pixel width so the render scale
+// stays 1:1 — dots and labels keep a constant size while the axis stretches to
+// fill the available horizontal space.
 const ROW_H = 22; // px
+const AXIS_H = 16; // space below the rows for tick labels
 const PAD_L = 34;
-const PAD_R = 52;
+const PAD_R = 40;
 const R = 3.2;
 const DEFAULT_W = 720;
 
 function median(values: number[]): number {
   const sorted = [...values].sort((a, b) => a - b);
   return sorted[Math.floor(sorted.length / 2)];
+}
+
+function quantile(sorted: number[], q: number): number {
+  if (sorted.length === 0) return 0;
+  return sorted[Math.min(sorted.length - 1, Math.round(q * (sorted.length - 1)))];
+}
+
+// nearest "nice" number (1/2/5 × 10^k) at or below x — used for the tick step.
+function niceStep(x: number): number {
+  if (x <= 0) return 1;
+  const e = Math.floor(Math.log10(x));
+  const b = 10 ** e;
+  const f = x / b;
+  const nice = f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10;
+  return nice * b;
 }
 
 const ARM_SHORT: Record<ArmId, string> = { git: 'git', 'jj+skill': 'jj', 'but+skill': 'but' };
@@ -48,10 +64,27 @@ export function RunStrip({ data, scenarioId }: { data: ResultsData; scenarioId: 
   const runs = data.rows.filter((r) => r.scenario === scenarioId && r.agent === agent);
   if (runs.length === 0) return null;
 
-  const maxMs = Math.max(...runs.map((r) => r.wall_ms));
-  const x = (ms: number) => PAD_L + (ms / maxMs) * (w - PAD_L - PAD_R);
-  const height = arms.length * ROW_H + 6;
+  // Robust axis: cap near the 90th percentile so one slow run doesn't flatten
+  // the rest, but never below any tool's median. Runs beyond the cap clamp to
+  // the right edge and are flagged, so the axis stays honest (slower = right)
+  // while the bulk spreads out.
+  const sorted = [...runs.map((r) => r.wall_ms)].sort((a, b) => a - b);
+  const medians = arms.map((arm) => {
+    const rr = runs.filter((r) => r.arm === arm).map((r) => r.wall_ms);
+    return rr.length ? median(rr) : 0;
+  });
+  const robust = Math.max(quantile(sorted, 0.9), ...medians);
+  const step = niceStep(robust / 3.2);
+  const axisMax = Math.max(step, Math.ceil(robust / step) * step);
+  const hasClamped = sorted[sorted.length - 1] > axisMax;
+
+  const x = (ms: number) => PAD_L + (Math.min(ms, axisMax) / axisMax) * (w - PAD_L - PAD_R);
+  const chartH = arms.length * ROW_H;
+  const height = chartH + 4 + AXIS_H;
   const agentLabel = data.meta.agents.find((a) => a.id === agent)?.label ?? agent;
+
+  const ticks: number[] = [];
+  for (let t = 0; t <= axisMax + 0.5; t += step) ticks.push(t);
 
   return (
     <figure className="runstrip" ref={wrapRef}>
@@ -62,6 +95,22 @@ export function RunStrip({ data, scenarioId }: { data: ResultsData; scenarioId: 
         role="img"
         aria-label={`Wall-clock time of each ${agentLabel} run on this scenario, one dot per run`}
       >
+        {/* gridlines + scale */}
+        {ticks.map((t) => (
+          <g key={`tick-${t}`}>
+            <line
+              className="runstrip-grid"
+              x1={x(t)}
+              x2={x(t)}
+              y1={4}
+              y2={chartH + 4}
+            />
+            <text className="runstrip-tick" x={x(t)} y={height - 4} textAnchor="middle">
+              {t === 0 ? '0' : `${Math.round(t / 1000)}s`}
+            </text>
+          </g>
+        ))}
+
         {arms.map((arm, i) => {
           const y = i * ROW_H + ROW_H / 2 + 4;
           const armRuns = runs.filter((r) => r.arm === arm);
@@ -70,20 +119,20 @@ export function RunStrip({ data, scenarioId }: { data: ResultsData; scenarioId: 
           const color = TOOL_COLOR[arm];
           return (
             <g key={arm}>
-              <text className="runstrip-label" x={PAD_L - 8} y={y + 3.5} textAnchor="end">
+              <text className="runstrip-label" x={PAD_L - 10} y={y + 3.5} textAnchor="end">
                 {ARM_SHORT[arm]}
               </text>
-              <line className="runstrip-axis" x1={PAD_L} x2={w - PAD_R} y1={y} y2={y} />
               <line
                 x1={x(med)}
                 x2={x(med)}
                 y1={y - 6}
                 y2={y + 6}
                 stroke={color}
-                strokeWidth="1.4"
-                opacity="0.5"
+                strokeWidth="1.5"
+                opacity="0.55"
               />
               {armRuns.map((r) => {
+                const clamped = r.wall_ms > axisMax;
                 const cx = x(r.wall_ms);
                 const secs = `${(r.wall_ms / 1000).toFixed(1)}s`;
                 return (
@@ -96,7 +145,7 @@ export function RunStrip({ data, scenarioId }: { data: ResultsData; scenarioId: 
                     onMouseLeave={() => setTip(null)}
                   >
                     <title>
-                      {`run ${r.rep}: ${secs}${r.passed ? '' : ` — failed (${r.failure ?? 'grading'})`}`}
+                      {`run ${r.rep}: ${secs}${clamped ? ' (beyond axis)' : ''}${r.passed ? '' : ` — failed (${r.failure ?? 'grading'})`}`}
                     </title>
                     {/* transparent hit target, larger than the drawn dot */}
                     <circle cx={cx} cy={y} r={8} fill="transparent" />
@@ -110,12 +159,14 @@ export function RunStrip({ data, scenarioId }: { data: ResultsData; scenarioId: 
                       opacity={r.passed ? 0.85 : 0.9}
                       pointerEvents="none"
                     />
+                    {clamped && (
+                      <text className="runstrip-clamp" x={cx + 5} y={y + 3} pointerEvents="none">
+                        ›
+                      </text>
+                    )}
                   </g>
                 );
               })}
-              <text className="runstrip-max" x={w - PAD_R + 8} y={y + 3.5}>
-                {i === 0 ? `${Math.round(maxMs / 1000)}s` : ''}
-              </text>
             </g>
           );
         })}
@@ -126,7 +177,8 @@ export function RunStrip({ data, scenarioId }: { data: ResultsData; scenarioId: 
         </span>
       )}
       <figcaption className="runstrip-caption faint">
-        each dot = one {agentLabel} run · tick = median · hollow = failed
+        one dot per {agentLabel} run · tick = median · hollow = failed
+        {hasClamped ? ' · › = off-axis' : ''}
       </figcaption>
     </figure>
   );

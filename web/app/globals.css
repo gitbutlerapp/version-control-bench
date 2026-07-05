@@ -564,20 +564,31 @@ section:first-of-type {
   pointer-events: none;
   z-index: 2;
 }
-.runstrip-label,
-.runstrip-max {
+.runstrip-label {
   font-family: var(--font-mono);
   font-size: 10px;
   fill: var(--text-muted);
 }
-.runstrip-axis {
-  stroke: var(--border, currentColor);
+.runstrip-tick {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  fill: var(--text-muted);
+  opacity: 0.75;
+}
+.runstrip-grid {
+  stroke: currentColor;
   stroke-width: 1;
-  opacity: 0.2;
+  opacity: 0.09;
+}
+.runstrip-clamp {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  fill: var(--text-muted);
 }
 .runstrip-caption {
   font-size: var(--fs-micro);
-  margin-top: 2px;
+  margin-top: 4px;
 }
 
 /* Results-history list in the About section. */
