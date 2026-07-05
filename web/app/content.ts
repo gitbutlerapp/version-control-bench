@@ -42,7 +42,7 @@ export const SCENARIOS_INTRO = {
 
 export const METHOD = {
   title: 'Method',
-  lede: 'GitButler builds and maintains this benchmark and is one of the three tools it measures — check rather than trust; the tasks, grader, harness, and per-run evidence are public. A hidden, deterministic grader scores the final Git state, so two different command sequences pass if they produce the same history. Every tool gets the same task and the same plain-English instruction, the tool’s name never appears in the prompt, and setup is excluded from timing.',
+  lede: 'A hidden, deterministic grader scores the final Git state, so two command sequences pass if they produce the same history. Every tool gets the same task and plain-English instruction, its name never appears in the prompt, and setup is excluded from timing.',
   facts: [
     {
       term: 'Identical instruction across tools',
