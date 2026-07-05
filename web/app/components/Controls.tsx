@@ -15,6 +15,7 @@ const ANCHORS = [
   { href: '#chores', label: 'Scenarios' },
   { href: '#method', label: 'Method' },
   { href: '#failures', label: 'Failures' },
+  { href: '#provenance', label: 'About' },
 ];
 
 // The agent switch. Lives next to the table it drives, not in the header.
