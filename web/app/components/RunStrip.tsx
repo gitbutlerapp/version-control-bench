@@ -6,12 +6,13 @@ import { TOOL_COLOR } from '@/lib/selectors';
 
 // One dot per run on a shared time axis: the distribution the matrix means
 // summarize. Hollow dots failed grading; the tick marks the median. Kept
-// deliberately small — three rows of dots, no axes machinery.
+// deliberately small — a compact inline sparkline, no axes machinery. The
+// figure is width-capped in CSS so it doesn't scale up to the full table.
 const W = 560;
-const ROW_H = 26;
-const PAD_L = 34;
-const PAD_R = 46;
-const R = 4.5;
+const ROW_H = 22;
+const PAD_L = 30;
+const PAD_R = 40;
+const R = 3.5;
 
 function median(values: number[]): number {
   const sorted = [...values].sort((a, b) => a - b);
@@ -28,7 +29,7 @@ export function RunStrip({ data, scenarioId }: { data: ResultsData; scenarioId: 
 
   const maxMs = Math.max(...runs.map((r) => r.wall_ms));
   const x = (ms: number) => PAD_L + (ms / maxMs) * (W - PAD_L - PAD_R);
-  const height = arms.length * ROW_H + 8;
+  const height = arms.length * ROW_H + 6;
   const agentLabel = data.meta.agents.find((a) => a.id === agent)?.label ?? agent;
 
   return (
@@ -59,11 +60,11 @@ export function RunStrip({ data, scenarioId }: { data: ResultsData; scenarioId: 
               <line
                 x1={x(med)}
                 x2={x(med)}
-                y1={y - 8}
-                y2={y + 8}
+                y1={y - 6}
+                y2={y + 6}
                 stroke={color}
-                strokeWidth="2"
-                opacity="0.55"
+                strokeWidth="1.4"
+                opacity="0.5"
               />
               {armRuns.map((r) => (
                 <circle
@@ -73,7 +74,7 @@ export function RunStrip({ data, scenarioId }: { data: ResultsData; scenarioId: 
                   r={R}
                   fill={r.passed ? color : 'none'}
                   stroke={color}
-                  strokeWidth={r.passed ? 0 : 1.8}
+                  strokeWidth={r.passed ? 0 : 1.4}
                   opacity={r.passed ? 0.85 : 0.9}
                 >
                   <title>
@@ -89,8 +90,7 @@ export function RunStrip({ data, scenarioId }: { data: ResultsData; scenarioId: 
         })}
       </svg>
       <figcaption className="runstrip-caption faint">
-        each dot is one {agentLabel} run (wall-clock, shared axis) · | median · hollow = failed
-        grading
+        each dot = one {agentLabel} run · tick = median · hollow = failed
       </figcaption>
     </figure>
   );

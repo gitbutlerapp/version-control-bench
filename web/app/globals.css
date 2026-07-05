@@ -521,7 +521,7 @@ section:first-of-type {
   color: var(--text);
 }
 .matrix-detail td {
-  padding: var(--s-3) var(--s-4) var(--s-3) calc(var(--s-4) + 18px);
+  padding: var(--s-2) var(--s-4) var(--s-2) calc(var(--s-4) + 18px);
   background: rgba(128, 128, 128, 0.06);
 }
 .matrix-detail-link {
@@ -534,9 +534,12 @@ section:first-of-type {
   color: var(--text);
 }
 
-/* Per-run wall-time strip (now shown inside an expanded matrix row). */
+/* Per-run wall-time strip (shown inside an expanded matrix row). Width-capped
+   so the SVG renders near its natural size instead of stretching across the
+   full table and scaling every dot and label up with it. */
 .runstrip {
-  margin: var(--s-4) 0 0;
+  margin: 0;
+  max-width: 460px;
 }
 .runstrip svg {
   width: 100%;
@@ -546,17 +549,17 @@ section:first-of-type {
 .runstrip-label,
 .runstrip-max {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 10px;
   fill: var(--text-muted);
 }
 .runstrip-axis {
   stroke: var(--border, currentColor);
   stroke-width: 1;
-  opacity: 0.25;
+  opacity: 0.2;
 }
 .runstrip-caption {
   font-size: var(--fs-micro);
-  margin-top: var(--s-1);
+  margin-top: 2px;
 }
 
 /* Results-history list in the About section. */
