@@ -75,47 +75,6 @@ export const METHOD = {
   ],
 };
 
-// Known limits, stated so they are priced in rather than discovered. Scope
-// critiques are welcome; honesty critiques should find nothing to add.
-export const LIMITS = {
-  title: 'Limitations',
-  lede: 'Every benchmark measures a slice. These are the known limits of this one.',
-  items: [
-    {
-      term: 'Built by a contestant',
-      body: 'GitButler funds and maintains this benchmark and is one of the three tools measured. Treat every design choice as potentially biased — and check: the tasks, grader, harness, and per-run evidence are public, and any cell can be re-run.',
-    },
-    {
-      term: 'Five scenarios',
-      body: 'Five operations is a small sample. Pass intervals are wide and most cross-scenario effects don’t reach significance, so claims here are about these operations, not version control in general. The task set is growing.',
-    },
-    {
-      term: 'Skill asymmetry',
-      body: 'GitButler runs with its first-party skill; Jujutsu with the most-installed community skill (pinned and hash-verified); git runs bare, as agents already know it best. A better skill for any arm would move its numbers — improvements are welcome as pull requests.',
-    },
-    {
-      term: 'Training data favors git',
-      body: 'Models have seen far more git than Jujutsu or GitButler. The deck is stacked toward the baseline: challenger wins are stronger than they look, and challenger losses are partly unfamiliarity.',
-    },
-    {
-      term: 'Synthetic fixtures',
-      body: 'Scenarios are small, script-built TypeScript repositories — deterministic and contamination-resistant, but smaller and cleaner than real ones. Real-repository scenarios are planned.',
-    },
-    {
-      term: 'Both agents are at the ceiling',
-      body: 'With 239 of 240 runs passing, the benchmark now separates the tools almost entirely on speed and efficiency, not reliability — better models closed the reliability differences it once showed. Harder scenarios are the priority before the reliability comparison says anything about frontier agents.',
-    },
-    {
-      term: 'Versions, not verdicts',
-      body: 'Each result belongs to a specific agent version, model, tool build, and skill revision (all in provenance). Newer models can change the picture; the benchmark is re-run as they ship.',
-    },
-    {
-      term: 'What a pass does not measure',
-      body: 'The grader checks the final Git state only — not commit-message quality, human ergonomics, merge and remote workflows, or long-horizon multi-branch work.',
-    },
-  ],
-};
-
 export const LEDGER = {
   title: 'Failed runs',
   // lede is derived from the data in the component so it never goes stale.
@@ -131,7 +90,6 @@ export const EYEBROWS = {
   method: 'Method',
   proof: 'Results',
   failures: 'Failures',
-  limitations: 'Limitations',
   provenance: 'About',
 };
 

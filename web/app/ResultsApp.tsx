@@ -7,7 +7,6 @@ import { ResultsTable } from './components/ResultsTable';
 import { Scenarios } from './components/Scenarios';
 import { FailureLedger } from './components/FailureLedger';
 import { Methodology } from './components/Methodology';
-import { Limitations } from './components/Limitations';
 import { Provenance, Footer } from './components/Provenance';
 import type { ResultsData } from '@/lib/types';
 
@@ -28,7 +27,6 @@ export function ResultsApp({ data }: { data: ResultsData }) {
         <Scenarios data={data} />
         <Methodology data={data} />
         {showFailures && <FailureLedger data={data} />}
-        <Limitations />
         <Provenance data={data} />
       </main>
       <Footer data={data} />
