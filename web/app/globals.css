@@ -539,6 +539,7 @@ section:first-of-type {
    spreads the dots without scaling them; the cap just keeps it from getting
    sparse on very wide viewports. */
 .runstrip {
+  position: relative;
   margin: 0;
   max-width: 1000px;
 }
@@ -546,6 +547,22 @@ section:first-of-type {
   width: 100%;
   height: auto;
   display: block;
+}
+.runstrip-dot {
+  cursor: pointer;
+}
+.runstrip-tip {
+  position: absolute;
+  transform: translate(-50%, calc(-100% - 5px));
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: var(--fs-micro);
+  line-height: 1.4;
+  white-space: nowrap;
+  background: var(--text);
+  color: var(--bg);
+  pointer-events: none;
+  z-index: 2;
 }
 .runstrip-label,
 .runstrip-max {

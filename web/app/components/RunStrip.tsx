@@ -29,6 +29,9 @@ export function RunStrip({ data, scenarioId }: { data: ResultsData; scenarioId: 
   const { agent } = useView();
   const wrapRef = useRef<HTMLElement>(null);
   const [w, setW] = useState(DEFAULT_W);
+  // Hover tooltip. The strip renders at 1:1 scale, so a dot's SVG coordinates
+  // are pixel offsets within the figure — an HTML overlay positions directly.
+  const [tip, setTip] = useState<{ x: number; y: number; text: string } | null>(null);
 
   useEffect(() => {
     const el = wrapRef.current;
@@ -80,22 +83,36 @@ export function RunStrip({ data, scenarioId }: { data: ResultsData; scenarioId: 
                 strokeWidth="1.4"
                 opacity="0.5"
               />
-              {armRuns.map((r) => (
-                <circle
-                  key={r.rep}
-                  cx={x(r.wall_ms)}
-                  cy={y}
-                  r={R}
-                  fill={r.passed ? color : 'none'}
-                  stroke={color}
-                  strokeWidth={r.passed ? 0 : 1.4}
-                  opacity={r.passed ? 0.85 : 0.9}
-                >
-                  <title>
-                    {`run ${r.rep}: ${(r.wall_ms / 1000).toFixed(1)}s${r.passed ? '' : ` — failed (${r.failure ?? 'grading'})`}`}
-                  </title>
-                </circle>
-              ))}
+              {armRuns.map((r) => {
+                const cx = x(r.wall_ms);
+                const secs = `${(r.wall_ms / 1000).toFixed(1)}s`;
+                return (
+                  <g
+                    key={r.rep}
+                    className="runstrip-dot"
+                    onMouseEnter={() =>
+                      setTip({ x: cx, y, text: r.passed ? secs : `${secs} · failed` })
+                    }
+                    onMouseLeave={() => setTip(null)}
+                  >
+                    <title>
+                      {`run ${r.rep}: ${secs}${r.passed ? '' : ` — failed (${r.failure ?? 'grading'})`}`}
+                    </title>
+                    {/* transparent hit target, larger than the drawn dot */}
+                    <circle cx={cx} cy={y} r={8} fill="transparent" />
+                    <circle
+                      cx={cx}
+                      cy={y}
+                      r={R}
+                      fill={r.passed ? color : 'none'}
+                      stroke={color}
+                      strokeWidth={r.passed ? 0 : 1.4}
+                      opacity={r.passed ? 0.85 : 0.9}
+                      pointerEvents="none"
+                    />
+                  </g>
+                );
+              })}
               <text className="runstrip-max" x={w - PAD_R + 8} y={y + 3.5}>
                 {i === 0 ? `${Math.round(maxMs / 1000)}s` : ''}
               </text>
@@ -103,6 +120,11 @@ export function RunStrip({ data, scenarioId }: { data: ResultsData; scenarioId: 
           );
         })}
       </svg>
+      {tip && (
+        <span className="runstrip-tip mono" style={{ left: tip.x, top: tip.y }} aria-hidden>
+          {tip.text}
+        </span>
+      )}
       <figcaption className="runstrip-caption faint">
         each dot = one {agentLabel} run · tick = median · hollow = failed
       </figcaption>
