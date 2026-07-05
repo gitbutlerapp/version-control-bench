@@ -1231,61 +1231,37 @@ button.passchip:focus-visible {
 /* =========================================================================
    provenance + footer
    ========================================================================= */
-.prov-grid {
+/* Compact provenance list — key-value rows, no cards. */
+.prov {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--s-5);
-}
-.prov-card {
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface-inset);
-  padding: var(--s-5);
-}
-.prov-card-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: var(--s-3);
-  margin-bottom: var(--s-4);
-  padding-bottom: var(--s-3);
-  border-bottom: 1px solid var(--border);
-}
-.prov-kv {
-  display: flex;
-  flex-direction: column;
   gap: var(--s-2);
   font-size: var(--fs-micro);
+  max-width: 90ch;
 }
-.prov-kv > div {
+.prov > div {
   display: grid;
-  grid-template-columns: 130px 1fr;
-  gap: var(--s-3);
+  grid-template-columns: 88px 1fr;
+  gap: var(--s-4);
+  align-items: baseline;
 }
-.prov-kv dt {
+.prov dt {
   color: var(--text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
-.prov-kv dd {
+.prov dd {
   color: var(--text-muted);
   overflow-wrap: anywhere;
 }
-.prov-hash {
+.prov a {
   color: var(--text);
-  word-break: break-all;
 }
-.prov-meta {
+.prov-block {
   margin-top: var(--s-5);
-  font-size: var(--fs-micro);
-  display: flex;
-  flex-direction: column;
-  gap: var(--s-3);
 }
-.prov-cmd {
-  color: var(--text-muted);
-}
-.prov-links {
-  display: flex;
-  gap: var(--s-5);
+.prov-block h3 {
+  font-size: var(--fs-body);
+  margin: 0 0 var(--s-2);
 }
 .footer {
   border-top: 1px solid var(--border);
@@ -1320,7 +1296,6 @@ button.passchip:focus-visible {
 /* tablet/below: stack heavy two-column grids */
 @media (max-width: 860px) {
   .hero-intro,
-  .prov-grid,
   .method-list {
     grid-template-columns: 1fr;
   }
