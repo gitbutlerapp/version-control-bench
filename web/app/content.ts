@@ -19,7 +19,6 @@ export const HERO = {
   intro: [
     'Which version-control tool should you give your coding agent? This benchmark fixes the agents — Claude Code and Codex — and compares three toolsets across five version-control operations: plain git, Jujutsu, and GitButler. It is the inverse of benchmarks that compare models on a fixed tool.',
     'On today’s frontier models all three are reliable — 239 of 240 runs passed — so the separator is speed, not correctness: GitButler ran about 60% faster than git with roughly 80% fewer commands, while Jujutsu was slower than git for both.',
-    'A model generation ago it was a reliability story — the previous Opus failed a split-commit task GitButler handled — but better models have closed the gap.',
   ],
 };
 
