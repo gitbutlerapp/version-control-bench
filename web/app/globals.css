@@ -469,6 +469,23 @@ section:first-of-type {
   cursor: pointer;
   width: fit-content;
   color: var(--text);
+  /* same ▸ disclosure language as the matrix rows and the About section */
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.stat-read summary::-webkit-details-marker {
+  display: none;
+}
+.stat-read summary::before {
+  content: '▸';
+  font-size: 12px;
+  color: var(--text-muted);
+  transition: transform 0.15s ease;
+}
+.stat-read[open] summary::before {
+  transform: rotate(90deg);
 }
 .stat-read ul {
   list-style: none;
@@ -523,6 +540,18 @@ section:first-of-type {
 .matrix-detail td {
   padding: var(--s-2) var(--s-4) var(--s-2) calc(var(--s-4) + 18px);
   background: rgba(128, 128, 128, 0.06);
+  /* the numeric cells' alignment and nowrap don't suit prose + a left axis */
+  text-align: left;
+  white-space: normal;
+}
+/* Pin the strip to the scroll viewport: the detail cell spans the full table
+   width, so without this the strip (and its caption) renders off-screen on
+   narrow viewports and only appears while scrolling sideways. left matches
+   the cell's left padding so the resting position is unchanged. */
+.matrix-detail-inner {
+  position: sticky;
+  left: calc(var(--s-4) + 18px);
+  max-width: min(1000px, calc(100vw - 100px));
 }
 .matrix-detail-link {
   display: inline-block;
@@ -541,7 +570,6 @@ section:first-of-type {
 .runstrip {
   position: relative;
   margin: 0;
-  max-width: 1000px;
 }
 .runstrip svg {
   width: 100%;
@@ -625,7 +653,7 @@ section:first-of-type {
   margin: var(--s-3) 0 0;
   display: grid;
   gap: var(--s-2);
-  font-size: var(--fs-small, var(--fs-micro));
+  font-size: var(--fs-caption);
   color: var(--text-muted);
   max-width: 78ch;
 }
@@ -1018,12 +1046,13 @@ button.passchip:focus-visible {
   display: none;
 }
 .scenario-prompt summary::before {
-  content: "+";
-  font-size: 0.95rem;
+  content: '▸';
+  font-size: 12px;
   color: var(--text-muted);
+  transition: transform 0.15s ease;
 }
 .scenario-prompt[open] summary::before {
-  content: "\2013";
+  transform: rotate(90deg);
 }
 .scenario-prompt summary:hover {
   color: var(--text-muted);
@@ -1300,10 +1329,11 @@ button.passchip:focus-visible {
   max-width: 74ch;
   margin: 0 0 var(--s-2);
 }
+/* the section above already pads its bottom; the border + surface swap is the
+   separator, so no extra margin — a margin here doubles the gap */
 .footer {
   border-top: 1px solid var(--border);
   background: var(--surface-inset);
-  margin-top: var(--s-8);
 }
 .footer-inner {
   padding-block: var(--s-7);
@@ -1338,10 +1368,17 @@ button.passchip:focus-visible {
   }
 }
 
-/* narrow: drop the section nav (header is just the brand) */
+/* narrow: drop the section nav (header is just the brand) and tighten the
+   vertical rhythm — 64px section gaps read as dead screens on a phone */
 @media (max-width: 640px) {
   .stickybar-nav {
     display: none;
+  }
+  section {
+    padding-block: var(--s-7);
+  }
+  .scenario-block {
+    padding-block: var(--s-6);
   }
 }
 

@@ -205,10 +205,14 @@ export function ResultsTable({ data }: { data: ResultsData }) {
                   {isOpen && row.sid && (
                     <tr className="matrix-detail" id={`detail-${row.sid}`}>
                       <td colSpan={colSpan}>
-                        <RunStrip data={data} scenarioId={row.sid} />
-                        <a className="matrix-detail-link mono" href={`#${row.sid}`}>
-                          full scenario ↗
-                        </a>
+                        {/* sticky inner keeps the strip inside the scroller's
+                            viewport when the table itself scrolls sideways */}
+                        <div className="matrix-detail-inner">
+                          <RunStrip data={data} scenarioId={row.sid} />
+                          <a className="matrix-detail-link mono" href={`#${row.sid}`}>
+                            full scenario ↗
+                          </a>
+                        </div>
                       </td>
                     </tr>
                   )}

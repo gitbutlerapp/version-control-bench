@@ -3,18 +3,19 @@ import { Hanken_Grotesk, JetBrains_Mono } from 'next/font/google';
 import './globals.css';
 import { Umami } from './components/Umami';
 
+// Both are variable fonts: loading the full weight axis (one file each) lets
+// the stylesheet's in-between weights (550, 650, 680, 720) render as designed
+// instead of snapping to the nearest static instance.
 const hanken = Hanken_Grotesk({
   subsets: ['latin'],
   display: 'swap',
   variable: '--font-hanken',
-  weight: ['400', '500', '600', '700', '800'],
 });
 
 const jbmono = JetBrains_Mono({
   subsets: ['latin'],
   display: 'swap',
   variable: '--font-jbmono',
-  weight: ['400', '500', '600', '700'],
 });
 
 const title = 'A version-control benchmark for coding agents';
