@@ -68,10 +68,6 @@ export const METHOD = {
       term: 'Repeated runs per cell',
       body: 'Each agent–tool–scenario cell runs several times (k, shown above); the figures are means over those runs, with a Wilson 95% interval on each pass rate.',
     },
-    {
-      term: 'Uncertainty',
-      body: 'Runs of the same scenario are correlated, so cross-scenario claims pair per-scenario deltas against the same agent’s git runs; the "statistical read" under the matrix shows them. With five scenarios those intervals are wide — directions are consistent, but effect sizes hold for these operations only.',
-    },
   ],
 };
 
