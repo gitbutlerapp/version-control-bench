@@ -42,7 +42,8 @@ export function AgentToggle() {
   );
 }
 
-export function StickyBar() {
+export function StickyBar({ showFailures = true }: { showFailures?: boolean }) {
+  const anchors = showFailures ? ANCHORS : ANCHORS.filter((a) => a.href !== '#failures');
   return (
     <div className="stickybar">
       <div className="page stickybar-inner">
@@ -51,7 +52,7 @@ export function StickyBar() {
         </a>
         <div className="stickybar-right">
           <nav className="stickybar-nav" aria-label="Sections">
-            {ANCHORS.map((a) => (
+            {anchors.map((a) => (
               <a key={a.href} href={a.href}>
                 {a.label}
               </a>
