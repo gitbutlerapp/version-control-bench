@@ -1,9 +1,11 @@
 'use client';
 
+import { Fragment, useState } from 'react';
 import { useView } from '../state/ViewContext';
 import { RESULTS, TOOL_URL } from '../content';
 import { AgentCaption, AgentToggle } from './Controls';
 import { PassChip } from './Bars';
+import { RunStrip } from './RunStrip';
 import { Tooltip } from './Tooltip';
 import type { ArmId, Cell, ResultsData } from '@/lib/types';
 import { TOOL_VAR, overallCell, scenarioCell } from '@/lib/selectors';
@@ -12,17 +14,10 @@ import { count, kb, pairedRange, seconds, secondsLabel } from '@/lib/format';
 interface Row {
   key: string;
   label: string;
-  sid?: string; // scenario id, for scroll-to-detail
-  help?: string; // short hover explanation
+  sid?: string; // scenario id; scenario rows are expandable
+  help?: string; // short hover explanation (the crux)
   overall?: boolean;
   cells: (Cell | undefined)[];
-}
-
-// scroll the matching scenario section into view
-function openScenario(id: string) {
-  const el = document.getElementById(id);
-  if (!el) return;
-  el.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 // jump to the failures table (from a pass chip that has a miss)
@@ -108,15 +103,38 @@ export function ResultsTable({ data }: { data: ResultsData }) {
     k: bestIdx(cells, (c) => c.mean_warm_bytes ?? Infinity),
   });
 
-  const renderRow = (row: Row) => {
+  // Expandable scenario rows: clicking a scenario drops its per-run wall-time
+  // distribution inline, pushing the rows below down. Complexity on demand —
+  // the matrix stays scannable until you open a row.
+  const [openSet, setOpenSet] = useState<Set<string>>(new Set());
+  const toggle = (sid: string) =>
+    setOpenSet((prev) => {
+      const next = new Set(prev);
+      if (next.has(sid)) next.delete(sid);
+      else next.add(sid);
+      return next;
+    });
+  const colSpan = 1 + arms.length * 4;
+
+  const renderRow = (row: Row, isOpen = false) => {
     const b = bestsFor(row.cells);
     return (
-      <tr key={row.key} data-overall={row.overall}>
+      <tr key={row.key} data-overall={row.overall} data-open={isOpen || undefined}>
         <th scope="row" className="m-task">
-          {row.sid && row.help ? (
-            <Tooltip label={row.help} onActivate={() => openScenario(row.sid!)}>
-              {row.label}
-            </Tooltip>
+          {row.sid ? (
+            <button
+              type="button"
+              className="m-expand"
+              aria-expanded={isOpen}
+              aria-controls={`detail-${row.sid}`}
+              title={row.help}
+              onClick={() => toggle(row.sid!)}
+            >
+              <span className="m-caret" data-open={isOpen} aria-hidden>
+                ▸
+              </span>
+              <span>{row.label}</span>
+            </button>
           ) : (
             row.label
           )}
@@ -178,7 +196,26 @@ export function ResultsTable({ data }: { data: ResultsData }) {
               ))}
             </tr>
           </thead>
-          <tbody>{rows.map(renderRow)}</tbody>
+          <tbody>
+            {rows.map((row) => {
+              const isOpen = openSet.has(row.key);
+              return (
+                <Fragment key={row.key}>
+                  {renderRow(row, isOpen)}
+                  {isOpen && row.sid && (
+                    <tr className="matrix-detail" id={`detail-${row.sid}`}>
+                      <td colSpan={colSpan}>
+                        <RunStrip data={data} scenarioId={row.sid} />
+                        <a className="matrix-detail-link mono" href={`#${row.sid}`}>
+                          full scenario ↗
+                        </a>
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
+              );
+            })}
+          </tbody>
           <tfoot>{renderRow(overallRow)}</tfoot>
         </table>
       </div>
@@ -191,6 +228,7 @@ export function ResultsTable({ data }: { data: ResultsData }) {
         <li>
           <span className="legend-bold">bold</span> = best value in each column
         </li>
+        <li>click a scenario to see its per-run times</li>
         <li>hover a pass chip for its Wilson 95% interval</li>
         <li>KB is comparable within one agent only</li>
       </ul>

@@ -489,7 +489,52 @@ section:first-of-type {
   max-width: 70ch;
 }
 
-/* Per-run wall-time strip in each scenario card. */
+/* Expandable scenario rows: the caret toggle and the inline detail row. */
+.m-expand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+.m-caret {
+  display: inline-block;
+  font-size: 10px;
+  line-height: 1;
+  color: var(--text-muted);
+  transition: transform 0.15s ease;
+}
+.m-caret[data-open='true'] {
+  transform: rotate(90deg);
+}
+.m-expand:hover .m-caret,
+.m-expand:focus-visible .m-caret {
+  color: var(--text);
+}
+.matrix tr[data-open] .m-task {
+  color: var(--text);
+}
+.matrix-detail td {
+  padding: var(--s-3) var(--s-4) var(--s-3) calc(var(--s-4) + 18px);
+  background: rgba(128, 128, 128, 0.06);
+}
+.matrix-detail-link {
+  display: inline-block;
+  margin-top: var(--s-1);
+  font-size: var(--fs-micro);
+  color: var(--text-muted);
+}
+.matrix-detail-link:hover {
+  color: var(--text);
+}
+
+/* Per-run wall-time strip (now shown inside an expanded matrix row). */
 .runstrip {
   margin: var(--s-4) 0 0;
 }
