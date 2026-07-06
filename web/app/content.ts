@@ -18,7 +18,7 @@ export const HERO = {
   title: 'A version-control benchmark for coding agents',
   intro: [
     'Which version-control tool should you give your coding agent? Claude Code and Codex run the same five version-control tasks three ways — with plain git, with Jujutsu, and with GitButler. Only the tool changes.',
-    'All three turn out reliable — 239 of 240 runs passed — so the separator is speed: GitButler ran about 60% faster than git with roughly 80% fewer commands; Jujutsu ran slower than git.',
+    'All three turn out reliable — 299 of 300 runs passed — so the separator is speed: GitButler ran about 60% faster than git with roughly 80% fewer commands; Jujutsu ran slower than git.',
   ],
 };
 
@@ -94,7 +94,8 @@ const resultDocUrl = (name: string) => `${REPO_URL}/blob/main/docs/results/${nam
 export const HISTORY = {
   title: 'Results history',
   entries: [
-    { date: '2026-07-05', scope: 'k=8 · Opus 4.8 · GPT-5.5', passed: '239/240', url: resultDocUrl('full-k8-2026-07-05.md'), current: true },
+    { date: '2026-07-06', scope: 'k=10 · Opus 4.8 · GPT-5.5', passed: '299/300', url: resultDocUrl('full-k10-2026-07-06.md'), current: true },
+    { date: '2026-07-05', scope: 'k=8 · Opus 4.8 · GPT-5.5', passed: '239/240', url: resultDocUrl('full-k8-2026-07-05.md') },
     { date: '2026-07-03', scope: 'k=7 · Opus 4.1 · GPT-5.5', passed: '193/210', url: resultDocUrl('full-k7-2026-07-03.md') },
     { date: '2026-07-01', scope: 'k=5 · 3 tools · 2 agents', passed: '137/150', url: resultDocUrl('full-k5-2026-07-01.md') },
     { date: '2026-06-29', scope: 'k=5 · 3 tools · 2 agents', passed: '142/150', url: resultDocUrl('full-k5-2026-06-29.md') },
