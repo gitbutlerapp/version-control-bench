@@ -423,6 +423,10 @@ section:first-of-type {
 .m-num[data-best='true'] {
   color: var(--text);
   font-weight: 700;
+  background: var(--pass-soft);
+}
+.matrix tbody tr:hover td[data-best='true'] {
+  background: var(--pass-soft);
 }
 .m-unit {
   color: var(--text-faint);
@@ -509,6 +513,7 @@ section:first-of-type {
 .mcard-table td[data-best='true'] {
   color: var(--text);
   font-weight: 700;
+  background: var(--pass-soft);
 }
 .mcard-pass {
   text-align: center;
@@ -536,6 +541,9 @@ section:first-of-type {
   color: var(--text);
   font-family: var(--font-mono);
   font-weight: 700;
+  background: var(--pass-soft);
+  padding: 0 5px;
+  border-radius: 4px;
 }
 
 /* Task-clustered paired-deltas disclosure under the results matrix. */
