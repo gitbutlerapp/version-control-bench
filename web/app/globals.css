@@ -1001,6 +1001,20 @@ section:first-of-type {
   padding: 6px 18px;
   font-size: var(--fs-body);
 }
+/* The active agent is a high-contrast inverted pill so it's obvious which
+   agent the matrix is showing: a dark pill with light text on the light theme,
+   a light pill with dark text on the dark theme. Same treatment for both
+   options — no per-agent color. */
+.agent-toggle .segmented-opt[data-active='true'] {
+  background: var(--text);
+  color: var(--bg);
+  font-weight: 600;
+  box-shadow: none;
+}
+.agent-caption-label {
+  font-weight: 600;
+  color: var(--text);
+}
 
 /* =========================================================================
    pass chip

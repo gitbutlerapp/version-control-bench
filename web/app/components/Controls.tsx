@@ -139,7 +139,7 @@ export function AgentCaption() {
   const label = agent === 'codex' ? 'Codex' : 'Claude';
   return (
     <p className="agent-caption faint">
-      <span className="mono">{label}</span>: {AGENT_NOTE}
+      <span className="agent-caption-label mono">{label}</span>: {AGENT_NOTE}
     </p>
   );
 }
