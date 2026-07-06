@@ -8,7 +8,7 @@ export const dynamic = 'force-static';
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
 export const alt =
-  'Mean wall-clock time per run for git, Jujutsu, and GitButler operated by Codex and Claude Code on five version-control tasks — all three reliable, GitButler fastest.';
+  'Mean wall-clock time per run for git, Jujutsu, and GitButler operated by Codex and Claude Code on five version-control tasks. All three reliable, GitButler fastest.';
 
 // The social card IS the results chart, rendered at build time from the same
 // committed results.json as the page — a re-run plus deploy refreshes it.
@@ -103,7 +103,7 @@ export default function OgImage() {
             Which version-control tool should you give your coding agent?
           </div>
           <div style={{ display: 'flex', fontSize: 26, color: '#9aa4b2', lineHeight: 1.2 }}>
-            {`All three are reliable — ${m.total_passed}/${m.total_runs} passed. The separator is speed:`}
+            {`All three are reliable (${m.total_passed}/${m.total_runs} passed). The separator is speed:`}
           </div>
         </div>
 
@@ -159,7 +159,7 @@ export default function OgImage() {
                           fontWeight: best ? 700 : 400,
                         }}
                       >
-                        {c ? secs(c.mean_wall_ms) : '—'}
+                        {c ? secs(c.mean_wall_ms) : '–'}
                       </div>
                     </div>
                   );

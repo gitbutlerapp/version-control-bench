@@ -17,8 +17,8 @@ export const TOOL_URL: Record<string, string> = {
 export const HERO = {
   title: 'A version-control benchmark for coding agents',
   intro: [
-    'Which version-control tool should you give your coding agent? Claude Code and Codex run the same five version-control tasks three ways — with plain git, with Jujutsu, and with GitButler. Only the tool changes.',
-    'All three turn out reliable — 299 of 300 runs passed — so the separator is speed: GitButler ran about 60% faster than git with roughly 80% fewer commands; Jujutsu ran slower than git.',
+    'Which version-control tool should you give your coding agent? Claude Code and Codex run the same five version-control tasks three ways: with plain git, with Jujutsu, and with GitButler. Only the tool changes.',
+    'All three turn out reliable (299 of 300 runs passed), so the separator is speed: GitButler ran about 60% faster than git with roughly 80% fewer commands; Jujutsu ran slower than git.',
   ],
 };
 
@@ -29,14 +29,14 @@ export const RESULTS = {
   columns: {
     pass: 'Reliability: share of runs that produced the exact history the instruction asked for.',
     time: 'Speed: mean wall-clock time per run, setup excluded.',
-    cmds: 'Version-control commands the agent ran per run — fewer usually means less time and output.',
-    kb: 'Efficiency: kilobytes of version-control output the agent read back per run (skill reads excluded) — a token-cost proxy, comparable within one agent only.',
+    cmds: 'Version-control commands the agent ran per run. Fewer usually means less time and output.',
+    kb: 'Efficiency: kilobytes of version-control output the agent read back per run (skill reads excluded). A token-cost proxy, comparable within one agent only.',
   },
 };
 
 export const SCENARIOS_INTRO = {
   title: 'Scenarios',
-  lede: 'Each scenario is a pre-built Git repository plus a plain-English instruction. No code is written during a run — only the version-control operation is measured.',
+  lede: 'Each scenario is a pre-built Git repository plus a plain-English instruction. No code is written during a run; only the version-control operation is measured.',
 };
 
 export const METHOD = {
@@ -49,7 +49,7 @@ export const METHOD = {
     },
     {
       term: 'Deterministic grader',
-      body: 'A hidden, scripted check that returns the same verdict for the same final state — no LLM judge. It inspects commit boundaries, branch topology, and what stayed uncommitted; it never compares commands against a reference.',
+      body: 'A hidden, scripted check that returns the same verdict for the same final state, with no LLM judge. It inspects commit boundaries, branch topology, and what stayed uncommitted; it never compares commands against a reference.',
     },
     {
       term: 'Timing boundary',
@@ -77,7 +77,7 @@ export const LEDGER = {
 };
 
 export const AGENT_NOTE =
-  'Both agents run the same matrix to check the tool effect holds across models — not a Claude-versus-Codex comparison.';
+  'Both agents run the same matrix to check the tool effect holds across models, not a Claude-versus-Codex comparison.';
 
 // Section kicker labels (rendered uppercase mono above each heading).
 export const EYEBROWS = {
@@ -110,7 +110,7 @@ export const HISTORY = {
 // different questions, and saying how earns the comparison back.
 export const RELATED = {
   title: 'How this relates to other benchmarks',
-  lede: 'Most benchmarks here hold the tool constant and compare models; this one holds the agents constant and compares the tools — the question a team faces once the agent is chosen.',
+  lede: 'Most benchmarks here hold the tool constant and compare models; this one holds the agents constant and compares the tools: the question a team faces once the agent is chosen.',
   items: [
     {
       name: 'jj-benchmark',

@@ -2,17 +2,17 @@
 // decide precision and units.
 
 export function seconds(ms: number | null): string {
-  if (ms == null) return '—';
+  if (ms == null) return '–';
   const s = ms / 1000;
   return s >= 100 ? s.toFixed(0) : s.toFixed(1);
 }
 
 export function secondsLabel(ms: number | null): string {
-  return ms == null ? '—' : `${seconds(ms)}s`;
+  return ms == null ? '–' : `${seconds(ms)}s`;
 }
 
 export function kb(bytes: number | null): string {
-  if (bytes == null) return '—';
+  if (bytes == null) return '–';
   return (bytes / 1000).toFixed(1);
 }
 
@@ -22,7 +22,7 @@ export function count(n: number): string {
 }
 
 export function pct(n: number | null, withSign = true): string {
-  if (n == null) return '—';
+  if (n == null) return '–';
   const r = Math.round(n * 10) / 10;
   const body = `${Math.abs(r)}%`;
   if (!withSign) return body;
@@ -31,13 +31,13 @@ export function pct(n: number | null, withSign = true): string {
 
 // "−61%" style delta where negative is the win for time/ops.
 export function deltaSavings(n: number | null): string {
-  if (n == null) return '—';
+  if (n == null) return '–';
   const r = Math.round(n * 10) / 10;
   return r < 0 ? `−${Math.abs(r)}%` : `+${r}%`;
 }
 
 export function speedup(ratio: number | null): string {
-  if (ratio == null) return '—';
+  if (ratio == null) return '–';
   return `${ratio.toFixed(ratio >= 10 ? 0 : 1)}×`;
 }
 
@@ -46,7 +46,7 @@ export function passFraction(pass: number, n: number): string {
 }
 
 export function ciRange(lo: number | null, hi: number | null): string {
-  if (lo == null || hi == null) return '—';
+  if (lo == null || hi == null) return '–';
   return `${Math.round(lo)}–${Math.round(hi)}%`;
 }
 
@@ -55,7 +55,7 @@ export function pairedRange(
   stat: { mean: number; lo: number | null; hi: number | null } | null | undefined,
   fmt: (v: number) => string,
 ): string {
-  if (!stat) return '—';
+  if (!stat) return '–';
   const signed = (v: number) => (v > 0 ? `+${fmt(v)}` : v < 0 ? `−${fmt(Math.abs(v))}` : fmt(v));
   if (stat.lo == null || stat.hi == null) return signed(stat.mean);
   return `${signed(stat.mean)} [${signed(stat.lo)}, ${signed(stat.hi)}]`;

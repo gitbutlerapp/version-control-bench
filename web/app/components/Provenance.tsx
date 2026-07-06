@@ -6,7 +6,7 @@ const REPO_URL = 'https://github.com/gitbutlerapp/version-control-bench';
 const DATA_URL = `${REPO_URL}/blob/main/web/data/results.json`;
 
 function short(hash: string | null | undefined, n = 12): string {
-  return hash ? hash.slice(0, n) : '—';
+  return hash ? hash.slice(0, n) : '–';
 }
 
 // Compact one-line summary of a source snapshot's provenance: the identifying
@@ -19,7 +19,7 @@ function snapshotSummary(s: ResultsData['source_snapshots'][number]): { label: s
   if (p.binary_hash) bits.push(`build ${short(p.binary_hash, 10)}`);
   if (p.skill_package) bits.push(p.skill_package);
   else if (p.skill_hash) bits.push(`skill ${short(p.skill_hash, 10)}`);
-  return { label, body: bits.join(' · ') || '—' };
+  return { label, body: bits.join(' · ') || '–' };
 }
 
 export function Provenance({ data }: { data: ResultsData }) {
@@ -98,7 +98,7 @@ export function Provenance({ data }: { data: ResultsData }) {
               <a href={r.url} target="_blank" rel="noopener noreferrer">
                 {r.name}
               </a>{' '}
-              <span className="faint">({r.by})</span> — {r.read}
+              <span className="faint">({r.by})</span>: {r.read}
             </li>
           ))}
         </ul>

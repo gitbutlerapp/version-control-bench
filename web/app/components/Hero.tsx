@@ -6,7 +6,7 @@ export function Hero({ data }: { data: ResultsData }) {
   return (
     <header className="hero" id="top">
       {/* one stamp line: run shape, date, and the provenance jump. On phones
-          the shape summary is hidden — the intro states it in words — leaving
+          the shape summary is hidden (the intro states it in words), leaving
           a single short line of stamp. */}
       <p className="eyebrow hero-eyebrow">
         <span className="hero-eyebrow-shape">3 tools · 2 agents · 5 scenarios · </span>

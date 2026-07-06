@@ -38,7 +38,7 @@ export function PassChip({
         data-size={size}
         onClick={onActivate}
         title={ci ?? undefined}
-        aria-label={`${pass} of ${n} runs passed${ci ? `, ${ci}` : ''} — see failures`}
+        aria-label={`${pass} of ${n} runs passed${ci ? `, ${ci}` : ''}; see failures`}
       >
         {inner}
       </button>

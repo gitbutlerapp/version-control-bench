@@ -145,7 +145,7 @@ export function RunStrip({ data, scenarioId }: { data: ResultsData; scenarioId: 
                     onMouseLeave={() => setTip(null)}
                   >
                     <title>
-                      {`run ${r.rep}: ${secs}${clamped ? ' (beyond axis)' : ''}${r.passed ? '' : ` — failed (${r.failure ?? 'grading'})`}`}
+                      {`run ${r.rep}: ${secs}${clamped ? ' (beyond axis)' : ''}${r.passed ? '' : `, failed (${r.failure ?? 'grading'})`}`}
                     </title>
                     {/* transparent hit target, larger than the drawn dot */}
                     <circle cx={cx} cy={y} r={8} fill="transparent" />

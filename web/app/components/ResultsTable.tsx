@@ -45,10 +45,10 @@ function Group({ cell, best }: { cell: Cell | undefined; best: { t: boolean; c: 
   if (!cell) {
     return (
       <>
-        <td className="m-pass">—</td>
-        <td className="m-num">—</td>
-        <td className="m-num">—</td>
-        <td className="m-num">—</td>
+        <td className="m-pass">–</td>
+        <td className="m-num">–</td>
+        <td className="m-num">–</td>
+        <td className="m-num">–</td>
       </>
     );
   }
@@ -183,10 +183,10 @@ export function ResultsTable({ data }: { data: ResultsData }) {
                     </>
                   ) : (
                     <>
-                      <td>—</td>
-                      <td>—</td>
-                      <td>—</td>
-                      <td>—</td>
+                      <td>–</td>
+                      <td>–</td>
+                      <td>–</td>
+                      <td>–</td>
                     </>
                   )}
                 </tr>
@@ -310,7 +310,7 @@ export function ResultsTable({ data }: { data: ResultsData }) {
 
       <ul className="matrix-legend">
         <li>
-          <PassChip pass={5} n={5} size="sm" /> pass rate — a wrong history fails, no matter how
+          <PassChip pass={5} n={5} size="sm" /> pass rate: a wrong history fails, no matter how
           fast
         </li>
         <li>
