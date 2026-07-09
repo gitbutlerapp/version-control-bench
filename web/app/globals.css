@@ -61,9 +61,11 @@
   --tool-git: #9aa4b2;
   --tool-but: #f4a623;
   --tool-jj: #5cc8b8;
+  --tool-jjbut: #a48cf2;
   --tool-git-soft: #9aa4b21f;
   --tool-but-soft: #f4a6231f;
   --tool-jj-soft: #5cc8b81f;
+  --tool-jjbut-soft: #a48cf21f;
 
   /* ---- agent identity (muted = secondary axis) ---- */
   --agent-claude: #d97757;
@@ -104,9 +106,11 @@
   --tool-git: #67727f;
   --tool-but: #a86a08;
   --tool-jj: #147d6e;
+  --tool-jjbut: #6a51c4;
   --tool-git-soft: #67727f1f;
   --tool-but-soft: #f4a62333;
   --tool-jj-soft: #1f9e8c26;
+  --tool-jjbut-soft: #a48cf233;
 
   --agent-claude: #c15f3e;
   --agent-codex: #5a679a;

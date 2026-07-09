@@ -8,7 +8,7 @@ export const dynamic = 'force-static';
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
 export const alt =
-  'Mean wall-clock time per run for git, Jujutsu, and GitButler operated by Codex and Claude Code on five version-control tasks. All three reliable, GitButler fastest.';
+  'Mean wall-clock time per run for git, Jujutsu, jj-but, and GitButler operated by Codex and Claude Code on five version-control tasks. GitButler fastest.';
 
 // The social card IS the results chart, rendered at build time from the same
 // committed results.json as the page — a re-run plus deploy refreshes it.
@@ -18,11 +18,13 @@ export const alt =
 const TOOL_COLOR: Record<ArmId, string> = {
   git: '#9aa4b2',
   'jj+skill': '#5cc8b8',
+  'jj-but+skill': '#a48cf2',
   'but+skill': '#f4a623',
 };
 const TOOL_LABEL: Record<ArmId, string> = {
   git: 'git',
   'jj+skill': 'Jujutsu',
+  'jj-but+skill': 'jj-but',
   'but+skill': 'GitButler',
 };
 const AGENTS = ['codex', 'claude'] as const;
@@ -103,11 +105,11 @@ export default function OgImage() {
             Which version-control tool should you give your coding agent?
           </div>
           <div style={{ display: 'flex', fontSize: 26, color: '#9aa4b2', lineHeight: 1.2 }}>
-            {`All three are reliable (${m.total_passed}/${m.total_runs} passed). The separator is speed:`}
+            {`${m.total_passed} of ${m.total_runs} runs passed the grader. Speed separates the tools:`}
           </div>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           {m.arm_order.map((arm) => (
             <div key={arm} style={{ display: 'flex', alignItems: 'center', gap: 22 }}>
               <div
@@ -182,7 +184,7 @@ export default function OgImage() {
             {'mean wall-clock seconds per run · lower is better'}
           </div>
           <div style={{ display: 'flex' }}>
-            {'maintained by GitButler, one of the three tools measured'}
+            {'maintained by GitButler, which builds two of the four tools measured'}
           </div>
         </div>
       </div>

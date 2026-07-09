@@ -15,7 +15,7 @@ interface LedgerRow {
 
 // Build the ledger from the per-scenario cells, in plain tool order.
 function buildRows(data: ResultsData): LedgerRow[] {
-  const order: ArmId[] = ['git', 'jj+skill', 'but+skill'];
+  const order: ArmId[] = data.meta.arm_order;
   const scenarioLabel = Object.fromEntries(
     data.meta.scenarios.map((s) => [s.id, s.label]),
   );
@@ -51,7 +51,7 @@ function buildRows(data: ResultsData): LedgerRow[] {
 function ledgerLede(data: ResultsData, failed: number): string {
   const m = data.meta;
   if (failed === 0) return LEDGER.emptyLede;
-  const armMisses = ['git', 'jj+skill', 'but+skill']
+  const armMisses = m.arm_order
     .map((arm) => {
       const n = data.cells_by_scenario
         .filter((c) => c.arm === arm && c.agent !== 'both')

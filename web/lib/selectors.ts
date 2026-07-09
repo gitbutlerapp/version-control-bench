@@ -3,16 +3,19 @@ import type { AgentId, ArmId, Cell, MetricId, ResultsData } from './types';
 export const TOOL_COLOR: Record<ArmId, string> = {
   git: 'var(--tool-git)',
   'jj+skill': 'var(--tool-jj)',
+  'jj-but+skill': 'var(--tool-jjbut)',
   'but+skill': 'var(--tool-but)',
 };
 export const TOOL_SOFT: Record<ArmId, string> = {
   git: 'var(--tool-git-soft)',
   'jj+skill': 'var(--tool-jj-soft)',
+  'jj-but+skill': 'var(--tool-jjbut-soft)',
   'but+skill': 'var(--tool-but-soft)',
 };
 export const TOOL_VAR: Record<ArmId, string> = {
   git: 'git',
   'jj+skill': 'jj',
+  'jj-but+skill': 'jjbut',
   'but+skill': 'but',
 };
 

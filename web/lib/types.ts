@@ -2,7 +2,7 @@
 
 export type AgentId = 'codex' | 'claude' | 'both';
 export type RealAgentId = 'codex' | 'claude';
-export type ArmId = 'git' | 'jj+skill' | 'but+skill';
+export type ArmId = 'git' | 'jj+skill' | 'jj-but+skill' | 'but+skill';
 export type MetricId = 'time' | 'ops';
 
 export interface VsGit {

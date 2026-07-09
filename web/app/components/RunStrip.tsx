@@ -39,7 +39,12 @@ function niceStep(x: number): number {
   return nice * b;
 }
 
-const ARM_SHORT: Record<ArmId, string> = { git: 'git', 'jj+skill': 'jj', 'but+skill': 'but' };
+const ARM_SHORT: Record<ArmId, string> = {
+  git: 'git',
+  'jj+skill': 'jj',
+  'jj-but+skill': 'jj-but',
+  'but+skill': 'but',
+};
 
 export function RunStrip({ data, scenarioId }: { data: ResultsData; scenarioId: string }) {
   const { agent } = useView();

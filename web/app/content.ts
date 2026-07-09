@@ -1,6 +1,7 @@
 // Page copy. Register: a benchmark report, declarative and precise, defined
 // terms used consistently, accessible to a non-specialist. The benchmark is
-// the subject; GitButler is one of three tools plus a single flat disclosure.
+// the subject; GitButler builds two of the four tools measured, disclosed
+// flatly wherever the tools are named.
 
 // Public benchmark repository. Each scenario id is also its task directory name.
 export const REPO_URL = 'https://github.com/gitbutlerapp/version-control-bench';
@@ -17,8 +18,8 @@ export const TOOL_URL: Record<string, string> = {
 export const HERO = {
   title: 'A version-control benchmark for coding agents',
   intro: [
-    'Which version-control tool should you give your coding agent? Claude Code and Codex run the same five version-control tasks three ways: with plain git, with Jujutsu, and with GitButler. Only the tool changes.',
-    'All three turn out reliable (299 of 300 runs passed), so the separator is speed: GitButler ran about 60% faster than git with roughly 80% fewer commands; Jujutsu ran slower than git.',
+    'Which version-control tool should you give your coding agent? Claude Code and Codex run the same five version-control tasks four ways: with plain git, with Jujutsu, with jj-but (an agent-facing companion CLI for Jujutsu repositories, built by GitButler), and with GitButler. Only the tool changes.',
+    '394 of 400 runs passed, so speed is still the main separator: GitButler ran about 60% faster than git with roughly 80% fewer commands, jj-but roughly halved git’s time, and Jujutsu itself ran slower than git. The six failures were one Codex Jujutsu run and five Claude jj-but runs that split a commit into the right pieces in the wrong order.',
   ],
 };
 
@@ -64,6 +65,10 @@ export const METHOD = {
       body: 'jj 0.42.0, a colocated repository (jj and git on the same working copy), and the most-installed external jj skill, all in place before timing.',
     },
     {
+      term: 'jj-but setup',
+      body: 'The same colocated Jujutsu repository (jj 0.39), with jj-but 0.2.0 and the skill that ships with the binary installed via jj-but skill install; plain jj stays available alongside it. jj-but is built by GitButler, the benchmark maintainer.',
+    },
+    {
       term: 'Repeated runs per cell',
       body: 'Each agent–tool–scenario cell runs several times (k, shown above); the figures are means over those runs, with a Wilson 95% interval on each pass rate.',
     },
@@ -94,7 +99,8 @@ const resultDocUrl = (name: string) => `${REPO_URL}/blob/main/docs/results/${nam
 export const HISTORY = {
   title: 'Results history',
   entries: [
-    { date: '2026-07-06', scope: 'k=10 · Opus 4.8 · GPT-5.5', passed: '299/300', url: resultDocUrl('full-k10-2026-07-06.md'), current: true },
+    { date: '2026-07-09', scope: 'k=10 · jj-but arm added · Opus 4.8 · GPT-5.5', passed: '394/400', url: resultDocUrl('full-k10-jj-but-2026-07-09.md'), current: true },
+    { date: '2026-07-06', scope: 'k=10 · Opus 4.8 · GPT-5.5', passed: '299/300', url: resultDocUrl('full-k10-2026-07-06.md') },
     { date: '2026-07-05', scope: 'k=8 · Opus 4.8 · GPT-5.5', passed: '239/240', url: resultDocUrl('full-k8-2026-07-05.md') },
     { date: '2026-07-03', scope: 'k=7 · Opus 4.1 · GPT-5.5', passed: '193/210', url: resultDocUrl('full-k7-2026-07-03.md') },
     { date: '2026-07-01', scope: 'k=5 · 3 tools · 2 agents', passed: '137/150', url: resultDocUrl('full-k5-2026-07-01.md') },

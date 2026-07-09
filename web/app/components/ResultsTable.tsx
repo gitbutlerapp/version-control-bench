@@ -116,8 +116,8 @@ export function ResultsTable({ data }: { data: ResultsData }) {
     });
   const colSpan = 1 + arms.length * 4;
 
-  // Phone rendering: the wide table needs sideways scrolling that hides two of
-  // the three tools, so under 640px each scenario becomes a card with tools as
+  // Phone rendering: the wide table needs sideways scrolling that hides most
+  // of the tools, so under 640px each scenario becomes a card with tools as
   // rows and metrics as columns — the tool comparison fits the screen whole.
   // Which of the two renders is shown is a pure CSS media query.
   const renderCard = (row: Row) => {
@@ -314,7 +314,7 @@ export function ResultsTable({ data }: { data: ResultsData }) {
           fast
         </li>
         <li>
-          <span className="legend-bold">bold</span> = best of the three tools
+          <span className="legend-bold">bold</span> = fastest tool that passed every run
         </li>
         <li>click a scenario to see its per-run times</li>
         <li>hover a pass chip for its Wilson 95% interval</li>

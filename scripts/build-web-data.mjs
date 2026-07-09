@@ -12,9 +12,19 @@
 //   node scripts/build-web-data.mjs
 //   node scripts/build-web-data.mjs --aggregate <path> --out <path>
 //   node scripts/build-web-data.mjs --baseline <path> --jj <path> --out <path>
+//   node scripts/build-web-data.mjs --base <results.json> --extend <aggregate.json>
 //
 // Re-run after a new benchmark batch (edit DEFAULTS or pass --aggregate),
 // then commit web/data/results.json.
+//
+// The --base/--extend mode grafts a new arm's aggregate onto an already-built
+// results.json without touching the existing arms' cells. It exists because
+// raw aggregates live under gitignored tmp/ and may be gone by the time a new
+// arm lands; the committed results.json is then the only source for the
+// existing arms. It refuses to extend with an arm the base already has.
+// The current jj-but+skill cells were merged with:
+//   node scripts/build-web-data.mjs --base web/data/results.json \
+//     --extend tmp/pilot-runs/full-k10-20260709-103337/aggregate.json
 
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, resolve, join } from 'node:path';
@@ -29,6 +39,8 @@ const DEFAULTS = {
   aggregate: 'tmp/pilot-runs/full-k7-20260703-all-tools/aggregate.json',
   baseline: null, // legacy: git + but+skill
   jj: null, // legacy: jj+skill
+  base: null, // merge mode: an already-built results.json holding the existing arms
+  extend: null, // merge mode: aggregate.json holding the new arm(s)
   out: 'web/data/results.json',
 };
 
@@ -38,7 +50,7 @@ function parseArgs(argv) {
     const k = argv[i]?.replace(/^--/, '');
     if (k && k in out) {
       out[k] = argv[i + 1];
-      if (k === 'baseline' || k === 'jj') out.aggregate = null;
+      if (k === 'baseline' || k === 'jj' || k === 'base' || k === 'extend') out.aggregate = null;
     }
   }
   return out;
@@ -101,6 +113,14 @@ const ARMS = [
   { id: 'git', label: 'git', short: 'git', is_baseline: true },
   { id: 'jj+skill', label: 'Jujutsu', short: 'jj', vendor: 'jj' },
   {
+    id: 'jj-but+skill',
+    label: 'jj-but',
+    short: 'jj-but',
+    vendor: 'gitbutler',
+    vendor_bias: true,
+    blurb: 'GitButler builds jj-but, an agent-facing companion CLI for Jujutsu repositories.',
+  },
+  {
     id: 'but+skill',
     label: 'GitButler',
     short: 'but',
@@ -109,7 +129,9 @@ const ARMS = [
     blurb: 'GitButler built this benchmark.',
   },
 ];
-const ARM_ORDER = ['git', 'jj+skill', 'but+skill']; // control -> challenger -> home
+// control -> challenger -> home tools. This is the canonical full order; a
+// build only emits the arms its sources actually contain, in this order.
+const ARM_ORDER = ['git', 'jj+skill', 'jj-but+skill', 'but+skill'];
 const AGENTS = [
   { id: 'codex', label: 'Codex' },
   { id: 'claude', label: 'Claude' },
@@ -245,6 +267,48 @@ function unique(values) {
   return [...new Set(values.filter((v) => v != null))];
 }
 
+const roundStat = (stat, scale = 1, digits = 1) =>
+  stat == null
+    ? null
+    : {
+        mean: round(stat.mean * scale, digits),
+        lo: stat.lo == null ? null : round(stat.lo * scale, digits),
+        hi: stat.hi == null ? null : round(stat.hi * scale, digits),
+        n: stat.n,
+      };
+
+// One graded run, slimmed for the page (distribution + verification only).
+const slimRow = (r) => ({
+  scenario: r.task,
+  agent: r.agent,
+  arm: r.arm,
+  rep: r.rep,
+  passed: r.passed,
+  failure: r.failure,
+  wall_ms: r.wall_ms,
+  task_vc: r.task_vc,
+  cold_bytes: r.cold_bytes,
+  warm_bytes: r.warm_bytes,
+});
+
+// failure counts per (scenario, agent, arm) from raw aggregate rows
+function failureIndex(rawRows) {
+  const failKey = {};
+  for (const r of rawRows) {
+    if (r.passed) continue;
+    const k = `${r.task}|${r.agent}|${r.arm}`;
+    (failKey[k] ||= {});
+    failKey[k][r.failure] = (failKey[k][r.failure] || 0) + 1;
+  }
+  return (k) =>
+    Object.entries(failKey[k] || {}).map(([failure, count]) => ({
+      failure,
+      count,
+      severity: FAILURE_READS[failure]?.severity ?? 'unknown',
+      read: FAILURE_READS[failure]?.read ?? 'Did not match the expected history.',
+    }));
+}
+
 function observedModelForAgent(rows, agent) {
   const models = unique(rows.filter((r) => r.agent === agent).map((r) => r.observed_model));
   return models.length > 0 ? models.join(', ') : null;
@@ -255,12 +319,16 @@ function cliVersionForAgent(rows, agent) {
   return versions.length > 0 ? versions.join(', ') : null;
 }
 
-function perGroupK(rows) {
+function perGroupK(rows, armOrder) {
+  // accepts raw aggregate rows (r.task) or slim page rows (r.scenario)
   const counts = new Set();
   for (const sc of SCENARIOS) {
     for (const agent of ['codex', 'claude']) {
-      for (const arm of ARM_ORDER) {
-        counts.add(rows.filter((r) => r.task === sc.id && r.agent === agent && r.arm === arm).length);
+      for (const arm of armOrder) {
+        counts.add(
+          rows.filter((r) => (r.task ?? r.scenario) === sc.id && r.agent === agent && r.arm === arm)
+            .length,
+        );
       }
     }
   }
@@ -318,7 +386,39 @@ function sourceSnapshotsFromAggregate(agg) {
     });
   }
 
+  if (arms.includes('jj-but+skill')) {
+    const sample = firstCompletedRow(rows, 'jj-but+skill') ?? {};
+    snapshots.push({
+      batch: agg.batch,
+      arms: ['jj-but+skill'],
+      generated_at: agg.generated_at,
+      runs: rowsForArms(rows, ['jj-but+skill']).length,
+      provenance: {
+        setup_hash: sample.setup_hash ?? null,
+        binary_hash: sample.binary_hash ?? null,
+        jj_but_version: sample.binary_version ?? null,
+        jj_but_head: sample.binary_head ?? null,
+        jj_version: jjVersionFromRun(sample),
+        skill_source_command: 'jj-but skill install',
+        skill_hash: sample.skill_hash ?? null,
+        skill_tree_hash: sample.skill_tree_hash ?? null,
+      },
+    });
+  }
+
   return snapshots;
+}
+
+// The aggregate rows don't carry the colocated jj version for jj-but runs; the
+// per-run result.json does. Best-effort read from one run, null if it's gone.
+function jjVersionFromRun(sampleRow) {
+  if (!sampleRow?.result_path) return null;
+  try {
+    const result = JSON.parse(readFileSync(resolve(REPO, sampleRow.result_path), 'utf8'));
+    return result.agent_instructions?.jj_version ?? null;
+  } catch {
+    return null;
+  }
 }
 
 function loadSources({ aggregate, baseline, jj }) {
@@ -388,19 +488,22 @@ function build({ aggregate, baseline, jj, out }) {
   const allSummaries = source.summaries;
   const allByTask = source.byTask;
 
-  // ---- overall cells: 2 real agents x 3 arms, plus a 'both' per arm --------
+  // Emit only the arms the sources actually contain, in canonical order.
+  const armOrder = ARM_ORDER.filter((arm) => allSummaries.some((s) => s.arm === arm));
+
+  // ---- overall cells: 2 real agents x N arms, plus a 'both' per arm --------
   const overallByKey = {};
   for (const s of allSummaries) overallByKey[`${s.agent}|${s.arm}`] = cellFromSummary(s);
 
   const cells_overall = [];
   for (const agent of ['codex', 'claude']) {
-    for (const arm of ARM_ORDER) {
+    for (const arm of armOrder) {
       const c = overallByKey[`${agent}|${arm}`];
       if (!c) throw new Error(`Missing overall summary for ${agent} / ${arm}`);
       cells_overall.push(c);
     }
   }
-  for (const arm of ARM_ORDER) {
+  for (const arm of armOrder) {
     cells_overall.push(bothCell(overallByKey[`codex|${arm}`], overallByKey[`claude|${arm}`]));
   }
   // attach within-agent vs_git
@@ -418,15 +521,6 @@ function build({ aggregate, baseline, jj, out }) {
   // differences vs the same agent's git arm with t-based 95% CIs.
   const taskSummary = (task, agent, arm) =>
     allByTask.find((s) => s.task === task && s.agent === agent && s.arm === arm);
-  const roundStat = (stat, scale = 1, digits = 1) =>
-    stat == null
-      ? null
-      : {
-          mean: round(stat.mean * scale, digits),
-          lo: stat.lo == null ? null : round(stat.lo * scale, digits),
-          hi: stat.hi == null ? null : round(stat.hi * scale, digits),
-          n: stat.n,
-        };
   for (const c of cells_overall) {
     c.task_count = SCENARIOS.length;
     if (c.agent === 'both') {
@@ -470,26 +564,13 @@ function build({ aggregate, baseline, jj, out }) {
   for (const s of allByTask) byTaskKey[`${s.task}|${s.agent}|${s.arm}`] = s;
 
   // aggregate failures per (scenario, agent, arm) from rows
-  const failKey = {};
-  for (const r of allRows) {
-    if (r.passed) continue;
-    const k = `${r.task}|${r.agent}|${r.arm}`;
-    (failKey[k] ||= {});
-    failKey[k][r.failure] = (failKey[k][r.failure] || 0) + 1;
-  }
-  const failuresFor = (k) =>
-    Object.entries(failKey[k] || {}).map(([failure, count]) => ({
-      failure,
-      count,
-      severity: FAILURE_READS[failure]?.severity ?? 'unknown',
-      read: FAILURE_READS[failure]?.read ?? 'Did not match the expected history.',
-    }));
+  const failuresFor = failureIndex(allRows);
 
   const cells_by_scenario = [];
   for (const sc of SCENARIOS) {
     const scenarioCells = {};
     for (const agent of ['codex', 'claude']) {
-      for (const arm of ARM_ORDER) {
+      for (const arm of armOrder) {
         const s = byTaskKey[`${sc.id}|${agent}|${arm}`];
         if (!s) throw new Error(`Missing by_task summary for ${sc.id} / ${agent} / ${arm}`);
         const cell = cellFromSummary(s);
@@ -499,7 +580,7 @@ function build({ aggregate, baseline, jj, out }) {
         cells_by_scenario.push(cell);
       }
     }
-    for (const arm of ARM_ORDER) {
+    for (const arm of armOrder) {
       const both = bothCell(scenarioCells[`codex|${arm}`], scenarioCells[`claude|${arm}`], {
         scenario: sc.id,
       });
@@ -519,23 +600,12 @@ function build({ aggregate, baseline, jj, out }) {
   }
 
   // ---- slim per-run rows (distribution + verification only) ----------------
-  const rows = allRows.map((r) => ({
-    scenario: r.task,
-    agent: r.agent,
-    arm: r.arm,
-    rep: r.rep,
-    passed: r.passed,
-    failure: r.failure,
-    wall_ms: r.wall_ms,
-    task_vc: r.task_vc,
-    cold_bytes: r.cold_bytes,
-    warm_bytes: r.warm_bytes,
-  }));
+  const rows = allRows.map(slimRow);
 
   const total_runs = allRows.length;
   const total_passed = allRows.filter((r) => r.passed).length;
   const snapshotDate = new Date(source.generatedAt).toISOString().slice(0, 10);
-  const k = perGroupK(allRows);
+  const k = perGroupK(allRows, armOrder);
 
   const data = {
     schema_version: 1,
@@ -554,8 +624,8 @@ function build({ aggregate, baseline, jj, out }) {
         })),
         { id: 'both', label: 'Both', note: 'Codex + Claude, averaged' },
       ],
-      arms: ARMS,
-      arm_order: ARM_ORDER,
+      arms: ARMS.filter((a) => armOrder.includes(a.id)),
+      arm_order: armOrder,
       scenarios: SCENARIOS.map((s) => ({
         id: s.id,
         label: s.label,
@@ -591,15 +661,196 @@ function build({ aggregate, baseline, jj, out }) {
   return { data, outAbs };
 }
 
+// ---- merge mode --------------------------------------------------------------
+// Graft the arm(s) of one raw aggregate onto an already-built results.json.
+// Cells for the base arms are carried over byte-identical; only the new arms'
+// cells (and their vs_git / paired_vs_git against the base git cells) are
+// computed here. Used when the raw aggregates behind the base are no longer on
+// disk, so the committed results.json is the only source for the existing arms.
+function mergeIntoBase({ base, extend, out }) {
+  if (!base || !extend) {
+    throw new Error('Merge mode needs both --base <results.json> and --extend <aggregate.json>.');
+  }
+  const baseData = readJSON(base);
+  const agg = readJSON(extend);
+
+  const newArms = unique(agg.rows.map((r) => r.arm));
+  for (const arm of newArms) {
+    if (!ARM_ORDER.includes(arm)) {
+      throw new Error(`merge: unknown arm ${arm}; add it to ARMS/ARM_ORDER first`);
+    }
+    if (baseData.meta.arm_order.includes(arm)) {
+      throw new Error(`merge: arm ${arm} is already in ${base}; refusing to double-merge`);
+    }
+  }
+  const armOrder = ARM_ORDER.filter(
+    (arm) => baseData.meta.arm_order.includes(arm) || newArms.includes(arm),
+  );
+
+  const baseOverall = new Map(baseData.cells_overall.map((c) => [`${c.agent}|${c.arm}`, c]));
+  const baseScenario = new Map(
+    baseData.cells_by_scenario.map((c) => [`${c.scenario}|${c.agent}|${c.arm}`, c]),
+  );
+  const aggByTask = new Map(agg.summaries.by_task.map((s) => [`${s.task}|${s.agent}|${s.arm}`, s]));
+  const failuresFor = failureIndex(agg.rows);
+
+  // ---- overall cells ---------------------------------------------------------
+  const newOverall = new Map();
+  for (const s of agg.summaries.overall) {
+    if (newArms.includes(s.arm)) newOverall.set(`${s.agent}|${s.arm}`, cellFromSummary(s));
+  }
+  const cells_overall = [];
+  for (const agent of ['codex', 'claude']) {
+    for (const arm of armOrder) {
+      const c = baseOverall.get(`${agent}|${arm}`) ?? newOverall.get(`${agent}|${arm}`);
+      if (!c) throw new Error(`merge: missing overall cell for ${agent} / ${arm}`);
+      cells_overall.push(c);
+    }
+  }
+  for (const arm of armOrder) {
+    cells_overall.push(
+      baseOverall.get(`both|${arm}`) ??
+        bothCell(newOverall.get(`codex|${arm}`), newOverall.get(`claude|${arm}`)),
+    );
+  }
+
+  // vs_git and task-clustered stats for the new arms only; base git cells are
+  // the comparison side, exactly as in a single-source build.
+  for (const arm of newArms) {
+    for (const agent of ['codex', 'claude', 'both']) {
+      const c = cells_overall.find((x) => x.agent === agent && x.arm === arm);
+      c.vs_git = vsGit(c, baseOverall.get(`${agent}|git`));
+      c.task_count = SCENARIOS.length;
+      if (agent === 'both') {
+        c.tasks_all_pass = SCENARIOS.filter((sc) =>
+          ['codex', 'claude'].every((ag) => {
+            const s = aggByTask.get(`${sc.id}|${ag}|${arm}`);
+            return s && s.pass === s.n;
+          }),
+        ).length;
+        c.paired_vs_git = null;
+        continue;
+      }
+      c.tasks_all_pass = SCENARIOS.filter((sc) => {
+        const s = aggByTask.get(`${sc.id}|${agent}|${arm}`);
+        return s && s.pass === s.n;
+      }).length;
+      const passDeltas = [];
+      const wallDeltas = [];
+      const opsDeltas = [];
+      for (const sc of SCENARIOS) {
+        const gitCell = baseScenario.get(`${sc.id}|${agent}|git`);
+        const cand = aggByTask.get(`${sc.id}|${agent}|${arm}`);
+        if (!gitCell || !cand) continue;
+        passDeltas.push(cand.pass / cand.n - gitCell.pass / gitCell.n);
+        wallDeltas.push(cand.mean_wall_ms - gitCell.mean_wall_ms);
+        opsDeltas.push(cand.mean_task_vc - gitCell.mean_task_vc);
+      }
+      c.paired_vs_git = {
+        pass_rate_pp: roundStat(pairedMeanCI(passDeltas), 100, 1),
+        wall_ms: roundStat(pairedMeanCI(wallDeltas), 1, 0),
+        task_vc: roundStat(pairedMeanCI(opsDeltas), 1, 1),
+      };
+    }
+  }
+
+  // ---- per-scenario cells ------------------------------------------------------
+  const cells_by_scenario = [];
+  for (const sc of SCENARIOS) {
+    const localCells = {};
+    for (const agent of ['codex', 'claude']) {
+      for (const arm of armOrder) {
+        let cell = baseScenario.get(`${sc.id}|${agent}|${arm}`);
+        if (!cell) {
+          const s = aggByTask.get(`${sc.id}|${agent}|${arm}`);
+          if (!s) throw new Error(`merge: missing by_task summary for ${sc.id} / ${agent} / ${arm}`);
+          cell = cellFromSummary(s);
+          cell.scenario = sc.id;
+          cell.failures = failuresFor(`${sc.id}|${agent}|${arm}`);
+          cell.vs_git = vsGit(cell, baseScenario.get(`${sc.id}|${agent}|git`));
+        }
+        localCells[`${agent}|${arm}`] = cell;
+        cells_by_scenario.push(cell);
+      }
+    }
+    for (const arm of armOrder) {
+      let both = baseScenario.get(`${sc.id}|both|${arm}`);
+      if (!both) {
+        both = bothCell(localCells[`codex|${arm}`], localCells[`claude|${arm}`], {
+          scenario: sc.id,
+        });
+        both.failures = [
+          ...failuresFor(`${sc.id}|codex|${arm}`),
+          ...failuresFor(`${sc.id}|claude|${arm}`),
+        ];
+        both.vs_git = vsGit(both, baseScenario.get(`${sc.id}|both|git`));
+      }
+      cells_by_scenario.push(both);
+    }
+  }
+
+  // ---- rows, meta, snapshots ---------------------------------------------------
+  const rows = [...baseData.rows, ...agg.rows.map(slimRow)];
+  const total_runs = rows.length;
+  const total_passed = rows.filter((r) => r.passed).length;
+  const k = perGroupK(rows, armOrder);
+
+  // Per-agent model/CLI strings become the union across sources, so a version
+  // bump between batches stays visible instead of being papered over.
+  const joinVersions = (...values) =>
+    unique(values.flatMap((v) => (v ? v.split(', ') : []))).join(', ') || null;
+  const agents = baseData.meta.agents.map((a) =>
+    a.id === 'both'
+      ? a
+      : {
+          ...a,
+          observed_model: joinVersions(a.observed_model, observedModelForAgent(agg.rows, a.id)),
+          agent_cli_version: joinVersions(
+            a.agent_cli_version,
+            cliVersionForAgent(agg.rows, a.id),
+          ),
+        },
+  );
+
+  const data = {
+    ...baseData,
+    generated_at: new Date().toISOString(),
+    meta: {
+      ...baseData.meta,
+      k,
+      total_runs,
+      total_passed,
+      pass_rate: round((total_passed / total_runs) * 100, 1),
+      snapshot_date: new Date(agg.generated_at).toISOString().slice(0, 10),
+      agents,
+      arms: ARMS.filter((a) => armOrder.includes(a.id)),
+      arm_order: armOrder,
+    },
+    source_snapshots: [...baseData.source_snapshots, ...sourceSnapshotsFromAggregate(agg)],
+    cells_overall,
+    cells_by_scenario,
+    rows,
+  };
+
+  validate(data);
+  const outAbs = resolve(REPO, out);
+  mkdirSync(dirname(outAbs), { recursive: true });
+  writeFileSync(outAbs, JSON.stringify(data, null, 2) + '\n');
+  return { data, outAbs };
+}
+
 function validate(d) {
-  const expectedRows = Number.isFinite(d.meta.k) ? d.meta.k * SCENARIOS.length * 2 * ARM_ORDER.length : d.rows.length;
+  const armOrder = d.meta.arm_order;
+  const expectedRows = Number.isFinite(d.meta.k) ? d.meta.k * SCENARIOS.length * 2 * armOrder.length : d.rows.length;
   const armsSeen = new Set(d.cells_overall.map((c) => c.arm));
-  for (const arm of ARM_ORDER) if (!armsSeen.has(arm)) throw new Error(`validate: arm ${arm} missing`);
+  for (const arm of armOrder) if (!armsSeen.has(arm)) throw new Error(`validate: arm ${arm} missing`);
   const agentsSeen = new Set(d.cells_overall.map((c) => c.agent));
   for (const a of ['codex', 'claude', 'both']) if (!agentsSeen.has(a)) throw new Error(`validate: agent ${a} missing`);
   if (d.rows.length !== expectedRows) throw new Error(`validate: expected ${expectedRows} rows, got ${d.rows.length}`);
-  if (d.cells_overall.length !== 9) throw new Error(`validate: expected 9 overall cells, got ${d.cells_overall.length}`);
-  if (d.cells_by_scenario.length !== 45) throw new Error(`validate: expected 45 scenario cells, got ${d.cells_by_scenario.length}`);
+  const expectedOverall = 3 * armOrder.length;
+  const expectedScenario = SCENARIOS.length * 3 * armOrder.length;
+  if (d.cells_overall.length !== expectedOverall) throw new Error(`validate: expected ${expectedOverall} overall cells, got ${d.cells_overall.length}`);
+  if (d.cells_by_scenario.length !== expectedScenario) throw new Error(`validate: expected ${expectedScenario} scenario cells, got ${d.cells_by_scenario.length}`);
   // honesty firewall: no 'both' cell may carry a KB number
   for (const c of [...d.cells_overall, ...d.cells_by_scenario]) {
     if (c.agent === 'both' && (c.mean_warm_bytes != null || c.mean_cold_bytes != null)) {
@@ -612,7 +863,7 @@ function validate(d) {
 }
 
 const args = parseArgs(process.argv.slice(2));
-const { data, outAbs } = build(args);
+const { data, outAbs } = args.base || args.extend ? mergeIntoBase(args) : build(args);
 console.log(`Wrote ${outAbs}`);
 console.log(
   `  ${data.meta.total_passed}/${data.meta.total_runs} passed · ` +

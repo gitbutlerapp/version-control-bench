@@ -13,8 +13,9 @@ function short(hash: string | null | undefined, n = 12): string {
 // tokens only. The full SHA-256 set lives in the linked results.json.
 function snapshotSummary(s: ResultsData['source_snapshots'][number]): { label: string; body: string } {
   const p = s.provenance;
-  const label = p.jj_version ? 'Jujutsu' : 'GitButler';
+  const label = p.jj_but_version ? 'jj-but' : p.jj_version ? 'Jujutsu' : 'GitButler';
   const bits: string[] = [];
+  if (p.jj_but_version) bits.push(p.jj_but_version);
   if (p.jj_version) bits.push(p.jj_version);
   if (p.binary_hash) bits.push(`build ${short(p.binary_hash, 10)}`);
   if (p.skill_package) bits.push(p.skill_package);
@@ -113,8 +114,9 @@ export function Footer({ data }: { data: ResultsData }) {
     <footer className="footer">
       <div className="page footer-inner">
         <p className="footer-bias">
-          Maintained by <a href="https://gitbutler.com">GitButler</a>, one of the three tools
-          measured. The grader is deterministic and the data is <a href={DATA_URL}>on GitHub</a>.
+          Maintained by <a href="https://gitbutler.com">GitButler</a>, which builds two of the
+          four tools measured (GitButler and jj-but). The grader is deterministic and the data is{' '}
+          <a href={DATA_URL}>on GitHub</a>.
         </p>
         <p className="footer-stamp mono faint">
           data generated {dateLabel(data.generated_at)} · {m.total_passed}/{m.total_runs} runs
