@@ -315,6 +315,19 @@ section:first-of-type {
   background: var(--border-strong);
   border-radius: 999px;
 }
+/* With four tool groups the matrix outgrows the page column, so on wide
+   viewports the whole results section breaks out toward the viewport width
+   (capped) instead of scrolling sideways inside the wrapper. The section is a
+   child of the centered .page column, so shifting it by half the width
+   difference keeps the bleed viewport-centered; the side gutters stay clear
+   of the vertical scrollbar. */
+@media (min-width: 1140px) {
+  #results {
+    --matrix-bleed: min(100vw - 2 * var(--s-6), 1720px);
+    width: var(--matrix-bleed);
+    margin-left: calc((100% - var(--matrix-bleed)) / 2);
+  }
+}
 .matrix {
   border-collapse: collapse;
   width: 100%;
@@ -434,6 +447,34 @@ section:first-of-type {
 }
 .m-unit {
   color: var(--text-faint);
+}
+/* Below the table's comfortable width (down to the card breakpoint), trade
+   cell air for fit so the four groups sit inside the wrapper without
+   scrolling. */
+@media (min-width: 640px) and (max-width: 1480px) {
+  .matrix th,
+  .matrix td {
+    padding-inline: var(--s-2);
+  }
+}
+@media (min-width: 640px) and (max-width: 1240px) {
+  .matrix {
+    font-size: 0.6875rem;
+  }
+  .matrix th,
+  .matrix td {
+    padding-inline: var(--s-1);
+  }
+  .matrix .m-corner {
+    width: auto;
+  }
+  .matrix .m-task,
+  .matrix .m-expand {
+    font-size: 0.8125rem;
+  }
+  .matrix .passchip {
+    font-size: 0.6875rem;
+  }
 }
 .matrix tfoot .m-task {
   font-weight: 700;
