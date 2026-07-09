@@ -2,7 +2,7 @@
 
 **Which version-control tool should you give your coding agent?** Live results: [vcbench.dev](https://vcbench.dev/)
 
-This benchmark holds the agents fixed — Claude Code and Codex — and varies the toolset: plain `git`, Jujutsu (`jj+skill`), and GitButler (`but+skill`), each scored on reliability, speed, and efficiency across five common version-control operations. Most benchmarks in this space fix the tool and compare models; this one fixes the agents and compares the tools — a measurement of agent–tool fit (what the industry has started calling agent experience) rather than a model leaderboard.
+This benchmark holds the agents fixed — Claude Code and Codex — and varies the toolset: plain `git`, Jujutsu (`jj+skill`), and GitButler (`but+skill`), each scored on reliability, speed, and efficiency across five common version-control operations. This fork adds an unmeasured `jj-axi+skill` arm using the same setup and deterministic grader; it must not be compared with the published three-tool results until it has completed an equivalent matrix. Most benchmarks in this space fix the tool and compare models; this one fixes the agents and compares the tools — a measurement of agent–tool fit (what the industry has started calling agent experience) rather than a model leaderboard.
 
 This is not a coding benchmark. The file changes already exist before the agent starts; the agent's job is to produce the right Git-visible state — commit boundaries, branch topology, what stays uncommitted, protected history. A deterministic grader judges the resulting Git history, never the commands used to produce it. And it is not a Claude-versus-Codex comparison: both agents run so the tool effect can be checked across them.
 
@@ -117,6 +117,7 @@ Run one task with Codex:
 npm run pilot:agent -- --task pilot-3-split-commit --agent codex --arm git
 npm run pilot:agent -- --task pilot-3-split-commit --agent codex --arm 'but+skill'
 npm run pilot:agent -- --task pilot-3-split-commit --agent codex --arm 'jj+skill'
+npm run pilot:agent -- --task pilot-3-split-commit --agent codex --arm 'jj-axi+skill' --jj-axi-bin /absolute/path/to/jj-axi --jj-axi-skill-dir /absolute/path/to/jj-axi/skills/jj-axi
 ```
 
 Run one task with Claude:
@@ -125,6 +126,7 @@ Run one task with Claude:
 npm run pilot:agent -- --task pilot-5-squash-commits --agent claude --arm git
 npm run pilot:agent -- --task pilot-5-squash-commits --agent claude --arm 'but+skill'
 npm run pilot:agent -- --task pilot-5-squash-commits --agent claude --arm 'jj+skill'
+npm run pilot:agent -- --task pilot-5-squash-commits --agent claude --arm 'jj-axi+skill' --jj-axi-bin /absolute/path/to/jj-axi --jj-axi-skill-dir /absolute/path/to/jj-axi/skills/jj-axi
 ```
 
 Defaults are `--task pilot-1-selective-validation`, `--agent codex`, `--arm git`, Codex model `gpt-5.5`, and Claude model `claude-opus-4-8` (a versioned model ID, so reruns hit the same model; the runner warns if you pass a floating alias like `opus`). Use `--model <name>` to override, or `--codex-model` / `--claude-model` on the matrix runner. The published k=7 results predate this default and used `claude-opus-4-1-20250805`.
@@ -134,6 +136,7 @@ The supported arms are:
 - `git`: plain Git is allowed for version-control writes; `but` and `jj` are blocked.
 - `but+skill`: GitButler is prepared before the measured run, the GitButler skill is installed into `.codex/skills/but` and `.claude/skills/but`, local `AGENTS.md` / `CLAUDE.md` files are written, and raw Git write commands are blocked.
 - `jj+skill`: the fixture repo is prepared with `jj git init --colocate`, the external `onevcat/skills@onevcat-jj` skill is fetched into the run directory and installed into the agent skill folders, local `AGENTS.md` / `CLAUDE.md` files are written, and raw Git writes plus GitButler are blocked.
+- `jj-axi+skill`: the fixture receives the same colocated JJ preparation as `jj+skill`; the supplied jj-axi skill is installed into `.codex/skills/jj-axi` and `.claude/skills/jj-axi`; and a PATH wrapper allows direct `jj-axi` operations while classifying its child `jj` processes as tool-internal. Direct raw Git writes, `but`, and direct `jj` are blocked.
 
 Pre-run fixture setup, tool setup, applying task branches, skill installation, and dirty-state application are excluded from measured agent duration and command metrics.
 
@@ -154,6 +157,21 @@ Use `--skill-dir <path>` to test a different GitButler skill directory.
 The `jj+skill` arm uses the `jj` binary found on `PATH` by default. Override it with `--jj-bin <path>`.
 
 By default, the runner fetches the external `onevcat/skills@onevcat-jj` skill pinned to upstream commit `4955f542` and verifies the fetched bytes against a recorded SHA-256, so every run uses identical skill content. Use `--jj-skill-dir <path>` to use a local copy, or `--jj-skill-package`, `--jj-skill-name`, and `--jj-skill-url` to point at another public skill (`--jj-skill-sha256 <hash|none>` controls the integrity check for custom URLs).
+
+### Local jj-axi setup
+
+The `jj-axi+skill` arm requires an explicit compiled binary and local skill directory:
+
+```bash
+node scripts/run-pilot-agent.mjs \
+  --task pilot-1-selective-validation \
+  --agent codex \
+  --arm 'jj-axi+skill' \
+  --jj-axi-bin /absolute/path/to/jj-axi/target/release/jj-axi \
+  --jj-axi-skill-dir /absolute/path/to/jj-axi/skills/jj-axi
+```
+
+The runner records the binary path, SHA-256, source Git metadata, version, and the installed skill provenance. Its JJ setup and dirty-state application match `jj+skill`, but its measured task command is the direct `jj-axi` invocation; Jujutsu subprocesses spawned by that binary are recorded as tool-internal.
 
 ### Codex isolation
 

@@ -17,7 +17,7 @@ const TASKS = [
   { id: "pilot-5-squash-commits", label: "Squash commits" },
 ];
 const AGENTS = ["codex", "claude"];
-const ARMS = ["git", "but+skill", "jj+skill"];
+const ARMS = ["git", "but+skill", "jj+skill", "jj-axi+skill"];
 
 function timestamp() {
   const d = new Date();
@@ -713,6 +713,11 @@ const jjSkillDir = args.get("jj-skill-dir") ? path.resolve(args.get("jj-skill-di
 const jjSkillPackage = args.get("jj-skill-package") ?? null;
 const jjSkillName = args.get("jj-skill-name") ?? null;
 const jjSkillUrl = args.get("jj-skill-url") ?? null;
+const jjAxiBin = args.get("jj-axi-bin") ? path.resolve(args.get("jj-axi-bin")) : null;
+const jjAxiSkillDir = args.get("jj-axi-skill-dir") ? path.resolve(args.get("jj-axi-skill-dir")) : null;
+if (arms.includes("jj-axi+skill") && (!jjAxiBin || !jjAxiSkillDir)) {
+  throw new Error("--arms jj-axi+skill requires --jj-axi-bin and --jj-axi-skill-dir");
+}
 const batchName = args.get("batch-name") ?? `full-k${k}-${timestamp()}`;
 const batchDir = path.resolve(args.get("out") ?? path.join(repoRoot, "tmp/pilot-runs", batchName));
 const commandLine = ["node", "scripts/run-full-matrix.mjs", ...process.argv.slice(2)];
@@ -763,6 +768,8 @@ for (const plan of plans) {
   if (jjSkillPackage) runArgs.push("--jj-skill-package", jjSkillPackage);
   if (jjSkillName) runArgs.push("--jj-skill-name", jjSkillName);
   if (jjSkillUrl) runArgs.push("--jj-skill-url", jjSkillUrl);
+  if (jjAxiBin) runArgs.push("--jj-axi-bin", jjAxiBin);
+  if (jjAxiSkillDir) runArgs.push("--jj-axi-skill-dir", jjAxiSkillDir);
 
   console.log(`[${plan.idx}/${plans.length}] ${plan.task} ${plan.agent} ${plan.arm} r${plan.rep}`);
   const started = Date.now();

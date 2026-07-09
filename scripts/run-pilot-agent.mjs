@@ -164,6 +164,18 @@ const JJ_MUTATIONS = new Set([
 
 const JJ_INSPECTIONS = new Set(["diff", "log", "show", "status", "st", "evolog"]);
 
+const JJ_AXI_MUTATIONS = new Set([
+  "selective-commit",
+  "route",
+  "amend",
+  "split",
+  "reorder",
+  "move-range",
+  "squash",
+]);
+
+const JJ_AXI_INSPECTIONS = new Set(["", "home"]);
+
 function shellQuote(value) {
   return `'${String(value).replaceAll("'", "'\\''")}'`;
 }
@@ -297,9 +309,11 @@ function prepareClaudeSettings(runDir, enabled, effortLevel) {
 
 function writeWrapper(binDir, tool, realPath, tracePath, arm) {
   const wrapperPath = path.join(binDir, tool);
-  const blockGitWrites = tool === "git" && ["but+skill", "jj+skill"].includes(arm);
+  const blockGitWrites = tool === "git" && ["but+skill", "jj+skill", "jj-axi+skill"].includes(arm);
   const blockBut = tool === "but" && arm !== "but+skill";
-  const blockJj = tool === "jj" && arm !== "jj+skill";
+  const blockJj = tool === "jj" && !["jj+skill", "jj-axi+skill"].includes(arm);
+  const blockDirectJj = tool === "jj" && arm === "jj-axi+skill";
+  const blockJjAxi = tool === "jj-axi" && arm !== "jj-axi+skill";
   const mutationList = [...GIT_MUTATIONS].filter((command) => command !== "branch").join("|");
 
   const body = `#!/usr/bin/env bash
@@ -318,8 +332,30 @@ GRANDPARENT=""
 if [[ -n "$GRANDPARENT_PID" ]]; then
   GRANDPARENT="$(ps -p "$GRANDPARENT_PID" -o comm= 2>/dev/null | tr -d '[:space:]')"
 fi
+has_ancestor_named() {
+  local wanted="$1"
+  local pid="$PPID"
+  local process_name
+  local parent_pid
+
+  while [[ "$pid" =~ ^[0-9]+$ && "$pid" -gt 1 ]]; do
+    process_name="$(ps -p "$pid" -o comm= 2>/dev/null | tr -d '[:space:]')"
+    case "$wanted:$process_name" in
+      jj-axi:*jj-axi*) return 0 ;;
+      jj:*jj*) return 0 ;;
+      but:*but*) return 0 ;;
+    esac
+    parent_pid="$(ps -p "$pid" -o ppid= 2>/dev/null | tr -d '[:space:]')"
+    [[ "$parent_pid" == "$pid" ]] && break
+    pid="$parent_pid"
+  done
+
+  return 1
+}
 INTERNAL=false
-if [[ "$TOOL" == "git" && ( "$PARENT" == *but* || "$GRANDPARENT" == *but* || "$PARENT" == *jj* || "$GRANDPARENT" == *jj* ) ]]; then
+if [[ "$TOOL" == "git" ]] && { has_ancestor_named but || has_ancestor_named jj || has_ancestor_named jj-axi; }; then
+  INTERNAL=true
+elif [[ "$TOOL" == "jj" ]] && has_ancestor_named jj-axi; then
   INTERNAL=true
 fi
 trace_argv() {
@@ -335,6 +371,12 @@ if [[ ${blockBut ? "true" : "false"} == true ]]; then
   POLICY_BLOCK=true
 fi
 if [[ ${blockJj ? "true" : "false"} == true ]]; then
+  POLICY_BLOCK=true
+fi
+if [[ ${blockDirectJj ? "true" : "false"} == true && "$INTERNAL" != true ]]; then
+  POLICY_BLOCK=true
+fi
+if [[ ${blockJjAxi ? "true" : "false"} == true ]]; then
   POLICY_BLOCK=true
 fi
 if [[ ${blockGitWrites ? "true" : "false"} == true && "$INTERNAL" != true ]]; then
@@ -393,7 +435,7 @@ exit "$STATUS"
   writeFileSync(wrapperPath, body, { mode: 0o755 });
 }
 
-function createWrappers(runDir, arm, realBut, realJj) {
+function createWrappers(runDir, arm, realBut, realJj, realJjAxi) {
   const binDir = path.join(runDir, "bin");
   mkdirSync(binDir, { recursive: true });
   const tracePath = path.join(runDir, "command-trace.tsv");
@@ -403,6 +445,7 @@ function createWrappers(runDir, arm, realBut, realJj) {
   writeWrapper(binDir, "git", realGit, tracePath, arm);
   writeWrapper(binDir, "but", realBut, tracePath, arm);
   writeWrapper(binDir, "jj", realJj, tracePath, arm);
+  writeWrapper(binDir, "jj-axi", realJjAxi ?? "jj-axi", tracePath, arm);
 
   return { binDir, tracePath };
 }
@@ -476,6 +519,47 @@ The local Jujutsu CLI skill is installed for this benchmark trial at:
 Skill source: ${sourceMetadata.package ?? sourceMetadata.source_url ?? "external source"}.
 
 Use the installed skill if your agent runtime loads local skills or you need Jujutsu command details.
+
+${policyBlock}
+`;
+
+  return {
+    content,
+    version,
+    setup_block: policyBlock.trimEnd(),
+    setup_block_sha256: sha256Text(policyBlock.trimEnd()),
+  };
+}
+
+function renderJjAxiInstructions(workspace, realJjAxi, codexSkillPath, claudeSkillPath, sourceMetadata) {
+  const version = run(realJjAxi, ["--version"], { cwd: workspace }).stdout.trimEnd();
+  const policyBlock = `## Version control
+
+- Use \`jj-axi\` for version-control operations in this benchmark trial. It invokes Jujutsu internally.
+- The repository was prepared with \`jj git init --colocate\`; Git-visible refs still matter to the verifier.
+- Do not call \`jj\` directly, including for writes; use \`jj-axi\`'s compact repository state and action commands instead.
+- Do not use raw \`git\` writes or GitButler (\`but\`) in this benchmark trial.
+- Read-only Git inspection is allowed if it helps you verify Git-visible state.
+- Keep bookmarks updated for any named task branch so the final Git branch points at the requested history.
+- When the task asks to leave changes uncommitted, leave the residual changes in the working copy as directed by \`jj-axi\`.
+`;
+
+  const content = `# AGENTS.md
+
+## Benchmark boundary
+
+Work only in the current repository. Do not inspect parent benchmark directories, hidden oracle files, or solution scripts.
+
+## Local skill
+
+The local jj-axi skill is installed for this benchmark trial at:
+
+- ${codexSkillPath}
+- ${claudeSkillPath}
+
+Skill source: ${sourceMetadata.package ?? sourceMetadata.source_url ?? "local jj-axi skill"}.
+
+Use the installed skill if your agent runtime loads local skills or you need jj-axi command details.
 
 ${policyBlock}
 `;
@@ -653,7 +737,56 @@ function installJjSkill(workspace, skillDir, realJj, sourceMetadata) {
   };
 }
 
-function prepareWorkspace(runDir, arm, realBut, butSkillDir, realJj, jjSkill) {
+function installJjAxiSkill(workspace, skillDir, realJjAxi, sourceMetadata) {
+  const skillFile = path.join(skillDir, "SKILL.md");
+  if (!existsSync(skillFile)) {
+    throw new Error(`jj-axi skill file not found: ${skillFile}`);
+  }
+
+  const refsDir = path.join(skillDir, "references");
+  const installed = [];
+  const declaredSkillName = parseSkillName(skillFile);
+  if (declaredSkillName && declaredSkillName !== "jj-axi") {
+    throw new Error(`jj-axi skill must declare name: jj-axi; found ${declaredSkillName}`);
+  }
+  const skillName = "jj-axi";
+
+  for (const root of [`.codex/skills/${skillName}`, `.claude/skills/${skillName}`]) {
+    const dest = path.join(workspace, root);
+    mkdirSync(dest, { recursive: true });
+    cpSync(skillFile, path.join(dest, "SKILL.md"));
+    if (existsSync(refsDir)) {
+      cpSync(refsDir, path.join(dest, "references"), { recursive: true });
+    }
+    installed.push(dest);
+  }
+
+  const codexSkillPath = path.join(workspace, `.codex/skills/${skillName}/SKILL.md`);
+  const claudeSkillPath = path.join(workspace, `.claude/skills/${skillName}/SKILL.md`);
+  const instructions = renderJjAxiInstructions(workspace, realJjAxi, codexSkillPath, claudeSkillPath, sourceMetadata);
+  writeAgentInstructionFiles(workspace, instructions.content);
+
+  appendHarnessExclude(workspace);
+
+  return {
+    name: skillName,
+    source_dir: skillDir,
+    source: sourceMetadata,
+    version: parseSkillVersion(skillFile),
+    installed,
+    instructions: {
+      installed_codex: path.join(workspace, "AGENTS.md"),
+      installed_claude: path.join(workspace, "CLAUDE.md"),
+      source_package: sourceMetadata.package ?? null,
+      source_url: sourceMetadata.source_url ?? null,
+      source_command: "jj-axi --version",
+      setup_block_sha256: instructions.setup_block_sha256,
+      tool_version: instructions.version,
+    },
+  };
+}
+
+function prepareWorkspace(runDir, arm, realBut, butSkillDir, realJj, jjSkill, realJjAxi, jjAxiSkill) {
   const workspace = path.join(runDir, "workspace");
   const dirty = arm === "git" && taskConfig.fixtureDirty !== false;
   run("node", [path.join(repoRoot, taskConfig.createFixtureScript), "--out", workspace, "--force", "true", "--dirty", String(dirty)], {
@@ -675,10 +808,12 @@ function prepareWorkspace(runDir, arm, realBut, butSkillDir, realJj, jjSkill) {
     return { workspace, setup };
   }
 
-  if (arm === "jj+skill") {
+  if (arm === "jj+skill" || arm === "jj-axi+skill") {
     run(realJj, ["git", "init", "--colocate"], { cwd: workspace, stdio: "pipe" });
     run(realJj, ["config", "set", "--repo", "ui.paginate", "never"], { cwd: workspace, stdio: "pipe" });
-    const setup = installJjSkill(workspace, jjSkill.dir, realJj, jjSkill.source);
+    const setup = arm === "jj+skill"
+      ? installJjSkill(workspace, jjSkill.dir, realJj, jjSkill.source)
+      : installJjAxiSkill(workspace, jjAxiSkill.dir, realJjAxi, jjAxiSkill.source);
     if (taskConfig.applyDirtyState !== false) {
       run("node", [path.join(repoRoot, taskConfig.applyStateScript), "dirty", workspace], { cwd: repoRoot });
     }
@@ -1074,13 +1209,29 @@ function isJjMutation(entry) {
   return false;
 }
 
+function isJjAxiInspection(entry) {
+  const { command, args } = vcSubcommand(entry);
+  return command === "--help"
+    || command === "-h"
+    || command === "--version"
+    || args.includes("--help")
+    || args.includes("-h")
+    || args.includes("--version")
+    || JJ_AXI_INSPECTIONS.has(command);
+}
+
+function isJjAxiMutation(entry) {
+  const { command, args } = vcSubcommand(entry);
+  return !args.includes("--help") && !args.includes("-h") && !args.includes("--version") && JJ_AXI_MUTATIONS.has(command);
+}
+
 function isShellParent(parent) {
   if (!parent) return false;
   return ["sh", "bash", "zsh", "/bin/sh", "/bin/bash", "/bin/zsh"].some((shell) => parent === shell || parent.endsWith(`/${shell}`));
 }
 
 function isVcEntry(entry) {
-  return entry.tool === "git" || entry.tool === "but" || entry.tool === "jj";
+  return entry.tool === "git" || entry.tool === "but" || entry.tool === "jj" || entry.tool === "jj-axi";
 }
 
 function isNumber(value) {
@@ -1145,6 +1296,7 @@ function isInspection(entry) {
   if (entry.tool === "git") return isGitInspection(entry);
   if (entry.tool === "but") return isButInspection(entry);
   if (entry.tool === "jj") return isJjInspection(entry);
+  if (entry.tool === "jj-axi") return isJjAxiInspection(entry);
   return false;
 }
 
@@ -1152,6 +1304,7 @@ function isMutation(entry) {
   if (entry.tool === "git") return isGitMutation(entry);
   if (entry.tool === "but") return isButMutation(entry);
   if (entry.tool === "jj") return isJjMutation(entry);
+  if (entry.tool === "jj-axi") return isJjAxiMutation(entry);
   return false;
 }
 
@@ -1268,6 +1421,8 @@ function runMetricsSelfTest() {
     ["task", { ...base, parent: "/bin/sh", grandparent: "claude", argv: "rev-parse --abbrev-ref HEAD" }],
     ["task", { ...base, parent: "/bin/sh", grandparent: "claude", argv: "diff -- src/handler.ts" }],
     ["task", { ...base, tool: "but", parent: "/bin/zsh", grandparent: "claude", argv: "diff" }],
+    ["task", { ...base, tool: "jj-axi", parent: "/bin/zsh", grandparent: "claude", argv: "selective-commit --bookmark validation-only --message Add" }],
+    ["tool_internal", { ...base, tool: "jj", parent: "jj-axi", grandparent: "/bin/sh", internal: true, argv: "new -m Add" }],
   ];
 
   const failures = cases
@@ -1324,6 +1479,7 @@ function summarizeCommands(entries) {
     git_command_count: vc.filter((entry) => entry.tool === "git").length,
     but_command_count: vc.filter((entry) => entry.tool === "but").length,
     jj_command_count: vc.filter((entry) => entry.tool === "jj").length,
+    jj_axi_command_count: vc.filter((entry) => entry.tool === "jj-axi").length,
     inspection_count: inspections.length,
     mutation_count: mutations.length,
     failed_vc_command_count: failed.length,
@@ -1595,10 +1751,14 @@ if (agent === "claude" && !/\d/.test(model)) {
   console.warn(`Warning: Claude model "${model}" is a floating alias, not a versioned model ID; the run will not be reproducible across model updates.`);
 }
 const timeoutMs = Number(args.get("timeout-ms") ?? 900000);
-const realBut = executablePath(args.get("but-bin"), "but");
-const realJj = executablePath(args.get("jj-bin"), "jj");
+const butBinArg = args.get("but-bin") ?? null;
+const jjBinArg = args.get("jj-bin") ?? null;
+const realBut = arm === "but+skill" || butBinArg ? executablePath(butBinArg, "but") : "but";
+const realJj = ["jj+skill", "jj-axi+skill"].includes(arm) || jjBinArg ? executablePath(jjBinArg, "jj") : "jj";
+const jjAxiBinArg = args.get("jj-axi-bin") ?? null;
 const skillDir = path.resolve(args.get("skill-dir") ?? "/Users/kiril/src/gitbutler/crates/but/skill");
 const configuredJjSkillDir = args.get("jj-skill-dir") ? path.resolve(args.get("jj-skill-dir")) : null;
+const configuredJjAxiSkillDir = args.get("jj-axi-skill-dir") ? path.resolve(args.get("jj-axi-skill-dir")) : null;
 const jjSkillUrlArg = args.get("jj-skill-url") ?? null;
 const jjSkillSha256Arg = args.get("jj-skill-sha256") ?? null;
 const jjSkillSource = {
@@ -1630,8 +1790,18 @@ if (!taskConfig) {
 }
 taskDir = path.join(repoRoot, taskConfig.taskDir);
 
-if (!["git", "but+skill", "jj+skill"].includes(arm)) {
-  console.error("Usage: node scripts/run-pilot-agent.mjs --task <task-id> --agent <codex|claude> --arm <git|but+skill|jj+skill>");
+if (!["git", "but+skill", "jj+skill", "jj-axi+skill"].includes(arm)) {
+  console.error("Usage: node scripts/run-pilot-agent.mjs --task <task-id> --agent <codex|claude> --arm <git|but+skill|jj+skill|jj-axi+skill>");
+  process.exit(2);
+}
+
+if (arm === "jj-axi+skill" && (!jjAxiBinArg || !path.isAbsolute(jjAxiBinArg))) {
+  console.error("The jj-axi+skill arm requires --jj-axi-bin <absolute-path>.");
+  process.exit(2);
+}
+
+if (arm === "jj-axi+skill" && !configuredJjAxiSkillDir) {
+  console.error("The jj-axi+skill arm requires --jj-axi-skill-dir <dir>.");
   process.exit(2);
 }
 
@@ -1639,8 +1809,29 @@ rmSync(runDir, { recursive: true, force: true });
 mkdirSync(runDir, { recursive: true });
 
 const resolvedJjSkill = arm === "jj+skill" ? resolveJjSkillSource(runDir, configuredJjSkillDir, jjSkillSource) : null;
-const { workspace, setup } = prepareWorkspace(runDir, arm, realBut, skillDir, realJj, resolvedJjSkill);
-const { binDir, tracePath } = createWrappers(runDir, arm, realBut, realJj);
+const realJjAxi = arm === "jj-axi+skill" ? executablePath(jjAxiBinArg, "jj-axi") : null;
+const resolvedJjAxiSkill = arm === "jj-axi+skill"
+  ? {
+      dir: configuredJjAxiSkillDir,
+      source: {
+        package: "jj-axi",
+        name: "jj-axi",
+        configured_dir: configuredJjAxiSkillDir,
+        selection_note: "Local jj-axi skill supplied with --jj-axi-skill-dir.",
+      },
+    }
+  : null;
+const { workspace, setup } = prepareWorkspace(
+  runDir,
+  arm,
+  realBut,
+  skillDir,
+  realJj,
+  resolvedJjSkill,
+  realJjAxi,
+  resolvedJjAxiSkill,
+);
+const { binDir, tracePath } = createWrappers(runDir, arm, realBut, realJj, realJjAxi);
 const codexHome = prepareCodexHome(runDir, codexIsolatedHome);
 const claudeSettings = prepareClaudeSettings(runDir, claudeCleanConfig, claudeEffortLevel);
 const prompt = buildPrompt();
@@ -1675,7 +1866,13 @@ const transcriptAgentResult = agentResultForTranscript(agentResult, agentOutput)
 const verifierResult = verify(workspace);
 const trace = markImplicitToolInternal(parseTrace(tracePath));
 const metrics = traceMetrics(trace, prompt, transcriptAgentResult);
-const activeSkillDir = arm === "but+skill" ? skillDir : arm === "jj+skill" ? resolvedJjSkill.dir : null;
+const activeSkillDir = arm === "but+skill"
+  ? skillDir
+  : arm === "jj+skill"
+    ? resolvedJjSkill.dir
+    : arm === "jj-axi+skill"
+      ? resolvedJjAxiSkill.dir
+      : null;
 const activeSkillName = arm.endsWith("+skill") ? setup.name : null;
 const measurement = measurementBreakdown(trace, prompt, transcriptAgentResult, activeSkillDir, activeSkillName);
 const skillFile = path.join(activeSkillDir ?? skillDir, "SKILL.md");
@@ -1694,7 +1891,21 @@ const jjBinaryMetadata = arm === "jj+skill"
       version: run(realJj, ["--version"], { cwd: workspace }).stdout.trimEnd(),
     }
   : null;
-const toolBinaryMetadata = arm === "but+skill" ? butBinaryMetadata : arm === "jj+skill" ? jjBinaryMetadata : null;
+const jjAxiBinaryMetadata = arm === "jj-axi+skill"
+  ? {
+      path: realJjAxi,
+      sha256: sha256File(realJjAxi),
+      source_git: gitSourceInfo(realJjAxi, { scope: "repo" }),
+      version: run(realJjAxi, ["--version"], { cwd: workspace }).stdout.trimEnd(),
+    }
+  : null;
+const toolBinaryMetadata = arm === "but+skill"
+  ? butBinaryMetadata
+  : arm === "jj+skill"
+    ? jjBinaryMetadata
+    : arm === "jj-axi+skill"
+      ? jjAxiBinaryMetadata
+      : null;
 const skillSourceGit = activeSkillDir
   ? (arm === "jj+skill" && !setup.source?.configured_dir ? null : gitSourceInfo(activeSkillDir))
   : null;
@@ -1753,8 +1964,9 @@ const result = {
     gitbutler_branch_applied_before_agent: arm === "but+skill" && taskConfig.gitbutlerPrep === "setup-and-apply-branch"
       ? taskConfig.applyBranch
       : null,
-    jj_setup_before_agent: arm === "jj+skill",
-    jj_colocated_before_agent: arm === "jj+skill",
+    jj_setup_before_agent: arm === "jj+skill" || arm === "jj-axi+skill",
+    jj_colocated_before_agent: arm === "jj+skill" || arm === "jj-axi+skill",
+    jj_axi_setup_before_agent: arm === "jj-axi+skill",
     skill_installed_before_agent: arm.endsWith("+skill"),
     agent_instructions_before_agent: true,
     dirty_state_applied_before_agent: taskConfig.applyDirtyState !== false || taskConfig.fixtureDirty !== false,
@@ -1764,6 +1976,7 @@ const result = {
   tool_binary: toolBinaryMetadata,
   but_binary: butBinaryMetadata,
   jj_binary: jjBinaryMetadata,
+  jj_axi_binary: jjAxiBinaryMetadata,
   skill: skillMetadata,
   agent_result: {
     status: agentResult.status,
