@@ -134,6 +134,7 @@ The supported arms are:
 - `git`: plain Git is allowed for version-control writes; `but` and `jj` are blocked.
 - `but+skill`: GitButler is prepared before the measured run, the GitButler skill is installed into `.codex/skills/but` and `.claude/skills/but`, local `AGENTS.md` / `CLAUDE.md` files are written, and raw Git write commands are blocked.
 - `jj+skill`: the fixture repo is prepared with `jj git init --colocate`, the external `onevcat/skills@onevcat-jj` skill is fetched into the run directory and installed into the agent skill folders, local `AGENTS.md` / `CLAUDE.md` files are written, and raw Git writes plus GitButler are blocked.
+- `jj-but+skill`: the fixture repo is prepared with `jj git init --colocate` exactly like `jj+skill`, the jj-but skill is installed with `jj-but skill install` (and mirrored into `.codex/skills/jj-but`), local `AGENTS.md` / `CLAUDE.md` files are written, and raw Git writes plus GitButler are blocked; plain `jj` stays available alongside `jj-but`.
 
 Pre-run fixture setup, tool setup, applying task branches, skill installation, and dirty-state application are excluded from measured agent duration and command metrics.
 
@@ -154,6 +155,8 @@ Use `--skill-dir <path>` to test a different GitButler skill directory.
 The `jj+skill` arm uses the `jj` binary found on `PATH` by default. Override it with `--jj-bin <path>`.
 
 By default, the runner fetches the external `onevcat/skills@onevcat-jj` skill pinned to upstream commit `4955f542` and verifies the fetched bytes against a recorded SHA-256, so every run uses identical skill content. Use `--jj-skill-dir <path>` to use a local copy, or `--jj-skill-package`, `--jj-skill-name`, and `--jj-skill-url` to point at another public skill (`--jj-skill-sha256 <hash|none>` controls the integrity check for custom URLs).
+
+The `jj-but+skill` arm uses the `jj-but` binary found on `PATH` by default (override with `--jj-but-bin <path>`); its skill content ships with the binary and is installed per run via `jj-but skill install`, so the skill version always matches the binary version.
 
 ### Codex isolation
 

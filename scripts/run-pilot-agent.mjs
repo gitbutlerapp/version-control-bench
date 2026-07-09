@@ -164,6 +164,19 @@ const JJ_MUTATIONS = new Set([
 
 const JJ_INSPECTIONS = new Set(["diff", "log", "show", "status", "st", "evolog"]);
 
+const JJ_BUT_MUTATIONS = new Set([
+  "absorb",
+  "amend",
+  "move",
+  "redo",
+  "reword",
+  "squash",
+  "uncommit",
+  "undo",
+]);
+
+const JJ_BUT_INSPECTIONS = new Set(["status", "diff", "show"]);
+
 function shellQuote(value) {
   return `'${String(value).replaceAll("'", "'\\''")}'`;
 }
@@ -297,9 +310,10 @@ function prepareClaudeSettings(runDir, enabled, effortLevel) {
 
 function writeWrapper(binDir, tool, realPath, tracePath, arm) {
   const wrapperPath = path.join(binDir, tool);
-  const blockGitWrites = tool === "git" && ["but+skill", "jj+skill"].includes(arm);
+  const blockGitWrites = tool === "git" && ["but+skill", "jj+skill", "jj-but+skill"].includes(arm);
   const blockBut = tool === "but" && arm !== "but+skill";
-  const blockJj = tool === "jj" && arm !== "jj+skill";
+  const blockJj = tool === "jj" && !["jj+skill", "jj-but+skill"].includes(arm);
+  const blockJjBut = tool === "jj-but" && arm !== "jj-but+skill";
   const mutationList = [...GIT_MUTATIONS].filter((command) => command !== "branch").join("|");
 
   const body = `#!/usr/bin/env bash
@@ -335,6 +349,9 @@ if [[ ${blockBut ? "true" : "false"} == true ]]; then
   POLICY_BLOCK=true
 fi
 if [[ ${blockJj ? "true" : "false"} == true ]]; then
+  POLICY_BLOCK=true
+fi
+if [[ ${blockJjBut ? "true" : "false"} == true ]]; then
   POLICY_BLOCK=true
 fi
 if [[ ${blockGitWrites ? "true" : "false"} == true && "$INTERNAL" != true ]]; then
@@ -393,7 +410,7 @@ exit "$STATUS"
   writeFileSync(wrapperPath, body, { mode: 0o755 });
 }
 
-function createWrappers(runDir, arm, realBut, realJj) {
+function createWrappers(runDir, arm, realBut, realJj, realJjBut) {
   const binDir = path.join(runDir, "bin");
   mkdirSync(binDir, { recursive: true });
   const tracePath = path.join(runDir, "command-trace.tsv");
@@ -403,6 +420,7 @@ function createWrappers(runDir, arm, realBut, realJj) {
   writeWrapper(binDir, "git", realGit, tracePath, arm);
   writeWrapper(binDir, "but", realBut, tracePath, arm);
   writeWrapper(binDir, "jj", realJj, tracePath, arm);
+  writeWrapper(binDir, "jj-but", realJjBut, tracePath, arm);
 
   return { binDir, tracePath };
 }
@@ -653,7 +671,94 @@ function installJjSkill(workspace, skillDir, realJj, sourceMetadata) {
   };
 }
 
-function prepareWorkspace(runDir, arm, realBut, butSkillDir, realJj, jjSkill) {
+function renderJjButInstructions(workspace, realJjBut, realJj, codexSkillPath, claudeSkillPath) {
+  const version = run(realJjBut, ["--version"], { cwd: workspace }).stdout.trimEnd();
+  const jjVersion = run(realJj, ["--version"], { cwd: workspace }).stdout.trimEnd();
+  const policyBlock = `## Version control
+
+- Use \`jj-but\` for history editing and Jujutsu (\`jj\`) for other version-control write operations in this benchmark trial.
+- The repository was prepared with \`jj git init --colocate\`; Git-visible refs still matter to the verifier.
+- Do not use raw \`git\` writes or GitButler (\`but\`) in this benchmark trial.
+- Read-only Git inspection is allowed if it helps you verify Git-visible state.
+- Always pass \`--no-pager\` to jj commands that may print long output.
+- Always pass \`-m\` / \`--message\` to jj and jj-but commands that need descriptions; do not open an editor.
+- Keep bookmarks updated for any named task branch so the final Git branch points at the requested history.
+- When the task asks to leave changes uncommitted, leave them in the working-copy commit \`@\`.
+`;
+
+  const content = `# AGENTS.md
+
+## Benchmark boundary
+
+Work only in the current repository. Do not inspect parent benchmark directories, hidden oracle files, or solution scripts.
+
+## Local skill
+
+The local jj-but CLI skill is installed for this benchmark trial at:
+
+- ${codexSkillPath}
+- ${claudeSkillPath}
+
+Skill source: \`jj-but skill install\`.
+
+Use the installed skill if your agent runtime loads local skills or you need jj-but command details.
+
+${policyBlock}
+`;
+
+  return {
+    content,
+    version,
+    jj_version: jjVersion,
+    setup_block: policyBlock.trimEnd(),
+    setup_block_sha256: sha256Text(policyBlock.trimEnd()),
+  };
+}
+
+function installJjButSkill(workspace, realJjBut, realJj) {
+  // Exclude harness files before jj-but's first snapshot can pick them up.
+  appendHarnessExclude(workspace);
+  run(realJjBut, ["skill", "install"], { cwd: workspace, stdio: "pipe" });
+
+  const claudeSkillDir = path.join(workspace, ".claude/skills/jj-but");
+  const skillFile = path.join(claudeSkillDir, "SKILL.md");
+  if (!existsSync(skillFile)) {
+    throw new Error(`jj-but skill install did not produce ${skillFile}`);
+  }
+
+  const codexSkillDir = path.join(workspace, ".codex/skills/jj-but");
+  mkdirSync(path.dirname(codexSkillDir), { recursive: true });
+  cpSync(claudeSkillDir, codexSkillDir, { recursive: true });
+
+  const codexSkillPath = path.join(codexSkillDir, "SKILL.md");
+  const instructions = renderJjButInstructions(workspace, realJjBut, realJj, codexSkillPath, skillFile);
+  writeAgentInstructionFiles(workspace, instructions.content);
+
+  return {
+    name: "jj-but",
+    source_dir: claudeSkillDir,
+    source: {
+      package: null,
+      name: "jj-but",
+      source_url: null,
+      source_command: "jj-but skill install",
+    },
+    version: parseSkillVersion(skillFile),
+    installed: [codexSkillDir, claudeSkillDir],
+    instructions: {
+      installed_codex: path.join(workspace, "AGENTS.md"),
+      installed_claude: path.join(workspace, "CLAUDE.md"),
+      source_package: null,
+      source_url: null,
+      source_command: "jj-but skill install",
+      setup_block_sha256: instructions.setup_block_sha256,
+      tool_version: instructions.version,
+      jj_version: instructions.jj_version,
+    },
+  };
+}
+
+function prepareWorkspace(runDir, arm, realBut, butSkillDir, realJj, jjSkill, realJjBut) {
   const workspace = path.join(runDir, "workspace");
   const dirty = arm === "git" && taskConfig.fixtureDirty !== false;
   run("node", [path.join(repoRoot, taskConfig.createFixtureScript), "--out", workspace, "--force", "true", "--dirty", String(dirty)], {
@@ -679,6 +784,16 @@ function prepareWorkspace(runDir, arm, realBut, butSkillDir, realJj, jjSkill) {
     run(realJj, ["git", "init", "--colocate"], { cwd: workspace, stdio: "pipe" });
     run(realJj, ["config", "set", "--repo", "ui.paginate", "never"], { cwd: workspace, stdio: "pipe" });
     const setup = installJjSkill(workspace, jjSkill.dir, realJj, jjSkill.source);
+    if (taskConfig.applyDirtyState !== false) {
+      run("node", [path.join(repoRoot, taskConfig.applyStateScript), "dirty", workspace], { cwd: repoRoot });
+    }
+    return { workspace, setup };
+  }
+
+  if (arm === "jj-but+skill") {
+    run(realJj, ["git", "init", "--colocate"], { cwd: workspace, stdio: "pipe" });
+    run(realJj, ["config", "set", "--repo", "ui.paginate", "never"], { cwd: workspace, stdio: "pipe" });
+    const setup = installJjButSkill(workspace, realJjBut, realJj);
     if (taskConfig.applyDirtyState !== false) {
       run("node", [path.join(repoRoot, taskConfig.applyStateScript), "dirty", workspace], { cwd: repoRoot });
     }
@@ -997,6 +1112,21 @@ function vcSubcommand(entry) {
     }
   }
 
+  if (entry.tool === "jj-but") {
+    while (i < parts.length) {
+      const part = parts[i];
+      if (["-R", "--repository", "--format"].includes(part)) {
+        i += 2;
+        continue;
+      }
+      if (part.startsWith("--repository=") || part.startsWith("--format=")) {
+        i += 1;
+        continue;
+      }
+      break;
+    }
+  }
+
   if (entry.tool === "jj") {
     while (i < parts.length) {
       const part = parts[i];
@@ -1074,13 +1204,31 @@ function isJjMutation(entry) {
   return false;
 }
 
+function isJjButInspection(entry) {
+  const { command, args } = vcSubcommand(entry);
+  if (args.includes("--help") || args.includes("-h") || command === "help") return true;
+  if (JJ_BUT_INSPECTIONS.has(command)) return true;
+  if (command === "merge") return args[0] === "list";
+  if (command === "skill") return args[0] === "check";
+  return false;
+}
+
+function isJjButMutation(entry) {
+  const { command, args } = vcSubcommand(entry);
+  if (args.includes("--help") || args.includes("-h") || command === "help") return false;
+  if (JJ_BUT_MUTATIONS.has(command)) return true;
+  if (command === "merge") return args[0] !== "list";
+  if (command === "skill") return args[0] === "install";
+  return false;
+}
+
 function isShellParent(parent) {
   if (!parent) return false;
   return ["sh", "bash", "zsh", "/bin/sh", "/bin/bash", "/bin/zsh"].some((shell) => parent === shell || parent.endsWith(`/${shell}`));
 }
 
 function isVcEntry(entry) {
-  return entry.tool === "git" || entry.tool === "but" || entry.tool === "jj";
+  return entry.tool === "git" || entry.tool === "but" || entry.tool === "jj" || entry.tool === "jj-but";
 }
 
 function isNumber(value) {
@@ -1145,6 +1293,7 @@ function isInspection(entry) {
   if (entry.tool === "git") return isGitInspection(entry);
   if (entry.tool === "but") return isButInspection(entry);
   if (entry.tool === "jj") return isJjInspection(entry);
+  if (entry.tool === "jj-but") return isJjButInspection(entry);
   return false;
 }
 
@@ -1152,6 +1301,7 @@ function isMutation(entry) {
   if (entry.tool === "git") return isGitMutation(entry);
   if (entry.tool === "but") return isButMutation(entry);
   if (entry.tool === "jj") return isJjMutation(entry);
+  if (entry.tool === "jj-but") return isJjButMutation(entry);
   return false;
 }
 
@@ -1324,6 +1474,7 @@ function summarizeCommands(entries) {
     git_command_count: vc.filter((entry) => entry.tool === "git").length,
     but_command_count: vc.filter((entry) => entry.tool === "but").length,
     jj_command_count: vc.filter((entry) => entry.tool === "jj").length,
+    jj_but_command_count: vc.filter((entry) => entry.tool === "jj-but").length,
     inspection_count: inspections.length,
     mutation_count: mutations.length,
     failed_vc_command_count: failed.length,
@@ -1597,6 +1748,17 @@ if (agent === "claude" && !/\d/.test(model)) {
 const timeoutMs = Number(args.get("timeout-ms") ?? 900000);
 const realBut = executablePath(args.get("but-bin"), "but");
 const realJj = executablePath(args.get("jj-bin"), "jj");
+// jj-but is only required for the jj-but+skill arm; other arms just need a
+// blockable wrapper target, so a missing binary must not fail them.
+const realJjBut = arm === "jj-but+skill"
+  ? executablePath(args.get("jj-but-bin"), "jj-but")
+  : (() => {
+      try {
+        return executablePath(args.get("jj-but-bin"), "jj-but");
+      } catch {
+        return "/usr/bin/false";
+      }
+    })();
 const skillDir = path.resolve(args.get("skill-dir") ?? "/Users/kiril/src/gitbutler/crates/but/skill");
 const configuredJjSkillDir = args.get("jj-skill-dir") ? path.resolve(args.get("jj-skill-dir")) : null;
 const jjSkillUrlArg = args.get("jj-skill-url") ?? null;
@@ -1630,8 +1792,8 @@ if (!taskConfig) {
 }
 taskDir = path.join(repoRoot, taskConfig.taskDir);
 
-if (!["git", "but+skill", "jj+skill"].includes(arm)) {
-  console.error("Usage: node scripts/run-pilot-agent.mjs --task <task-id> --agent <codex|claude> --arm <git|but+skill|jj+skill>");
+if (!["git", "but+skill", "jj+skill", "jj-but+skill"].includes(arm)) {
+  console.error("Usage: node scripts/run-pilot-agent.mjs --task <task-id> --agent <codex|claude> --arm <git|but+skill|jj+skill|jj-but+skill>");
   process.exit(2);
 }
 
@@ -1639,8 +1801,8 @@ rmSync(runDir, { recursive: true, force: true });
 mkdirSync(runDir, { recursive: true });
 
 const resolvedJjSkill = arm === "jj+skill" ? resolveJjSkillSource(runDir, configuredJjSkillDir, jjSkillSource) : null;
-const { workspace, setup } = prepareWorkspace(runDir, arm, realBut, skillDir, realJj, resolvedJjSkill);
-const { binDir, tracePath } = createWrappers(runDir, arm, realBut, realJj);
+const { workspace, setup } = prepareWorkspace(runDir, arm, realBut, skillDir, realJj, resolvedJjSkill, realJjBut);
+const { binDir, tracePath } = createWrappers(runDir, arm, realBut, realJj, realJjBut);
 const codexHome = prepareCodexHome(runDir, codexIsolatedHome);
 const claudeSettings = prepareClaudeSettings(runDir, claudeCleanConfig, claudeEffortLevel);
 const prompt = buildPrompt();
@@ -1675,7 +1837,13 @@ const transcriptAgentResult = agentResultForTranscript(agentResult, agentOutput)
 const verifierResult = verify(workspace);
 const trace = markImplicitToolInternal(parseTrace(tracePath));
 const metrics = traceMetrics(trace, prompt, transcriptAgentResult);
-const activeSkillDir = arm === "but+skill" ? skillDir : arm === "jj+skill" ? resolvedJjSkill.dir : null;
+const activeSkillDir = arm === "but+skill"
+  ? skillDir
+  : arm === "jj+skill"
+    ? resolvedJjSkill.dir
+    : arm === "jj-but+skill"
+      ? setup.source_dir
+      : null;
 const activeSkillName = arm.endsWith("+skill") ? setup.name : null;
 const measurement = measurementBreakdown(trace, prompt, transcriptAgentResult, activeSkillDir, activeSkillName);
 const skillFile = path.join(activeSkillDir ?? skillDir, "SKILL.md");
@@ -1686,7 +1854,7 @@ const butBinaryMetadata = arm === "but+skill"
       source_git: gitSourceInfo(realBut, { scope: "repo" }),
     }
   : null;
-const jjBinaryMetadata = arm === "jj+skill"
+const jjBinaryMetadata = ["jj+skill", "jj-but+skill"].includes(arm)
   ? {
       path: realJj,
       sha256: sha256File(realJj),
@@ -1694,9 +1862,25 @@ const jjBinaryMetadata = arm === "jj+skill"
       version: run(realJj, ["--version"], { cwd: workspace }).stdout.trimEnd(),
     }
   : null;
-const toolBinaryMetadata = arm === "but+skill" ? butBinaryMetadata : arm === "jj+skill" ? jjBinaryMetadata : null;
+const jjButBinaryMetadata = arm === "jj-but+skill"
+  ? {
+      path: realJjBut,
+      sha256: sha256File(realJjBut),
+      source_git: gitSourceInfo(realJjBut, { scope: "repo" }),
+      version: run(realJjBut, ["--version"], { cwd: workspace }).stdout.trimEnd(),
+    }
+  : null;
+const toolBinaryMetadata = arm === "but+skill"
+  ? butBinaryMetadata
+  : arm === "jj+skill"
+    ? jjBinaryMetadata
+    : arm === "jj-but+skill"
+      ? jjButBinaryMetadata
+      : null;
+// The jj-but skill is installed inside the fixture workspace, and the fetched
+// jj skill has no local git provenance; only configured local dirs do.
 const skillSourceGit = activeSkillDir
-  ? (arm === "jj+skill" && !setup.source?.configured_dir ? null : gitSourceInfo(activeSkillDir))
+  ? ((arm === "jj+skill" && !setup.source?.configured_dir) || arm === "jj-but+skill" ? null : gitSourceInfo(activeSkillDir))
   : null;
 const skillMetadata = activeSkillDir
   ? {
@@ -1753,8 +1937,9 @@ const result = {
     gitbutler_branch_applied_before_agent: arm === "but+skill" && taskConfig.gitbutlerPrep === "setup-and-apply-branch"
       ? taskConfig.applyBranch
       : null,
-    jj_setup_before_agent: arm === "jj+skill",
-    jj_colocated_before_agent: arm === "jj+skill",
+    jj_setup_before_agent: ["jj+skill", "jj-but+skill"].includes(arm),
+    jj_colocated_before_agent: ["jj+skill", "jj-but+skill"].includes(arm),
+    jj_but_skill_installed_before_agent: arm === "jj-but+skill",
     skill_installed_before_agent: arm.endsWith("+skill"),
     agent_instructions_before_agent: true,
     dirty_state_applied_before_agent: taskConfig.applyDirtyState !== false || taskConfig.fixtureDirty !== false,
@@ -1764,6 +1949,7 @@ const result = {
   tool_binary: toolBinaryMetadata,
   but_binary: butBinaryMetadata,
   jj_binary: jjBinaryMetadata,
+  jj_but_binary: jjButBinaryMetadata,
   skill: skillMetadata,
   agent_result: {
     status: agentResult.status,

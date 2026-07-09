@@ -17,7 +17,7 @@ const TASKS = [
   { id: "pilot-5-squash-commits", label: "Squash commits" },
 ];
 const AGENTS = ["codex", "claude"];
-const ARMS = ["git", "but+skill", "jj+skill"];
+const ARMS = ["git", "but+skill", "jj+skill", "jj-but+skill"];
 
 function timestamp() {
   const d = new Date();
@@ -709,6 +709,7 @@ const gitbutlerRoot = path.resolve(args.get("gitbutler-root") ?? "/Users/kiril/s
 const butBin = path.resolve(args.get("but-bin") ?? path.join(gitbutlerRoot, "target/release/but"));
 const skillDir = path.resolve(args.get("skill-dir") ?? path.join(gitbutlerRoot, "crates/but/skill"));
 const jjBin = args.get("jj-bin") ? path.resolve(args.get("jj-bin")) : null;
+const jjButBin = args.get("jj-but-bin") ? path.resolve(args.get("jj-but-bin")) : null;
 const jjSkillDir = args.get("jj-skill-dir") ? path.resolve(args.get("jj-skill-dir")) : null;
 const jjSkillPackage = args.get("jj-skill-package") ?? null;
 const jjSkillName = args.get("jj-skill-name") ?? null;
@@ -759,6 +760,7 @@ for (const plan of plans) {
   const planModel = plan.agent === "codex" ? codexModel : claudeModel;
   if (planModel) runArgs.push("--model", planModel);
   if (jjBin) runArgs.push("--jj-bin", jjBin);
+  if (jjButBin) runArgs.push("--jj-but-bin", jjButBin);
   if (jjSkillDir) runArgs.push("--jj-skill-dir", jjSkillDir);
   if (jjSkillPackage) runArgs.push("--jj-skill-package", jjSkillPackage);
   if (jjSkillName) runArgs.push("--jj-skill-name", jjSkillName);
