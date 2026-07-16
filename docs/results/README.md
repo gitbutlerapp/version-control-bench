@@ -1,12 +1,12 @@
 # Results Overview
 
-Latest batches: [full-k10-2026-07-06.md](full-k10-2026-07-06.md) (three arms) plus [full-k10-jj-but-2026-07-09.md](full-k10-jj-but-2026-07-09.md) (the `jj-but+skill` arm added at the same k).
+Latest batches: [full-k10-2026-07-06.md](full-k10-2026-07-06.md) (three arms) plus [full-k10-jj-but-2026-07-16.md](full-k10-jj-but-2026-07-16.md) (the `jj-but+skill` arm, re-run after a tool fix; the superseded first jj-but batch is [full-k10-jj-but-2026-07-09.md](full-k10-jj-but-2026-07-09.md)).
 
-Short answer on these frontier models: 394 of 400 runs passed, so speed and efficiency remain the main separators, but the new arm reopened the reliability axis. GitButler is the fastest arm for both agents (roughly 60% below plain `git` on the mean) with far fewer version-control commands; `jj-but` — GitButler's agent-facing companion CLI for Jujutsu repositories — runs at about half of plain `git`'s time; Jujutsu itself is slower than plain `git` for both agents. Claude failed split-commit with `jj-but` in 5 of 10 runs (same near-miss every time: right contents, reversed commit order), the first repeated cell failure in this model generation.
+Short answer on these frontier models: 399 of 400 runs passed, so speed and efficiency are the separators. GitButler is the fastest arm for both agents (roughly 60% below plain `git` on the mean) with far fewer version-control commands; `jj-but` — GitButler's agent-facing companion CLI for Jujutsu repositories — runs at under half of plain `git`'s time; Jujutsu itself is slower than plain `git` for both agents. The 2026-07-09 jj-but batch failed Claude split-commit 5/10 on a skill/output ordering ambiguity; that diagnosis fixed the tool and the re-run went 100/100 — the benchmark-drives-tool loop is disclosed in the writeup.
 
-The current view is the full 2026-07-06 batch (300 planned runs, `git` / `but+skill` / `jj+skill`) plus the 2026-07-09 `jj-but+skill` batch (100 planned runs) — five scenarios, Codex and Claude, four arms, k=10 throughout. Cross-arm deltas involving `jj-but` are cross-batch (same fixtures, graders, and configured models, three days and one Claude Code patch release apart).
+The current view is the full 2026-07-06 batch (300 planned runs, `git` / `but+skill` / `jj+skill`) plus the 2026-07-16 `jj-but+skill` batch (100 planned runs) — five scenarios, Codex and Claude, four arms, k=10 throughout. Cross-arm deltas involving `jj-but` are cross-batch (same fixtures and graders, ten days and agent-CLI point releases apart).
 
-Models: Codex used `gpt-5.5` (codex-cli 0.141.0); Claude used `claude-opus-4-8` (Claude Code 2.1.198 on 2026-07-06, 2.1.205 on 2026-07-09). Both configured and observed models are captured in the aggregates.
+Models: Codex used `gpt-5.5` (codex-cli 0.141.0 on 2026-07-06, 0.144.5 on 2026-07-16); Claude used `claude-opus-4-8` (Claude Code 2.1.198, then 2.1.210). Both configured and observed models are captured in the aggregates.
 
 ## Current Scorecard
 
@@ -17,15 +17,15 @@ Pass is over k=10 runs per cell; "tasks all-k" is the count of scenarios where e
 | Codex | `git` | 50/50 | 105.9s | 64.0s | 179.4s | 22.7 | 5/5 |
 | Codex | `but+skill` | 50/50 | 28.7s | 26.9s | 42.9s | 3.9 | 5/5 |
 | Codex | `jj+skill` | 49/50 | 115.9s | 87.8s | 190.9s | 20.3 | 4/5 |
-| Codex | `jj-but+skill` | 50/50 | 50.1s | 32.2s | 56.6s | 4.7 | 5/5 |
+| Codex | `jj-but+skill` | 50/50 | 46.7s | 37.8s | 56.8s | 4.4 | 5/5 |
 | Claude | `git` | 50/50 | 118.0s | 67.2s | 257.1s | 22.3 | 5/5 |
 | Claude | `but+skill` | 50/50 | 44.5s | 42.1s | 69.3s | 4.9 | 5/5 |
 | Claude | `jj+skill` | 50/50 | 167.8s | 166.3s | 320.1s | 17.4 | 5/5 |
-| Claude | `jj-but+skill` | 45/50 | 54.0s | 44.3s | 103.7s | 10.0 | 4/5 |
+| Claude | `jj-but+skill` | 50/50 | 49.9s | 42.7s | 84.3s | 8.4 | 5/5 |
 
 Read the mean alongside the median: `git` and `jj+skill` carry heavy right tails (a Codex `git` run hit 889.6s and a Codex `jj+skill` run 839.2s — genuine agent floundering that still passed), so their means sit above their medians, while GitButler's slowest run was ~86s. On typical (median) runs GitButler is ~37–58% faster than `git`; on the mean, which carries the tail, ~62–73%.
 
-Per-scenario breakdowns, paired deltas, and confidence intervals are in the full writeups: [full-k10-2026-07-06.md](full-k10-2026-07-06.md) and [full-k10-jj-but-2026-07-09.md](full-k10-jj-but-2026-07-09.md).
+Per-scenario breakdowns, paired deltas, and confidence intervals are in the full writeups: [full-k10-2026-07-06.md](full-k10-2026-07-06.md) and [full-k10-jj-but-2026-07-16.md](full-k10-jj-but-2026-07-16.md).
 
 ## Current Read
 
@@ -41,7 +41,7 @@ Same models as the previous batch ([full-k8-2026-07-05.md](full-k8-2026-07-05.md
 
 ## Failure Read
 
-Six of 400 runs failed the verifier. One Codex `jj+skill` split-commit run (`CONTENT_WRONG`) in the 2026-07-06 batch, and five Claude `jj-but+skill` split-commit runs (`GRAPH_WRONG`) in the 2026-07-09 batch — all five the identical near-miss: correct contents in the three replacement commits, but in reverse order on the branch. Every other agent–tool cell passed all ten runs of all five scenarios. No agent-runtime errors or timeouts.
+One of 400 runs failed the verifier: a Codex `jj+skill` split-commit run (`CONTENT_WRONG`) in the 2026-07-06 batch. Every other agent–tool cell passed all ten runs of all five scenarios. The superseded 2026-07-09 jj-but batch had failed Claude split-commit 5/10 (`GRAPH_WRONG`, identical reversed-order near-miss every time); the fixed tool re-ran that arm clean on 2026-07-16. One run in the 07-16 batch was invalidated and redone after the machine slept through it (disclosed with power-log evidence in the writeup).
 
 ## Fair Shot Read
 
@@ -70,18 +70,18 @@ Current full batch:
 - JJ skill package: `onevcat/skills@onevcat-jj` (commit `4955f542`)
 - JJ skill file SHA-256: `e0364004187a1769adc0b532befe346fd4b372bb1aab2768b9ebb694f2d13687`
 
-`jj-but+skill` batch (2026-07-09):
+`jj-but+skill` batch (2026-07-16):
 
-- Raw batch: `tmp/pilot-runs/full-k10-20260709-103337`
-- Models: Codex `gpt-5.5` (codex-cli 0.141.0); Claude `claude-opus-4-8` (Claude Code 2.1.205)
-- `jj-but` binary SHA-256: `9ec7446ab99c4603bfd8468eced8df0a0c2d494c6ed2e6aa9b9f82d6f688f0b7` (`jj-but 0.2.0`, source head `31f77afd`)
+- Raw batch: `tmp/pilot-runs/full-k10-jjbut-fix-20260716`
+- Models: Codex `gpt-5.5` (codex-cli 0.144.5); Claude `claude-opus-4-8` (Claude Code 2.1.210)
+- `jj-but` binary SHA-256: `21e7ecbaa350829fe8e77a80ab4c79657cdfa40733117c6fbcf60a31c76242bf` (`jj-but 0.2.0`, source head `ba126d0d`)
 - Colocated `jj` version: `jj 0.39.0`
-- Skill: installed per run via `jj-but skill install`; skill file SHA-256 `4ad34bcc779063a5d8226cd248b383809c3e5acdb61cfd98e2bdccf82aa166be`
+- Skill: installed per run via `jj-but skill install`; skill file SHA-256 `dde5cf6f492a937f92912edc32570f1ade8bfccb378eb415da555500e58425bd`
 
 ## Evidence
 
 - Consolidated full report: [full-k10-2026-07-06.md](full-k10-2026-07-06.md)
-- `jj-but` arm report: [full-k10-jj-but-2026-07-09.md](full-k10-jj-but-2026-07-09.md)
+- `jj-but` arm report: [full-k10-jj-but-2026-07-16.md](full-k10-jj-but-2026-07-16.md) (supersedes [full-k10-jj-but-2026-07-09.md](full-k10-jj-but-2026-07-09.md))
 - Previous full report: [full-k8-2026-07-05.md](full-k8-2026-07-05.md)
 - Results archive: [archive.md](archive.md)
 - Plain-English scenarios: [../scenarios.md](../scenarios.md)

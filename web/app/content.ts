@@ -19,7 +19,7 @@ export const HERO = {
   title: 'A version-control benchmark for coding agents',
   intro: [
     'Which version-control tool should you give your coding agent? Claude Code and Codex run the same five version-control tasks four ways: with plain git, with Jujutsu, with jj-but (an agent-facing companion CLI for Jujutsu repositories, built by GitButler), and with GitButler. Only the tool changes.',
-    '394 of 400 runs passed, so speed is still the main separator: GitButler ran about 60% faster than git with roughly 80% fewer commands, jj-but roughly halved git’s time, and Jujutsu itself ran slower than git. The six failures were one Codex Jujutsu run and five Claude jj-but runs that split a commit into the right pieces in the wrong order.',
+    '399 of 400 runs passed, so speed is the separator: GitButler ran about 60% faster than git with roughly 80% fewer commands, jj-but ran at under half of git’s time, and Jujutsu itself ran slower than git. The one failure was a single Codex Jujutsu run. An earlier jj-but batch failed half its split-commit runs on a commit-ordering ambiguity; the tool was fixed and the arm re-run clean — the results history has both batches.',
   ],
 };
 
@@ -99,7 +99,8 @@ const resultDocUrl = (name: string) => `${REPO_URL}/blob/main/docs/results/${nam
 export const HISTORY = {
   title: 'Results history',
   entries: [
-    { date: '2026-07-09', scope: 'k=10 · jj-but arm added · Opus 4.8 · GPT-5.5', passed: '394/400', url: resultDocUrl('full-k10-jj-but-2026-07-09.md'), current: true },
+    { date: '2026-07-16', scope: 'k=10 · jj-but re-run after tool fix · Opus 4.8 · GPT-5.5', passed: '399/400', url: resultDocUrl('full-k10-jj-but-2026-07-16.md'), current: true },
+    { date: '2026-07-09', scope: 'k=10 · jj-but arm added · Opus 4.8 · GPT-5.5', passed: '394/400', url: resultDocUrl('full-k10-jj-but-2026-07-09.md') },
     { date: '2026-07-06', scope: 'k=10 · Opus 4.8 · GPT-5.5', passed: '299/300', url: resultDocUrl('full-k10-2026-07-06.md') },
     { date: '2026-07-05', scope: 'k=8 · Opus 4.8 · GPT-5.5', passed: '239/240', url: resultDocUrl('full-k8-2026-07-05.md') },
     { date: '2026-07-03', scope: 'k=7 · Opus 4.1 · GPT-5.5', passed: '193/210', url: resultDocUrl('full-k7-2026-07-03.md') },
