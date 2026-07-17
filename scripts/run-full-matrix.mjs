@@ -156,8 +156,14 @@ function rowFromPlan(plan) {
     skill_name: result?.skill?.name ?? null,
     skill_source_package: result?.skill?.source_package ?? null,
     skill_source_url: result?.skill?.source_url ?? null,
-    skill_hash: result?.skill?.skill_file_sha256 ?? result?.skill?.skill_md_sha256 ?? null,
-    skill_tree_hash: result?.skill?.source_dir_sha256 ?? result?.skill?.tree_sha256 ?? null,
+    skill_hash: result?.skill?.installed_skill_file_sha256
+      ?? result?.skill?.skill_file_sha256
+      ?? result?.skill?.skill_md_sha256
+      ?? null,
+    skill_tree_hash: result?.skill?.installed_dir_sha256
+      ?? result?.skill?.source_dir_sha256
+      ?? result?.skill?.tree_sha256
+      ?? null,
     skill_dirty: result?.skill?.source_git?.dirty ?? null,
     skill_head: result?.skill?.source_git?.head ?? null,
     failed_command_samples: completed ? taskFailedSamples(result) : [],

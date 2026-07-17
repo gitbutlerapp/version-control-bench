@@ -1,7 +1,8 @@
 #!/usr/bin/env node
-import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { createHash } from "node:crypto";
+import { homedir, tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import { parseArgs } from "./lib/args.mjs";
@@ -295,6 +296,53 @@ function prepareClaudeSettings(runDir, enabled, effortLevel) {
   };
 }
 
+function prepareClaudeConfig(enabled) {
+  if (!enabled) return null;
+
+  const configDir = mkdtempSync(path.join(tmpdir(), "vcb-claude-config-"));
+  chmodSync(configDir, 0o700);
+  const sourceConfigDir = process.env.CLAUDE_CONFIG_DIR ?? path.join(homedir(), ".claude");
+  const sourceCredentialsPath = path.join(sourceConfigDir, ".credentials.json");
+  let oauthToken = process.env.CLAUDE_CODE_OAUTH_TOKEN ?? null;
+  let authSource = oauthToken ? "environment" : null;
+  let credentialsJson = null;
+
+  if (!oauthToken && existsSync(sourceCredentialsPath)) {
+    credentialsJson = readFileSync(sourceCredentialsPath, "utf8");
+    authSource = "credentials-file";
+  } else if (!oauthToken && process.platform === "darwin") {
+    const keychainCredentials = run(
+      "security",
+      ["find-generic-password", "-s", "Claude Code-credentials", "-w"],
+      { check: false },
+    );
+    if (keychainCredentials.status === 0 && keychainCredentials.stdout.trim()) {
+      credentialsJson = keychainCredentials.stdout.trim();
+      authSource = "macos-keychain";
+    }
+  }
+
+  if (!oauthToken && credentialsJson) {
+    try {
+      oauthToken = JSON.parse(credentialsJson)?.claudeAiOauth?.accessToken ?? null;
+    } catch {
+      oauthToken = null;
+    }
+  }
+
+  if (!oauthToken) {
+    rmSync(configDir, { recursive: true, force: true });
+    throw new Error("Could not prepare isolated Claude OAuth from the environment, configured credentials file, or macOS Keychain");
+  }
+
+  return {
+    path: configDir,
+    auth_source: authSource,
+    oauth_token: oauthToken,
+    cleanup: () => rmSync(configDir, { recursive: true, force: true }),
+  };
+}
+
 function writeWrapper(binDir, tool, realPath, tracePath, arm) {
   const wrapperPath = path.join(binDir, tool);
   const blockGitWrites = tool === "git" && ["but+skill", "jj+skill"].includes(arm);
@@ -419,8 +467,8 @@ function parseSkillName(skillFile) {
   return match?.[1] ?? null;
 }
 
-function renderGitButlerInstructions(workspace, realBut, codexSkillPath, claudeSkillPath) {
-  const setupBlock = run(realBut, ["agent", "setup", "--print"], { cwd: workspace }).stdout.trimEnd();
+function renderGitButlerInstructions(workspace, realBut, codexSkillPath, claudeSkillPath, butEnv) {
+  const setupBlock = run(realBut, ["agent", "setup", "--print"], { cwd: workspace, env: butEnv }).stdout.trimEnd();
   const content = `# AGENTS.md
 
 ## Benchmark boundary
@@ -521,7 +569,7 @@ function installPlainGitInstructions(workspace) {
   };
 }
 
-function installGitButlerSkill(workspace, skillDir, realBut) {
+function installGitButlerSkill(workspace, skillDir, realBut, butEnv) {
   const skillFile = path.join(skillDir, "SKILL.md");
   if (!existsSync(skillFile)) {
     throw new Error(`GitButler skill file not found: ${skillFile}`);
@@ -529,28 +577,47 @@ function installGitButlerSkill(workspace, skillDir, realBut) {
 
   const refsDir = path.join(skillDir, "references");
   const installed = [];
+  const cliVersionOutput = run(realBut, ["--version"], { cwd: workspace, env: butEnv }).stdout.trim();
+  const cliVersion = /^but\s+(\S+)(?:\s|$)/.exec(cliVersionOutput)?.[1];
+  if (!cliVersion) {
+    throw new Error(`Could not parse GitButler CLI version from: ${JSON.stringify(cliVersionOutput)}`);
+  }
+  const sourceSkillContent = readFileSync(skillFile, "utf8");
+  const frontmatter = /^---\r?\n[\s\S]*?\r?\n---/.exec(sourceSkillContent)?.[0];
+  if (!frontmatter) {
+    throw new Error(`GitButler skill source does not contain YAML frontmatter: ${skillFile}`);
+  }
+  const installedFrontmatter = frontmatter.replace(
+    /^version:\s*0\.0\.0\s*$/m,
+    `version: ${cliVersion}`,
+  );
+  if (installedFrontmatter === frontmatter) {
+    throw new Error(`GitButler skill source does not contain the expected placeholder version: ${skillFile}`);
+  }
+  const installedSkillContent = installedFrontmatter + sourceSkillContent.slice(frontmatter.length);
 
-  for (const root of [".codex/skills/but", ".claude/skills/but"]) {
+  for (const root of [".codex/skills/gitbutler", ".claude/skills/gitbutler"]) {
     const dest = path.join(workspace, root);
     mkdirSync(dest, { recursive: true });
-    cpSync(skillFile, path.join(dest, "SKILL.md"));
+    writeFileSync(path.join(dest, "SKILL.md"), installedSkillContent);
     if (existsSync(refsDir)) {
       cpSync(refsDir, path.join(dest, "references"), { recursive: true });
     }
     installed.push(dest);
   }
 
-  const codexSkillPath = path.join(workspace, ".codex/skills/but/SKILL.md");
-  const claudeSkillPath = path.join(workspace, ".claude/skills/but/SKILL.md");
-  const instructions = renderGitButlerInstructions(workspace, realBut, codexSkillPath, claudeSkillPath);
+  const codexSkillPath = path.join(workspace, ".codex/skills/gitbutler/SKILL.md");
+  const claudeSkillPath = path.join(workspace, ".claude/skills/gitbutler/SKILL.md");
+  const instructions = renderGitButlerInstructions(workspace, realBut, codexSkillPath, claudeSkillPath, butEnv);
   writeAgentInstructionFiles(workspace, instructions.content);
 
   appendHarnessExclude(workspace);
 
   return {
-    name: "but",
+    name: parseSkillName(skillFile) ?? "but",
+    install_name: "gitbutler",
     source_dir: skillDir,
-    version: parseSkillVersion(skillFile),
+    version: cliVersion,
     installed,
     instructions: {
       installed_codex: path.join(workspace, "AGENTS.md"),
@@ -653,7 +720,7 @@ function installJjSkill(workspace, skillDir, realJj, sourceMetadata) {
   };
 }
 
-function prepareWorkspace(runDir, arm, realBut, butSkillDir, realJj, jjSkill) {
+function prepareWorkspace(runDir, arm, realBut, butSkillDir, realJj, jjSkill, butEnv) {
   const workspace = path.join(runDir, "workspace");
   const dirty = arm === "git" && taskConfig.fixtureDirty !== false;
   run("node", [path.join(repoRoot, taskConfig.createFixtureScript), "--out", workspace, "--force", "true", "--dirty", String(dirty)], {
@@ -664,11 +731,11 @@ function prepareWorkspace(runDir, arm, realBut, butSkillDir, realJj, jjSkill) {
     if (taskConfig.gitbutlerPrep === "setup-and-apply-branch") {
       run("git", ["switch", "main"], { cwd: workspace, stdio: "pipe" });
     }
-    run(realBut, ["setup"], { cwd: workspace, stdio: "pipe" });
+    run(realBut, ["setup"], { cwd: workspace, stdio: "pipe", env: butEnv });
     if (taskConfig.gitbutlerPrep === "setup-and-apply-branch") {
-      run(realBut, ["apply", taskConfig.applyBranch], { cwd: workspace, stdio: "pipe" });
+      run(realBut, ["apply", taskConfig.applyBranch], { cwd: workspace, stdio: "pipe", env: butEnv });
     }
-    const setup = installGitButlerSkill(workspace, butSkillDir, realBut);
+    const setup = installGitButlerSkill(workspace, butSkillDir, realBut, butEnv);
     if (taskConfig.applyDirtyState !== false) {
       run("node", [path.join(repoRoot, taskConfig.applyStateScript), "dirty", workspace], { cwd: repoRoot });
     }
@@ -734,7 +801,13 @@ function runAgent(agent, workspace, prompt, env, model, timeoutMs) {
     cmd = "claude";
     args = ["-p", "--permission-mode", "bypassPermissions", "--output-format", "json"];
     if (env.VCB_CLAUDE_CLEAN_CONFIG === "true" && env.VCB_CLAUDE_SETTINGS) {
-      args.push("--settings", env.VCB_CLAUDE_SETTINGS, "--strict-mcp-config");
+      args.push(
+        "--settings",
+        env.VCB_CLAUDE_SETTINGS,
+        "--setting-sources",
+        "project,local",
+        "--strict-mcp-config",
+      );
     }
     if (model) args.push("--model", model);
     args.push(prompt);
@@ -1638,11 +1711,19 @@ if (!["git", "but+skill", "jj+skill"].includes(arm)) {
 rmSync(runDir, { recursive: true, force: true });
 mkdirSync(runDir, { recursive: true });
 
+const butAppDataDir = arm === "but+skill" ? path.join(runDir, "but-app-data") : null;
+const butEnv = butAppDataDir
+  ? { ...process.env, E2E_TEST_APP_DATA_DIR: butAppDataDir }
+  : process.env;
+if (butAppDataDir) {
+  mkdirSync(butAppDataDir, { recursive: true });
+}
 const resolvedJjSkill = arm === "jj+skill" ? resolveJjSkillSource(runDir, configuredJjSkillDir, jjSkillSource) : null;
-const { workspace, setup } = prepareWorkspace(runDir, arm, realBut, skillDir, realJj, resolvedJjSkill);
+const { workspace, setup } = prepareWorkspace(runDir, arm, realBut, skillDir, realJj, resolvedJjSkill, butEnv);
 const { binDir, tracePath } = createWrappers(runDir, arm, realBut, realJj);
 const codexHome = prepareCodexHome(runDir, codexIsolatedHome);
 const claudeSettings = prepareClaudeSettings(runDir, claudeCleanConfig, claudeEffortLevel);
+const claudeConfig = prepareClaudeConfig(claudeCleanConfig);
 const prompt = buildPrompt();
 writeFileSync(path.join(runDir, "prompt.txt"), prompt);
 
@@ -1661,8 +1742,25 @@ if (codexHome) {
 if (claudeSettings) {
   env.VCB_CLAUDE_SETTINGS = claudeSettings.path;
 }
+if (claudeConfig) {
+  env.CLAUDE_CONFIG_DIR = claudeConfig.path;
+  env.CLAUDE_CODE_OAUTH_TOKEN = claudeConfig.oauth_token;
+  delete env.CLAUDE_SECURESTORAGE_CONFIG_DIR;
+}
+if (butAppDataDir) {
+  env.E2E_TEST_APP_DATA_DIR = butAppDataDir;
+}
 
-const agentResult = runAgent(agent, workspace, prompt, env, model, timeoutMs);
+let agentResult;
+if (claudeConfig) process.once("exit", claudeConfig.cleanup);
+try {
+  agentResult = runAgent(agent, workspace, prompt, env, model, timeoutMs);
+} finally {
+  if (claudeConfig) {
+    claudeConfig.cleanup();
+    process.off("exit", claudeConfig.cleanup);
+  }
+}
 writeFileSync(path.join(runDir, "agent-stdout.txt"), agentResult.stdout);
 writeFileSync(path.join(runDir, "agent-stderr.txt"), agentResult.stderr);
 const agentOutput = parseAgentOutput(agent, agentResult);
@@ -1677,8 +1775,15 @@ const trace = markImplicitToolInternal(parseTrace(tracePath));
 const metrics = traceMetrics(trace, prompt, transcriptAgentResult);
 const activeSkillDir = arm === "but+skill" ? skillDir : arm === "jj+skill" ? resolvedJjSkill.dir : null;
 const activeSkillName = arm.endsWith("+skill") ? setup.name : null;
-const measurement = measurementBreakdown(trace, prompt, transcriptAgentResult, activeSkillDir, activeSkillName);
+const activeSkillInstallName = arm.endsWith("+skill") ? (setup.install_name ?? activeSkillName) : null;
+const measurement = measurementBreakdown(trace, prompt, transcriptAgentResult, activeSkillDir, activeSkillInstallName);
 const skillFile = path.join(activeSkillDir ?? skillDir, "SKILL.md");
+const installedCodexSkill = activeSkillInstallName
+  ? path.join(workspace, `.codex/skills/${activeSkillInstallName}/SKILL.md`)
+  : null;
+const installedClaudeSkill = activeSkillInstallName
+  ? path.join(workspace, `.claude/skills/${activeSkillInstallName}/SKILL.md`)
+  : null;
 const butBinaryMetadata = arm === "but+skill"
   ? {
       path: realBut,
@@ -1710,11 +1815,18 @@ const skillMetadata = activeSkillDir
       source_fetched_at: setup.source?.fetched_at ?? null,
       configured_dir: setup.source?.configured_dir ?? null,
       version: parseSkillVersion(skillFile),
+      installed_version: setup.version ?? parseSkillVersion(skillFile),
       skill_file_sha256: sha256File(skillFile),
       source_dir_sha256: sha256Directory(activeSkillDir),
+      installed_skill_file_sha256: installedCodexSkill && existsSync(installedCodexSkill)
+        ? sha256File(installedCodexSkill)
+        : null,
+      installed_dir_sha256: installedCodexSkill && existsSync(installedCodexSkill)
+        ? sha256Directory(path.dirname(installedCodexSkill))
+        : null,
       source_git: skillSourceGit,
-      installed_codex: path.join(workspace, `.codex/skills/${activeSkillName}/SKILL.md`),
-      installed_claude: path.join(workspace, `.claude/skills/${activeSkillName}/SKILL.md`),
+      installed_codex: installedCodexSkill,
+      installed_claude: installedClaudeSkill,
     }
   : null;
 const runFailureClass = agentResult.timed_out
@@ -1744,6 +1856,9 @@ const result = {
     claude_enabled_plugins: claudeSettings?.settings.enabledPlugins ?? null,
     claude_effort_level: claudeSettings?.settings.effortLevel ?? null,
     claude_strict_mcp_config: agent === "claude" ? claudeCleanConfig : null,
+    claude_setting_sources: agent === "claude" && claudeCleanConfig ? ["project", "local"] : null,
+    claude_config_dir: claudeConfig?.path ?? null,
+    claude_auth_source: claudeConfig?.auth_source ?? null,
   },
   workspace,
   task: taskConfig.id,
@@ -1757,6 +1872,7 @@ const result = {
     jj_colocated_before_agent: arm === "jj+skill",
     skill_installed_before_agent: arm.endsWith("+skill"),
     agent_instructions_before_agent: true,
+    but_app_data_dir: butAppDataDir,
     dirty_state_applied_before_agent: taskConfig.applyDirtyState !== false || taskConfig.fixtureDirty !== false,
     included_in_agent_duration_or_metrics: false,
   },

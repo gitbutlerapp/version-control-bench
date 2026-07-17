@@ -132,7 +132,7 @@ Defaults are `--task pilot-1-selective-validation`, `--agent codex`, `--arm git`
 The supported arms are:
 
 - `git`: plain Git is allowed for version-control writes; `but` and `jj` are blocked.
-- `but+skill`: GitButler is prepared before the measured run, the GitButler skill is installed into `.codex/skills/but` and `.claude/skills/but`, local `AGENTS.md` / `CLAUDE.md` files are written, and raw Git write commands are blocked.
+- `but+skill`: GitButler is prepared before the measured run, the GitButler skill is installed into `.codex/skills/gitbutler` and `.claude/skills/gitbutler`, local `AGENTS.md` / `CLAUDE.md` files are written, and raw Git write commands are blocked.
 - `jj+skill`: the fixture repo is prepared with `jj git init --colocate`, the external `onevcat/skills@onevcat-jj` skill is fetched into the run directory and installed into the agent skill folders, local `AGENTS.md` / `CLAUDE.md` files are written, and raw Git writes plus GitButler are blocked.
 
 Pre-run fixture setup, tool setup, applying task branches, skill installation, and dirty-state application are excluded from measured agent duration and command metrics.
@@ -166,6 +166,10 @@ npm run pilot:agent -- --agent codex --arm git --codex-isolated-home false
 npm run pilot:agent -- --agent codex --arm git --codex-disable-plugins false
 npm run pilot:agent -- --agent codex --arm git --codex-clean-config false
 ```
+
+### Claude isolation
+
+Claude trials use a temporary config directory, load only project/local settings, disable user plugins, and ignore ambient MCP configuration. OAuth is passed through the process environment and the temporary config is deleted after the run; credentials are never written into retained benchmark artifacts. Pass `--claude-clean-config false` to opt out.
 
 ### Outputs
 
