@@ -75,6 +75,15 @@ const TASK_CONFIGS = {
     fixtureDirty: false,
     applyDirtyState: false,
   },
+  "pilot-6-update-dirty-branch": {
+    id: "pilot-6-update-dirty-branch",
+    taskDir: "tasks/pilot-6-update-dirty-branch",
+    createFixtureScript: "scripts/create-pilot6-fixture.mjs",
+    applyStateScript: "scripts/apply-pilot6-state.mjs",
+    verifyScript: "scripts/verify-pilot6.mjs",
+    gitbutlerPrep: "setup-and-apply-branch",
+    applyBranch: "notify-retry",
+  },
 };
 
 let taskConfig;

@@ -62,6 +62,7 @@ Each scenario is a pre-built Git repository (a commit history plus uncommitted c
 3. split commit:       [big mixed commit] -> [validation] [scoring] [docs]
 4. reorder commits:    A B C D E F -> A D E B C F
 5. squash commits:     A B C D E F G -> A [B+C] D [E+F+G]
+6. update dirty branch: feature + moved main + 2 conflicting commits -> rebased branch, resolved, leftovers intact
 ```
 
 | Task | What it tests | QA |
@@ -71,6 +72,7 @@ Each scenario is a pre-built Git repository (a commit history plus uncommitted c
 | [`pilot-3-split-commit`](tasks/pilot-3-split-commit) | Replace one broad non-top commit with three semantic commits, keep later history above it, and expose leftovers as uncommitted. | `npm run pilot3:check` |
 | [`pilot-4-reorder-commits`](tasks/pilot-4-reorder-commits) | Move an adjacent commit block earlier in a six-commit branch without changing commit contents. | `npm run pilot4:check` |
 | [`pilot-5-squash-commits`](tasks/pilot-5-squash-commits) | Squash two adjacent commit groups in a seven-commit branch into two semantic commits while preserving final contents. | `npm run pilot5:check` |
+| [`pilot-6-update-dirty-branch`](tasks/pilot-6-update-dirty-branch) | Rebase a dirty feature branch onto an advanced `main`, resolving conflicts inside two branch commits while carrying uncommitted work through untouched. | `npm run pilot6:check` |
 
 ## How it's scored
 

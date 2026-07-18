@@ -1,0 +1,28 @@
+{
+  "target": [
+    {
+      "id": "sms-channel-survives-rebase",
+      "commit": "Add sms channel",
+      "path": "src/notify.ts",
+      "snippet": "\"sms\""
+    },
+    {
+      "id": "retry-budget-survives-rebase",
+      "commit": "Tune retry budget",
+      "path": "src/config.ts",
+      "snippet": "retryLimit: 4,"
+    }
+  ],
+  "leftover": [
+    {
+      "id": "readme-retry-tuning-note",
+      "path": "README.md",
+      "snippet": "Retry tuning notes are being collected on this branch before release."
+    },
+    {
+      "id": "rollout-checklist-note",
+      "path": "notes/rollout-checklist.md",
+      "snippet": "Verify relay quotas before enabling the higher retry limit."
+    }
+  ]
+}

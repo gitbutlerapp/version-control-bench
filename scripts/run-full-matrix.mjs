@@ -15,6 +15,7 @@ const TASKS = [
   { id: "pilot-3-split-commit", label: "Split commit" },
   { id: "pilot-4-reorder-commits", label: "Reorder commits" },
   { id: "pilot-5-squash-commits", label: "Squash commits" },
+  { id: "pilot-6-update-dirty-branch", label: "Update dirty branch" },
 ];
 const AGENTS = ["codex", "claude"];
 const ARMS = ["git", "but+skill", "jj+skill"];

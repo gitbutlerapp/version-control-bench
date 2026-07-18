@@ -1,0 +1,23 @@
+{
+  "task_branch": "notify-retry",
+  "protected_refs": ["refs/heads/main"],
+  "commit_subjects": [
+    "Add sms channel",
+    "Tune retry budget"
+  ],
+  "committed_conflicts": [
+    {
+      "commit": "Add sms channel",
+      "file": "src/notify.ts",
+      "resolutions": [
+        "[\"email\", \"sms\", \"push\"]",
+        "[\"email\", \"push\", \"sms\"]"
+      ]
+    },
+    {
+      "commit": "Tune retry budget",
+      "file": "src/config.ts",
+      "resolutions": ["retryLimit: 4 (branch value wins over main's bump)"]
+    }
+  ]
+}

@@ -89,3 +89,25 @@ before:
 after:
   A token model -> [B+C parser pipeline] -> D export -> [E+F+G retry support]
 ```
+
+## 6. Update Dirty Branch Onto Moved Target
+
+Plain English: `main` moved on while you were working, and syncing up means resolving conflicts inside two of your commits — without losing the uncommitted work sitting in your worktree.
+
+Use case: you branched off to add an sms notification channel and tune the retry budget, with uncommitted notes in progress. Meanwhile main gained a push channel on the same line your first commit changed, and bumped the retry limit on the same line your second commit changed.
+
+What it tests: can the agent rebase onto the new target with linear history, resolve two committed conflicts in the right order (one combining both sides, one keeping the branch's value), and carry the dirty worktree state — a tracked edit and an untracked note — through the update untouched and uncommitted?
+
+```text
+before:
+  main:         M - U1 - U2          (moved ahead)
+  notify-retry: M - F1 - F2          (F1 conflicts with U1, F2 with U2)
+  worktree:     dirty README edit + untracked note
+
+after:
+  main:         M - U1 - U2          (untouched)
+  notify-retry: M - U1 - U2 - F1' - F2'
+  worktree:     dirty edit survives uncommitted + untracked note intact
+```
+
+This is the first scenario with conflicts and a moving target, and the tools' conflict models genuinely differ: git needs a stash/rebase/pop dance with two mid-rebase conflict stops, Jujutsu materializes the conflicts in the commits, and GitButler carries the uncommitted work through `pull` and marks both commits conflicted for `resolve`, resolved bottom-up.
