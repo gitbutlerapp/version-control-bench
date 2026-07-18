@@ -1295,6 +1295,8 @@ function isClaudePlatformProbe(entry) {
   if (command === "config" && args[0] === "user.name") return true;
   if (command === "config" && args[0] === "user.email") return true;
   if (command === "config" && args[0] === "--get" && ["user.email", "remote.origin.url"].includes(args[1])) return true;
+  if (command === "remote" && (args.length === 0 || args[0] === "get-url" || args[0] === "-v")) return true;
+  if (command === "ls-files" && args.includes("--error-unmatch") && entry.argv.includes(".claude/")) return true;
   if (command === "rev-parse" && args.join(" ") === "--show-toplevel") return true;
   if (command === "rev-parse" && args.join(" ") === "--is-inside-work-tree") return true;
   if (command === "rev-parse" && args.join(" ") === "--abbrev-ref HEAD") return true;
@@ -1337,6 +1339,10 @@ function runMetricsSelfTest() {
     ["platform", { ...base, parent: "/bin/sh", grandparent: "/bin/sh", argv: "config user.email" }],
     ["platform", { ...base, parent: "/bin/sh", grandparent: "claude", argv: "log -n 1000 --pretty=format: --name-only --diff-filter=M --author=bench@example.com" }],
     ["platform", { ...base, parent: "/bin/sh", grandparent: "claude", argv: "log -n 1000 --pretty=format: --name-only --diff-filter=M" }],
+    ["platform", { ...base, status: 1, argv: "-c core.hooksPath=/dev/null -c core.fsmonitor= -C /tmp/repo ls-files --error-unmatch -- :(icase).claude/settings.local.json" }],
+    ["platform", { ...base, argv: "-c core.hooksPath=/dev/null -c core.fsmonitor= remote" }],
+    ["platform", { ...base, status: 2, argv: "-c core.hooksPath=/dev/null -c core.fsmonitor= remote get-url origin" }],
+    ["task", { ...base, argv: "ls-files --error-unmatch -- src/handler.ts" }],
     ["task", { ...base, parent: "/bin/sh", grandparent: "claude", argv: "status --short" }],
     ["task", { ...base, parent: "/bin/sh", grandparent: "claude", argv: "rev-parse --abbrev-ref HEAD" }],
     ["task", { ...base, parent: "/bin/sh", grandparent: "claude", argv: "diff -- src/handler.ts" }],
