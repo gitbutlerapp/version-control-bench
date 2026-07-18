@@ -129,6 +129,8 @@ npm run pilot:agent -- --task pilot-5-squash-commits --agent claude --arm 'jj+sk
 
 Defaults are `--task pilot-1-selective-validation`, `--agent codex`, `--arm git`, Codex model `gpt-5.5`, and Claude model `claude-opus-4-8` (a versioned model ID, so reruns hit the same model; the runner warns if you pass a floating alias like `opus`). Use `--model <name>` to override, or `--codex-model` / `--claude-model` on the matrix runner. The published k=7 results predate this default and used `claude-opus-4-1-20250805`.
 
+Claude auth gotcha: the runner copies the keychain OAuth token into an isolated config that cannot refresh itself. The keychain access token expires after roughly eight hours, and once it does every Claude run fails within seconds as `AGENT_RUNTIME_ERROR` with a 401 in `agent-output.json`. Run any plain `claude -p "ok"` outside the harness to refresh the keychain token, then rerun the affected cells. Before long batches (and periodically during overnight sessions), refresh proactively.
+
 The supported arms are:
 
 - `git`: plain Git is allowed for version-control writes; `but` and `jj` are blocked.
