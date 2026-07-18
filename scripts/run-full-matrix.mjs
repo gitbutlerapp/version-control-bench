@@ -143,6 +143,7 @@ function rowFromPlan(plan) {
     repeated_state_queries: result?.metrics?.repeated_state_queries ?? null,
     cold_bytes: transcript.total_bytes ?? null,
     warm_bytes: transcript.warm_estimated_total_bytes ?? null,
+    tokens: result?.agent_output?.tokens_used_total ?? null,
     skill_output_bytes: transcript.skill_reference_output_bytes ?? null,
     task_vc_runtime_ms: taskRuntime,
     configured_model: result?.model ?? null,
@@ -233,6 +234,7 @@ function summarizeGroup(rows) {
     mean_task_vc_runtime_ms: mean(numeric(rows, "task_vc_runtime_ms")),
     mean_cold_bytes: mean(cold),
     mean_warm_bytes: mean(warm),
+    mean_tokens: mean(numeric(rows, "tokens")),
   };
 }
 
@@ -451,6 +453,7 @@ function renderReport(data) {
       count(summary.mean_parser),
       kb(summary.mean_cold_bytes),
       kb(summary.mean_warm_bytes),
+      count(summary.mean_tokens, 0),
     ]);
 
   const overallDeltaRows = [];
@@ -485,6 +488,7 @@ function renderReport(data) {
       count(summary.mean_mutate),
       count(summary.mean_failed_task_vc),
       kb(summary.mean_warm_bytes),
+      count(summary.mean_tokens, 0),
     ]);
 
   const taskDeltaRows = [];
@@ -532,7 +536,7 @@ function renderReport(data) {
     "## Overall",
     "",
     markdownTable(
-      ["Agent", "Arm", "n", "Pass", "Pass 95% CI", "Tasks all-k", "Mean Wall", "Median Wall", "P90 Wall", "Max Wall", "Task VC", "Inspect", "Mutate", "Failed Task VC", "Parser", "Cold KB", "Warm KB"],
+      ["Agent", "Arm", "n", "Pass", "Pass 95% CI", "Tasks all-k", "Mean Wall", "Median Wall", "P90 Wall", "Max Wall", "Task VC", "Inspect", "Mutate", "Failed Task VC", "Parser", "Cold KB", "Warm KB", "Mean Tokens"],
       overallRows,
     ),
     "",
@@ -564,7 +568,7 @@ function renderReport(data) {
     "## By Task",
     "",
     markdownTable(
-      ["Task", "Agent", "Arm", "Pass", "Pass 95% CI", "Mean Wall", "Median Wall", "Max Wall", "Task VC", "Inspect", "Mutate", "Failed Task VC", "Warm KB"],
+      ["Task", "Agent", "Arm", "Pass", "Pass 95% CI", "Mean Wall", "Median Wall", "Max Wall", "Task VC", "Inspect", "Mutate", "Failed Task VC", "Warm KB", "Mean Tokens"],
       byTaskRows,
     ),
     "",

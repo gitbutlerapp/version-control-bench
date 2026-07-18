@@ -879,12 +879,38 @@ function primaryModelFromUsage(modelUsage) {
   return entries[0]?.model ?? null;
 }
 
+// Codex prints a trailing "tokens used\n<n,nnn>" block on stderr.
+function parseCodexTokensUsed(stderr) {
+  const matches = [...stderr.matchAll(/tokens used\s*[\r\n]+\s*([\d,]+)/gi)];
+  const value = matches.at(-1)?.[1];
+  return value ? Number(value.replaceAll(",", "")) : null;
+}
+
+// Totals are comparable across runs of the same agent, not across agents:
+// each CLI decides for itself what counts as a used token (e.g. cache reads).
+function claudeTokensUsed(parsed) {
+  const sumKeys = (usage, keys) =>
+    keys.reduce((sum, key) => sum + (Number.isFinite(usage?.[key]) ? usage[key] : 0), 0);
+
+  if (parsed.modelUsage && typeof parsed.modelUsage === "object") {
+    const total = Object.values(parsed.modelUsage).reduce(
+      (sum, usage) => sum + sumKeys(usage, ["inputTokens", "outputTokens", "cacheReadInputTokens", "cacheCreationInputTokens"]),
+      0,
+    );
+    if (total > 0) return total;
+  }
+
+  const total = sumKeys(parsed.usage, ["input_tokens", "output_tokens", "cache_read_input_tokens", "cache_creation_input_tokens"]);
+  return total > 0 ? total : null;
+}
+
 function parseAgentOutput(agent, agentResult) {
   if (agent !== "claude") {
     return {
       output_format: "text",
       observed_model: parseAgentModel(agentResult),
       observed_model_source: "stderr",
+      tokens_used_total: parseCodexTokensUsed(agentResult.stderr),
       transcript_stdout: agentResult.stdout,
     };
   }
@@ -913,6 +939,7 @@ function parseAgentOutput(agent, agentResult) {
     stop_reason: parsed.stop_reason ?? null,
     session_id: parsed.session_id ?? null,
     total_cost_usd: parsed.total_cost_usd ?? null,
+    tokens_used_total: claudeTokensUsed(parsed),
     usage: parsed.usage ?? null,
     model_usage: parsed.modelUsage ?? null,
     errors: parsed.errors ?? null,
