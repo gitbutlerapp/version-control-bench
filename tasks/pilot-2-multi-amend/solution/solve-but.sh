@@ -42,7 +42,7 @@ hunk_id() {
     const blocks = [];
     let current = null;
     for (const line of lines) {
-      const match = line.match(/^([a-z0-9]+)\s+(.+?)│$/);
+      const match = line.match(/^([a-z0-9]+(?::[a-z0-9]+)?)\s+(.+?)│$/);
       if (match) {
         current = { id: match[1], path: match[2].trim(), body: "" };
         blocks.push(current);
