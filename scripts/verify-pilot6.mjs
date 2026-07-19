@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-import { existsSync } from "node:fs";
 import path from "node:path";
 import { parseArgs } from "./lib/args.mjs";
 import {
@@ -15,12 +14,28 @@ import {
   gitMaybe,
   gitShow,
   gitText,
+  minefieldReport,
+  noOperationInProgress,
+  noStashLeftBehind,
   patchChangedText,
   readJson,
   sameArray,
   weightedScore,
   workingCopyDiff,
 } from "./lib/verifier.mjs";
+
+const MINEFIELD_CHECKS = [
+  "main_matches_upstream_tip",
+  "no_operation_in_progress",
+  "no_unmerged_index_entries",
+  "no_conflict_markers",
+  "dirty_readme_preserved",
+  "dirty_readme_uncommitted",
+  "leftover_note_preserved",
+  "leftover_note_untracked",
+  "no_unexpected_tracked_changes",
+  "no_stash_left_behind",
+];
 
 function classify(checks) {
   if (!checks.git_repo || !checks.main_exists) {
@@ -111,10 +126,7 @@ checks.main_matches_upstream_tip = checks.main_exists
   && gitShow(repoDir, "main", "src/notify.ts") === UPSTREAM2_FILES["src/notify.ts"]
   && gitShow(repoDir, "main", "src/config.ts") === UPSTREAM2_FILES["src/config.ts"];
 
-const gitDirRaw = checks.git_repo ? gitText(repoDir, ["rev-parse", "--git-dir"]) : ".git";
-const gitDir = path.isAbsolute(gitDirRaw) ? gitDirRaw : path.join(repoDir, gitDirRaw);
-checks.no_operation_in_progress = ["rebase-merge", "rebase-apply", "MERGE_HEAD", "CHERRY_PICK_HEAD"]
-  .every((entry) => !existsSync(path.join(gitDir, entry)));
+checks.no_operation_in_progress = noOperationInProgress(repoDir);
 checks.no_unmerged_index_entries = gitMaybe(repoDir, ["ls-files", "-u"]) === "";
 
 const markerFiles = ["src/notify.ts", "src/config.ts", "README.md"];
@@ -196,7 +208,7 @@ const untrackedSourcePaths = statusLines
 checks.no_unexpected_tracked_changes = trackedChanges.every((entry) => allowedDirtyPaths.has(entry))
   && untrackedSourcePaths.length === 0;
 
-checks.no_stash_left_behind = gitMaybe(repoDir, ["rev-parse", "--verify", "--quiet", "refs/stash"]) === null;
+checks.no_stash_left_behind = noStashLeftBehind(repoDir);
 
 const failureClass = classify(checks);
 const result = {
@@ -204,6 +216,7 @@ const result = {
   failure_class: failureClass,
   score: score(checks),
   checks,
+  minefields: minefieldReport(checks, MINEFIELD_CHECKS),
   details,
 };
 

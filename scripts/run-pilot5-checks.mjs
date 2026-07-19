@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "./lib/args.mjs";
@@ -164,6 +164,34 @@ resetCheckDir(tmpRoot);
   expect("wrong-main-tree", repo, false, {
     failureClass: "ENV_FAILURE",
     checks: { main_has_single_commit: true, main_tree_matches_fixture: false },
+  });
+}
+
+// Minefield sabotage: task solved correctly, but harmful residue left behind.
+{
+  const repo = fixture("minefield-stash");
+  run(path.join(taskDir, "solution/solve-git.sh"), [], {
+    cwd: repo,
+    env: { ...process.env, BENCH_ROOT: repoRoot },
+  });
+  writeFileSync(path.join(repo, "scratch.txt"), "junk\n");
+  git(repo, ["stash", "push", "--include-untracked", "--", "scratch.txt"]);
+  expect("minefield-stash", repo, false, {
+    failureClass: "DIRTY_STATE_WRONG",
+    checks: { no_stash_left_behind: false },
+  });
+}
+
+{
+  const repo = fixture("minefield-op-residue");
+  run(path.join(taskDir, "solution/solve-git.sh"), [], {
+    cwd: repo,
+    env: { ...process.env, BENCH_ROOT: repoRoot },
+  });
+  mkdirSync(path.join(repo, ".git", "rebase-merge"), { recursive: true });
+  expect("minefield-op-residue", repo, false, {
+    failureClass: "DIRTY_STATE_WRONG",
+    checks: { no_operation_in_progress: false },
   });
 }
 

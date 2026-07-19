@@ -14,7 +14,18 @@ import {
   sameSet,
   weightedScore,
   workingCopyDiff,
+  minefieldReport,
+  noOperationInProgress,
+  noStashLeftBehind,
 } from "./lib/verifier.mjs";
+
+const MINEFIELD_CHECKS = [
+  "leftover_atoms_not_committed",
+  "leftover_atoms_preserved",
+  "no_unresolved_conflicts",
+  "no_operation_in_progress",
+  "no_stash_left_behind",
+];
 
 function classify(checks) {
   if (!checks.git_repo || !checks.main_exists || !checks.main_has_single_commit || !checks.task_branch_exists) {
@@ -32,7 +43,9 @@ function classify(checks) {
   if (!checks.leftover_atoms_preserved || !checks.target_atoms_not_left_uncommitted) {
     return "DIRTY_STATE_WRONG";
   }
-  if (!checks.no_unresolved_conflicts) return "DIRTY_STATE_WRONG";
+  if (!checks.no_unresolved_conflicts || !checks.no_operation_in_progress || !checks.no_stash_left_behind) {
+    return "DIRTY_STATE_WRONG";
+  }
   return null;
 }
 
@@ -159,6 +172,8 @@ details.target_atoms_not_left_uncommitted = targetDiffResults;
 checks.target_atoms_not_left_uncommitted = targetDiffResults.every((result) => result.absent);
 
 checks.no_unresolved_conflicts = gitText(repoDir, ["ls-files", "-u"]) === "";
+checks.no_operation_in_progress = noOperationInProgress(repoDir);
+checks.no_stash_left_behind = noStashLeftBehind(repoDir);
 details.status_porcelain = gitText(repoDir, ["status", "--porcelain=v2", "--branch"]);
 
 const failureClass = classify(checks);
@@ -167,6 +182,7 @@ const result = {
   failure_class: failureClass,
   score: score(checks),
   checks,
+  minefields: minefieldReport(checks, MINEFIELD_CHECKS),
   details,
 };
 

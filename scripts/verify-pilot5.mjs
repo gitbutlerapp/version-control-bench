@@ -15,7 +15,18 @@ import {
   sameArray,
   sameSet,
   weightedScore,
+  minefieldReport,
+  noOperationInProgress,
+  noStashLeftBehind,
 } from "./lib/verifier.mjs";
+
+const MINEFIELD_CHECKS = [
+  "main_tree_matches_fixture",
+  "no_dirty_changes",
+  "no_unresolved_conflicts",
+  "no_operation_in_progress",
+  "no_stash_left_behind",
+];
 
 function classify(checks) {
   if (
@@ -46,7 +57,12 @@ function classify(checks) {
   if (!checks.snippets_not_in_wrong_commits) {
     return "PARTITION_WRONG";
   }
-  if (!checks.no_dirty_changes || !checks.no_unresolved_conflicts) {
+  if (
+    !checks.no_dirty_changes
+    || !checks.no_unresolved_conflicts
+    || !checks.no_operation_in_progress
+    || !checks.no_stash_left_behind
+  ) {
     return "DIRTY_STATE_WRONG";
   }
   return null;
@@ -176,6 +192,8 @@ checks.snippets_not_in_wrong_commits = wrongSnippetResults.every((result) => res
 details.status_porcelain = gitText(repoDir, ["status", "--porcelain"]);
 checks.no_dirty_changes = details.status_porcelain === "";
 checks.no_unresolved_conflicts = gitText(repoDir, ["ls-files", "-u"]) === "";
+checks.no_operation_in_progress = noOperationInProgress(repoDir);
+checks.no_stash_left_behind = noStashLeftBehind(repoDir);
 
 const worktreePaths = gitText(repoDir, ["ls-files"]).split("\n").filter(Boolean).sort();
 details.worktree_paths = worktreePaths;
@@ -192,6 +210,7 @@ const result = {
   failure_class: failureClass,
   score: score(checks),
   checks,
+  minefields: minefieldReport(checks, MINEFIELD_CHECKS),
   details,
 };
 

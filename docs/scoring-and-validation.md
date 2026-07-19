@@ -53,6 +53,27 @@ Suggested caps:
 
 The diagnostic score helps sort failures. The pass/fail result stays crisp.
 
+## Milestones And Minefields
+
+The named boolean checks in each verifier serve two roles, borrowed from
+agent-bench design:
+
+- **Milestones** — checks that measure forward progress toward the goal
+  (branch shape, commit partitioning, content placement). The weighted
+  diagnostic score over these answers "how far did the run get".
+- **Minefields** — the subset of checks that detect harm or leftover mess
+  rather than progress: unrelated work scooped into a commit, uncommitted
+  user work destroyed, conflict markers or unmerged index entries left,
+  an in-progress rebase/merge abandoned, or a stash left behind.
+
+Every check gates pass/fail either way. The distinction exists for
+reporting: each verifier declares its `MINEFIELD_CHECKS` and emits a
+`minefields: { checks, hit }` object so a failed run can be labeled
+"incomplete" versus "did harm" without new matrix columns. All pilots share
+the residue minefields (`no_operation_in_progress`, `no_stash_left_behind`)
+via `scripts/lib/verifier.mjs`, and every pilot self-test includes sabotage
+cases that solve the task correctly and then trip one minefield.
+
 ## Git Plumbing Inputs
 
 Prefer plumbing and stable porcelain:
