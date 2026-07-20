@@ -26,7 +26,7 @@ const REPO = resolve(__dirname, '..');
 
 // ---- source snapshots (the "current value") -------------------------------
 const DEFAULTS = {
-  aggregate: 'tmp/pilot-runs/full-k7-20260703-all-tools/aggregate.json',
+  aggregate: 'tmp/pilot-runs/full-k10-20260720-six-scenarios/aggregate.json',
   baseline: null, // legacy: git + but+skill
   jj: null, // legacy: jj+skill
   out: 'web/data/results.json',
@@ -94,6 +94,15 @@ const SCENARIOS = [
       'A seven-commit branch interleaves two standalone commits with two runs of incremental commits: a two-commit parser group and a three-commit retry group. The task squashes each run into one semantic commit and leaves the standalone commits untouched, ending with four.',
     crux: 'Only the two adjacent groups may be combined; the standalone commits must stay separate, and the final file contents must be identical with a clean worktree.',
     shape: 'squash',
+  },
+  {
+    id: 'pilot-6-update-dirty-branch',
+    label: 'Update dirty branch',
+    title: 'Update a dirty branch onto a moved target',
+    situation:
+      'Main advanced by two commits while a feature branch accumulated two commits plus uncommitted work. The task rebuilds the feature branch on the new main tip, resolves both commit conflicts, and carries the dirty worktree through unchanged.',
+    crux: 'The update must keep linear history and resolve two conflicts differently while preserving a tracked edit and an untracked note as exact uncommitted leftovers.',
+    shape: 'update',
   },
 ];
 
@@ -255,9 +264,9 @@ function cliVersionForAgent(rows, agent) {
   return versions.length > 0 ? versions.join(', ') : null;
 }
 
-function perGroupK(rows) {
+function perGroupK(rows, scenarios) {
   const counts = new Set();
-  for (const sc of SCENARIOS) {
+  for (const sc of scenarios) {
     for (const agent of ['codex', 'claude']) {
       for (const arm of ARM_ORDER) {
         counts.add(rows.filter((r) => r.task === sc.id && r.agent === agent && r.arm === arm).length);
@@ -387,6 +396,13 @@ function build({ aggregate, baseline, jj, out }) {
   const allRows = source.rows;
   const allSummaries = source.summaries;
   const allByTask = source.byTask;
+  const taskIds = unique(allRows.map((row) => row.task));
+  const knownTaskIds = new Set(SCENARIOS.map((scenario) => scenario.id));
+  const unknownTaskIds = taskIds.filter((taskId) => !knownTaskIds.has(taskId));
+  if (unknownTaskIds.length > 0) {
+    throw new Error(`Missing scenario metadata for: ${unknownTaskIds.join(', ')}`);
+  }
+  const scenarios = SCENARIOS.filter((scenario) => taskIds.includes(scenario.id));
 
   // ---- overall cells: 2 real agents x 3 arms, plus a 'both' per arm --------
   const overallByKey = {};
@@ -428,9 +444,9 @@ function build({ aggregate, baseline, jj, out }) {
           n: stat.n,
         };
   for (const c of cells_overall) {
-    c.task_count = SCENARIOS.length;
+    c.task_count = scenarios.length;
     if (c.agent === 'both') {
-      c.tasks_all_pass = SCENARIOS.filter((sc) =>
+      c.tasks_all_pass = scenarios.filter((sc) =>
         ['codex', 'claude'].every((agent) => {
           const s = taskSummary(sc.id, agent, c.arm);
           return s && s.pass === s.n;
@@ -439,7 +455,7 @@ function build({ aggregate, baseline, jj, out }) {
       c.paired_vs_git = null;
       continue;
     }
-    c.tasks_all_pass = SCENARIOS.filter((sc) => {
+    c.tasks_all_pass = scenarios.filter((sc) => {
       const s = taskSummary(sc.id, c.agent, c.arm);
       return s && s.pass === s.n;
     }).length;
@@ -450,7 +466,7 @@ function build({ aggregate, baseline, jj, out }) {
     const passDeltas = [];
     const wallDeltas = [];
     const opsDeltas = [];
-    for (const sc of SCENARIOS) {
+    for (const sc of scenarios) {
       const base = taskSummary(sc.id, c.agent, 'git');
       const cand = taskSummary(sc.id, c.agent, c.arm);
       if (!base || !cand) continue;
@@ -486,7 +502,7 @@ function build({ aggregate, baseline, jj, out }) {
     }));
 
   const cells_by_scenario = [];
-  for (const sc of SCENARIOS) {
+  for (const sc of scenarios) {
     const scenarioCells = {};
     for (const agent of ['codex', 'claude']) {
       for (const arm of ARM_ORDER) {
@@ -535,7 +551,7 @@ function build({ aggregate, baseline, jj, out }) {
   const total_runs = allRows.length;
   const total_passed = allRows.filter((r) => r.passed).length;
   const snapshotDate = new Date(source.generatedAt).toISOString().slice(0, 10);
-  const k = perGroupK(allRows);
+  const k = perGroupK(allRows, scenarios);
 
   const data = {
     schema_version: 1,
@@ -556,7 +572,7 @@ function build({ aggregate, baseline, jj, out }) {
       ],
       arms: ARMS,
       arm_order: ARM_ORDER,
-      scenarios: SCENARIOS.map((s) => ({
+      scenarios: scenarios.map((s) => ({
         id: s.id,
         label: s.label,
         title: s.title,
@@ -575,7 +591,7 @@ function build({ aggregate, baseline, jj, out }) {
       kb_note:
         'warm_bytes subtracts visible skill/reference reads: a token-cost proxy, not a token counter. Claude and Codex record transcripts in different formats, so KB is only comparable between tools within the same agent.',
       stats_note:
-        'Pass rates carry Wilson 95% intervals over the runs in the cell. Trials of the same scenario are correlated, so cross-scenario comparisons pair per-scenario means against the same agent’s git arm with t-based 95% CIs (df = scenarios − 1); with five scenarios those intervals are wide. tasks_all_pass counts scenarios where every run passed (per-scenario pass^k).',
+        `Pass rates carry Wilson 95% intervals over the runs in the cell. Trials of the same scenario are correlated, so cross-scenario comparisons pair per-scenario means against the same agent’s git arm with t-based 95% CIs (df = scenarios − 1); with ${scenarios.length} scenarios those intervals are wide. tasks_all_pass counts scenarios where every run passed (per-scenario pass^k).`,
       generator: 'node scripts/build-web-data.mjs',
     },
     source_snapshots: source.sourceSnapshots,
@@ -592,14 +608,18 @@ function build({ aggregate, baseline, jj, out }) {
 }
 
 function validate(d) {
-  const expectedRows = Number.isFinite(d.meta.k) ? d.meta.k * SCENARIOS.length * 2 * ARM_ORDER.length : d.rows.length;
+  const scenarioCount = d.meta.scenarios.length;
+  const expectedRows = Number.isFinite(d.meta.k) ? d.meta.k * scenarioCount * 2 * ARM_ORDER.length : d.rows.length;
   const armsSeen = new Set(d.cells_overall.map((c) => c.arm));
   for (const arm of ARM_ORDER) if (!armsSeen.has(arm)) throw new Error(`validate: arm ${arm} missing`);
   const agentsSeen = new Set(d.cells_overall.map((c) => c.agent));
   for (const a of ['codex', 'claude', 'both']) if (!agentsSeen.has(a)) throw new Error(`validate: agent ${a} missing`);
   if (d.rows.length !== expectedRows) throw new Error(`validate: expected ${expectedRows} rows, got ${d.rows.length}`);
   if (d.cells_overall.length !== 9) throw new Error(`validate: expected 9 overall cells, got ${d.cells_overall.length}`);
-  if (d.cells_by_scenario.length !== 45) throw new Error(`validate: expected 45 scenario cells, got ${d.cells_by_scenario.length}`);
+  const expectedScenarioCells = scenarioCount * 3 * ARM_ORDER.length;
+  if (d.cells_by_scenario.length !== expectedScenarioCells) {
+    throw new Error(`validate: expected ${expectedScenarioCells} scenario cells, got ${d.cells_by_scenario.length}`);
+  }
   // honesty firewall: no 'both' cell may carry a KB number
   for (const c of [...d.cells_overall, ...d.cells_by_scenario]) {
     if (c.agent === 'both' && (c.mean_warm_bytes != null || c.mean_cold_bytes != null)) {

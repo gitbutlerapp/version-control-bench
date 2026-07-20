@@ -5,7 +5,7 @@ GitButler (`but+skill`), and Jujutsu (`jj+skill`) compare when coding agents do
 version-control chores. Built with Next.js (static export), deployed on Vercel.
 
 The page leads with the question and the sharpest checkable finding, lets a
-skeptic drill into the five scenarios, the methodology, the uncertainty, and the
+skeptic drill into the scenarios, the methodology, the uncertainty, and the
 stated limitations, and is built so the honesty rules can't be edited away by
 accident (the data layer never emits a cross-agent KB series, correctness is a
 precomputed gate, pass rates carry Wilson intervals, GitButler's own failures
@@ -16,7 +16,7 @@ are listed first).
 The page renders one committed file: [`data/results.json`](data/results.json).
 It is derived from a raw batch aggregate (which lives under the gitignored
 `tmp/`) by [`scripts/build-web-data.mjs`](../scripts/build-web-data.mjs).
-The build never touches `tmp/` — only the committed JSON.
+The site build never touches `tmp/` — only the committed JSON.
 
 ### Refresh after a new benchmark batch
 
@@ -29,8 +29,9 @@ npm run web:data
 
 Then commit `web/data/results.json`. The footer stamps `generated_at` and the
 batch names, so staleness is visible on the page. The script validates the
-shape (rows = k x scenarios x agents x arms, 9 overall cells, 45 scenario
-cells) and fails loudly if the source snapshot is missing.
+shape (rows = k x scenarios x agents x arms, 9 overall cells, and
+`scenarios x 9` scenario cells) and fails loudly if the source snapshot is
+missing.
 
 The social/OG card (`app/opengraph-image.tsx`) is a pass-rate chart rendered
 at build time from the same `results.json`, so it regenerates on every deploy

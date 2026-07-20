@@ -328,7 +328,7 @@ export function ResultsTable({ data }: { data: ResultsData }) {
 
 // The task-clustered read of the overall row: mean paired per-scenario deltas
 // vs the same agent's git arm with 95% CIs. This is the honest version of the
-// headline percentages — with five scenarios most intervals cross zero, and
+// headline percentages — with a small scenario set most intervals cross zero, and
 // saying so on the page beats a critic saying it first.
 function StatisticalRead({ data }: { data: ResultsData }) {
   const { agent } = useView();

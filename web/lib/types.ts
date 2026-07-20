@@ -68,7 +68,7 @@ export interface ScenarioMeta {
   title: string;
   situation: string;
   crux: string;
-  shape: 'select' | 'amend' | 'split' | 'reorder' | 'squash';
+  shape: 'select' | 'amend' | 'split' | 'reorder' | 'squash' | 'update';
   prompt: string;
 }
 

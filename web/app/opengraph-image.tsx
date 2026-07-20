@@ -8,7 +8,7 @@ export const dynamic = 'force-static';
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
 export const alt =
-  'Mean wall-clock time per run for git, Jujutsu, and GitButler operated by Codex and Claude Code on five version-control tasks. All three reliable, GitButler fastest.';
+  `Mean wall-clock time per run for git, Jujutsu, and GitButler operated by Codex and Claude Code on ${data.meta.scenarios.length} version-control tasks. ${data.meta.total_passed} of ${data.meta.total_runs} runs passed; GitButler was fastest.`;
 
 // The social card IS the results chart, rendered at build time from the same
 // committed results.json as the page — a re-run plus deploy refreshes it.

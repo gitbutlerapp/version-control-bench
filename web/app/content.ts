@@ -17,12 +17,12 @@ export const TOOL_URL: Record<string, string> = {
 export const HERO = {
   title: 'A version-control benchmark for coding agents',
   intro: [
-    'Which version-control tool should you give your coding agent? Claude Code and Codex run the same five version-control tasks three ways: with plain git, with Jujutsu, and with GitButler. Only the tool changes.',
-    'All three turn out reliable (299 of 300 runs passed), so the separator is speed: GitButler ran about 60% faster than git with roughly 80% fewer commands; Jujutsu ran slower than git.',
+    'Which version-control tool should you give your coding agent? Claude Code and Codex run the same version-control tasks three ways: with plain git, with Jujutsu, and with GitButler. Only the tool changes.',
+    'The fresh six-scenario matrix passed 359 of 360 runs. GitButler passed all 120 and ran about 65% faster than git with roughly 78% fewer commands; Jujutsu had the lone miss and ran slower than git overall.',
   ],
 };
 
-// The results matrix: 5 tasks (rows) x 3 tools, each with pass, time, commands, KB.
+// The results matrix: one row per task x 3 tools, each with pass, time, commands, KB.
 export const RESULTS = {
   eyebrow: 'Results',
   title: 'Results matrix',
@@ -94,7 +94,8 @@ const resultDocUrl = (name: string) => `${REPO_URL}/blob/main/docs/results/${nam
 export const HISTORY = {
   title: 'Results history',
   entries: [
-    { date: '2026-07-06', scope: 'k=10 · Opus 4.8 · GPT-5.5', passed: '299/300', url: resultDocUrl('full-k10-2026-07-06.md'), current: true },
+    { date: '2026-07-20', scope: 'k=10 · 6 scenarios · Opus 4.8 · GPT-5.5', passed: '359/360', url: resultDocUrl('full-k10-2026-07-20.md'), current: true },
+    { date: '2026-07-06', scope: 'k=10 · 5 scenarios · Opus 4.8 · GPT-5.5', passed: '299/300', url: resultDocUrl('full-k10-2026-07-06.md') },
     { date: '2026-07-05', scope: 'k=8 · Opus 4.8 · GPT-5.5', passed: '239/240', url: resultDocUrl('full-k8-2026-07-05.md') },
     { date: '2026-07-03', scope: 'k=7 · Opus 4.1 · GPT-5.5', passed: '193/210', url: resultDocUrl('full-k7-2026-07-03.md') },
     { date: '2026-07-01', scope: 'k=5 · 3 tools · 2 agents', passed: '137/150', url: resultDocUrl('full-k5-2026-07-01.md') },

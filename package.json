@@ -25,6 +25,7 @@
     "pilot6:verify": "node scripts/verify-pilot6.mjs",
     "pilot6:check": "node scripts/run-pilot6-checks.mjs",
     "matrix:run": "node scripts/run-full-matrix.mjs",
+    "matrix:merge": "node scripts/merge-matrix-batches.mjs",
     "runs:export": "node scripts/export-batch-artifacts.mjs",
     "web:data": "node scripts/build-web-data.mjs"
   },

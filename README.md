@@ -2,7 +2,7 @@
 
 **Which version-control tool should you give your coding agent?** Live results: [vcbench.dev](https://vcbench.dev/)
 
-This benchmark holds the agents fixed — Claude Code and Codex — and varies the toolset: plain `git`, Jujutsu (`jj+skill`), and GitButler (`but+skill`), each scored on reliability, speed, and efficiency across five common version-control operations. Most benchmarks in this space fix the tool and compare models; this one fixes the agents and compares the tools — a measurement of agent–tool fit (what the industry has started calling agent experience) rather than a model leaderboard.
+This benchmark holds the agents fixed — Claude Code and Codex — and varies the toolset: plain `git`, Jujutsu (`jj+skill`), and GitButler (`but+skill`), each scored on reliability, speed, and efficiency across six common version-control operations. Most benchmarks in this space fix the tool and compare models; this one fixes the agents and compares the tools — a measurement of agent–tool fit (what the industry has started calling agent experience) rather than a model leaderboard.
 
 This is not a coding benchmark. The file changes already exist before the agent starts; the agent's job is to produce the right Git-visible state — commit boundaries, branch topology, what stays uncommitted, protected history. A deterministic grader judges the resulting Git history, never the commands used to produce it. And it is not a Claude-versus-Codex comparison: both agents run so the tool effect can be checked across them.
 
@@ -10,15 +10,13 @@ The benchmark is maintained by GitButler, one of the three tools measured. Read 
 
 ## Latest results
 
-Full matrix from 2026-07-06 (Codex on `gpt-5.5`, Claude Code on `claude-opus-4-8`): 5 scenarios x 3 tools x 2 agents, ten runs per cell (k=10), 300 graded runs, 299 passed.
+Full matrix from 2026-07-20 (Codex on `gpt-5.5`, Claude Code on `claude-opus-4-8`): 6 scenarios x 3 tools x 2 agents, ten runs per cell (k=10), 360 graded runs, 359 passed.
 
-**On the current frontier models all three tools are reliable on these operations — 299 of 300 runs passed — so speed and efficiency are the separator, not reliability.** GitButler finished roughly 60% faster than plain `git` with about 80% fewer version-control commands (Claude 44.5s vs 118.0s, Codex 28.7s vs 105.9s); Jujutsu ran slower than plain `git` for both agents (Claude 167.8s, Codex 115.9s). The one failure in the whole matrix was a single Codex run splitting a commit with Jujutsu.
+**GitButler passed all 120 runs and was the clear efficiency winner: about 65% faster than plain `git` with 78% fewer version-control commands.** It averaged 34.0s versus 92.2s for Codex and 32.2s versus 98.4s for Claude. Jujutsu was slower than `git` overall for both agents and had the matrix's only grader failure: one Claude split-commit run preserved an extra commit.
 
-Read the mean wall time alongside the median: `git` and Jujutsu both have heavy right tails (a Codex `git` run took 890s and a Codex Jujutsu run 839s — genuine agent floundering that still passed), so their means sit above their medians, while GitButler's slowest run was ~86s. On typical (median) runs GitButler is ~37-58% faster than `git`; on the mean it is ~62-73%. Either way GitButler has no comparable tail.
+The sixth scenario is materially harder: update a dirty feature branch onto a moved `main`, resolve conflicts inside two commits, and preserve unrelated worktree changes. GitButler still passed 20/20 there. Claude's GitButler runs averaged 58.8s versus 51.8s for `git`, but used 9.2 commands versus 16.7; Codex's averaged 74.4s versus 110.6s and used 9.1 versus 16.9.
 
-The reliability tie is a change from an earlier generation: on `claude-opus-4-1-20250805` (k=7, 2026-07-03), Claude failed split-commit in 5 of 7 runs with `git` and 6 of 7 with Jujutsu while GitButler passed every run — that gap closed as the model improved, which is the kind of shift this benchmark exists to track. With both agents now near the ceiling, harder scenarios are the priority before the reliability comparison says anything about frontier agents.
-
-With five scenarios the task-clustered 95% intervals on the wall-time deltas are wide (the direction is consistent across scenarios, but the effect size is measured on these operations only); the command-count reduction for GitButler is the tightest effect, and at k=10 the paired command-count and Codex wall-time intervals for GitButler exclude zero. Confidence intervals and paired per-scenario deltas are in the [full writeup](docs/results/full-k10-2026-07-06.md).
+The task-clustered intervals are in the [full writeup](docs/results/full-k10-2026-07-20.md). GitButler's paired command-count reduction excludes zero for both agents; its Codex wall-time reduction also excludes zero, while Claude's wall interval remains wide across six tasks. This is evidence about these operations and agents, not a universal tool ranking.
 
 Each cell shows pass rate, mean wall time, and mean version-control commands per run. **Bold** marks the fastest tool that passed every run of that scenario.
 
@@ -26,23 +24,25 @@ Each cell shows pass rate, mean wall time, and mean version-control commands per
 
 | Scenario | git | Jujutsu | GitButler |
 | --- | --- | --- | --- |
-| Selective commit | 7/7 · 67.8s · 19 cmds | 7/7 · 99.2s · 20 cmds | **7/7 · 30.8s · 2 cmds** |
-| Multi-amend | 7/7 · 174.4s · 44 cmds | 7/7 · 208.5s · 25 cmds | **7/7 · 36.5s · 6 cmds** |
-| Split commit | 7/7 · 116.2s · 30 cmds | 7/7 · 185.9s · 37 cmds | **7/7 · 33.0s · 6 cmds** |
-| Reorder commits | 7/7 · 54.4s · 11 cmds | 7/7 · 58.4s · 11 cmds | **7/7 · 20.6s · 2 cmds** |
-| Squash commits | 7/7 · 34.1s · 11 cmds | 7/7 · 43.3s · 11 cmds | **7/7 · 24.3s · 3 cmds** |
-| **All scenarios** | 35/35 · 89.4s · 23 cmds | 35/35 · 119.0s · 21 cmds | **35/35 · 29.0s · 4 cmds** |
+| Selective commit | 10/10 · 61.3s · 17.8 cmds | 10/10 · 94.3s · 17.1 cmds | **10/10 · 20.7s · 2.0 cmds** |
+| Multi-amend | 10/10 · 168.9s · 35.7 cmds | 10/10 · 124.2s · 22.4 cmds | **10/10 · 29.0s · 5.0 cmds** |
+| Split commit | 10/10 · 117.6s · 30.0 cmds | 10/10 · 187.7s · 40.1 cmds | **10/10 · 35.8s · 6.0 cmds** |
+| Reorder commits | 10/10 · 50.5s · 9.1 cmds | 10/10 · 53.1s · 9.9 cmds | **10/10 · 21.1s · 2.0 cmds** |
+| Squash commits | 10/10 · 44.4s · 12.7 cmds | 10/10 · 51.9s · 10.0 cmds | **10/10 · 23.2s · 3.0 cmds** |
+| Update dirty branch | 10/10 · 110.6s · 16.9 cmds | 10/10 · 148.0s · 26.2 cmds | **10/10 · 74.4s · 9.1 cmds** |
+| **All scenarios** | 60/60 · 92.2s · 20.4 cmds | 60/60 · 109.9s · 21.0 cmds | **60/60 · 34.0s · 4.5 cmds** |
 
-### Claude Code (claude-opus-4-1-20250805)
+### Claude Code (claude-opus-4-8)
 
 | Scenario | git | Jujutsu | GitButler |
 | --- | --- | --- | --- |
-| Selective commit | 6/7 · 169.9s · 18 cmds | 5/7 · 172.3s · 21 cmds | **7/7 · 52.3s · 4 cmds** |
-| Multi-amend | 6/7 · 598.1s · 58 cmds | 6/7 · 585.5s · 36 cmds | **7/7 · 97.5s · 9 cmds** |
-| Split commit | 2/7 · 294.4s · 25 cmds | 1/7 · 456.4s · 43 cmds | **7/7 · 157.5s · 17 cmds** |
-| Reorder commits | **7/7 · 68.0s · 6 cmds** | 7/7 · 91.3s · 14 cmds | 7/7 · 97.6s · 9 cmds |
-| Squash commits | 7/7 · 111.6s · 12 cmds | 6/7 · 105.8s · 15 cmds | **7/7 · 82.5s · 10 cmds** |
-| **All scenarios** | 28/35 · 248.4s · 24 cmds | 25/35 · 282.2s · 26 cmds | **35/35 · 97.5s · 10 cmds** |
+| Selective commit | 10/10 · 39.4s · 11.6 cmds | 10/10 · 119.7s · 10.0 cmds | **10/10 · 20.3s · 2.0 cmds** |
+| Multi-amend | 10/10 · 227.8s · 48.4 cmds | 10/10 · 277.9s · 19.6 cmds | **10/10 · 26.8s · 5.0 cmds** |
+| Split commit | 10/10 · 194.9s · 32.5 cmds | 9/10 · 297.9s · 32.8 cmds | **10/10 · 42.6s · 6.2 cmds** |
+| Reorder commits | 10/10 · 34.3s · 8.0 cmds | 10/10 · 53.4s · 4.4 cmds | **10/10 · 20.8s · 2.2 cmds** |
+| Squash commits | 10/10 · 42.4s · 12.2 cmds | 10/10 · 42.9s · 7.4 cmds | **10/10 · 23.6s · 3.1 cmds** |
+| Update dirty branch | **10/10 · 51.8s · 16.7 cmds** | 10/10 · 82.1s · 15.8 cmds | 10/10 · 58.8s · 9.2 cmds |
+| **All scenarios** | 60/60 · 98.4s · 21.6 cmds | 59/60 · 145.7s · 15.0 cmds | **60/60 · 32.2s · 4.6 cmds** |
 
 Both agents are run to check whether the tool effect holds across them; this is not a Claude-versus-Codex comparison.
 
@@ -50,7 +50,7 @@ More detail:
 
 - Interactive results with per-scenario breakdowns and the failure ledger: [vcbench.dev](https://vcbench.dev/) (source in [web/](web/)).
 - Checked-in results overview: [docs/results/README.md](docs/results/README.md).
-- Latest full-matrix writeup: [docs/results/full-k7-2026-07-03.md](docs/results/full-k7-2026-07-03.md).
+- Latest full-matrix writeup: [docs/results/full-k10-2026-07-20.md](docs/results/full-k10-2026-07-20.md).
 
 ## Scenarios
 
@@ -80,13 +80,13 @@ Each scenario is a pre-built Git repository (a commit history plus uncommitted c
 - **Deterministic grader.** Correctness is checked by a hidden, scripted verifier that inspects the final Git state: commit boundaries, branch topology, and what stayed uncommitted. It is not an LLM judge and does not compare commands against a reference — two different command sequences pass if they produce the same history.
 - **Timing boundary.** Fixture build, workspace prep, skill installation, and dirty-state application all happen before timing begins; the measured figures cover only the agent's work on the task.
 - **Git write restriction.** In GitButler and Jujutsu runs, raw git write commands are blocked so the agent must use the tool under test. Git calls a tool makes internally count as tool-internal work, not agent commands.
-- **k=7.** Every agent-tool-task cell ran seven times; reported numbers are means over those runs. Checked-in reports also carry Wilson 95% intervals on pass rates, paired per-scenario deltas with task-clustered CIs, and per-scenario pass^k ("passed all 7 runs").
+- **k=10.** Every agent-tool-task cell ran ten times; reported numbers are means over those runs. Checked-in reports also carry Wilson 95% intervals on pass rates, paired per-scenario deltas with task-clustered CIs, and per-scenario pass^k ("passed all 10 runs").
 
 Full method docs: [benchmark design](docs/benchmark-design.md), [scoring and validation](docs/scoring-and-validation.md), [fairness and anti-cheat](docs/fairness-and-anti-cheat.md), [results presentation](docs/results-presentation.md).
 
 ## What's here
 
-- Five VC-only pilot tasks under [tasks/](tasks/), with a quick index at [tasks/README.md](tasks/README.md).
+- Six VC-only pilot tasks under [tasks/](tasks/), with a quick index at [tasks/README.md](tasks/README.md).
 - Synthetic TypeScript fixtures generated by `scripts/create-pilot*-fixture.mjs`.
 - Hidden oracle verifiers under `scripts/verify-pilot*.mjs`.
 - Reference `git` and `but` solutions in each task directory.
@@ -107,6 +107,7 @@ npm run pilot2:check
 npm run pilot3:check
 npm run pilot4:check
 npm run pilot5:check
+npm run pilot6:check
 ```
 
 Each check proves no-op and known-wrong states fail, then verifies the reference solutions.
@@ -140,6 +141,17 @@ The supported arms are:
 - `jj+skill`: the fixture repo is prepared with `jj git init --colocate`, the external `onevcat/skills@onevcat-jj` skill is fetched into the run directory and installed into the agent skill folders, local `AGENTS.md` / `CLAUDE.md` files are written, and raw Git writes plus GitButler are blocked.
 
 Pre-run fixture setup, tool setup, applying task branches, skill installation, and dirty-state application are excluded from measured agent duration and command metrics.
+
+### Full matrix
+
+The matrix runner covers all six scenarios, both agents, and all three tool arms by default:
+
+```bash
+npm run matrix:run -- --dry-run true --k 1
+npm run matrix:run -- --k 5 --batch-name full-k5
+```
+
+Use `--tasks`, `--agents`, or `--arms` with comma-separated values to run a subset. Plans, progress, aggregate data, and the generated report land under `tmp/pilot-runs/<batch-name>/`.
 
 ### Local GitButler build
 

@@ -1,6 +1,6 @@
 # Version Control Bench Design
 
-Last updated: 2026-06-16
+Last updated: 2026-07-20
 
 This repo benchmarks how coding agents perform version-control operations when the tool under test is plain `git`, GitButler CLI (`but`), or Jujutsu (`jj`).
 
@@ -15,7 +15,7 @@ Primary scoring should inspect the final Git-visible repository state: refs, DAG
 
 ## Docs
 
-- [scenarios.md](scenarios.md): plain-English guide to the five pilot scenarios, with quick sketches.
+- [scenarios.md](scenarios.md): plain-English guide to the six pilot scenarios, with quick sketches.
 - [benchmark-design.md](benchmark-design.md): requirements, comparison model, architecture, task lifecycle.
 - [task-format.md](task-format.md): proposed task package format and fixture rules.
 - [scoring-and-validation.md](scoring-and-validation.md): deterministic oracles, semantic edit atoms, metrics.
@@ -27,7 +27,7 @@ Primary scoring should inspect the final Git-visible repository state: refs, DAG
 ## Results
 
 - [results/README.md](results/README.md): human-facing current results overview, with scenario links and `git`, `but+skill`, and `jj+skill` comparisons.
-- [results/full-k5-2026-06-29.md](results/full-k5-2026-06-29.md): latest consolidated five-pilot k=5 matrix for Codex and Claude across `git`, `but+skill`, and `jj+skill`.
+- [results/full-k10-2026-07-20.md](results/full-k10-2026-07-20.md): latest six-scenario k=10 matrix for Codex and Claude across `git`, `but+skill`, and `jj+skill`.
 - [results/archive.md](results/archive.md): full matrices and historical per-scenario reruns.
 
 ## Opinionated Recommendation

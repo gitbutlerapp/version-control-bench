@@ -16,7 +16,7 @@ interface GraphSpec {
 // before | after diff. Fits the narrow column beside the scenario text.
 // Drives the generic before|after stack renderer for the history-shape
 // scenarios. select and amend have their own bespoke components below.
-const SPECS: Record<'split' | 'reorder' | 'squash', GraphSpec> = {
+const SPECS: Record<'split' | 'reorder' | 'squash' | 'update', GraphSpec> = {
   split: {
     before: [{ label: 'top' }, { label: 'mixed', tone: 'changed' }],
     after: [
@@ -64,6 +64,22 @@ const SPECS: Record<'split' | 'reorder' | 'squash', GraphSpec> = {
       { label: 'A' },
     ],
     note: 'two groups squashed · two commits kept',
+  },
+  update: {
+    before: [
+      { label: 'feature 2', tone: 'changed' },
+      { label: 'feature 1', tone: 'changed' },
+      { label: 'old main' },
+    ],
+    after: [
+      { label: 'feature 2′', tone: 'result' },
+      { label: 'feature 1′', tone: 'result' },
+      { label: 'main +2' },
+      { label: 'main +1' },
+      { label: 'old main' },
+    ],
+    note: 'rebuilt on new main · conflicts resolved',
+    leftovers: 'README edit · rollout note',
   },
 };
 

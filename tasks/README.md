@@ -1,6 +1,6 @@
 # Pilot Tasks
 
-These are the five version-control scenarios in the benchmark. They are all VC-only: the code changes already exist, and the agent is judged on the final Git state.
+These are the six version-control scenarios in the benchmark. They are all VC-only: the code changes already exist, and the agent is judged on the final Git state.
 
 ## Quick Map
 
@@ -9,6 +9,7 @@ These are the five version-control scenarios in the benchmark. They are all VC-o
 3. [Split Broad Commit](pilot-3-split-commit/README.md): break one overloaded non-top commit into clean semantic commits.
 4. [Reorder Existing Commits](pilot-4-reorder-commits/README.md): move a related block of commits earlier without changing their contents.
 5. [Squash Commit Groups](pilot-5-squash-commits/README.md): compress noisy step-by-step commits into fewer meaningful commits.
+6. [Update Dirty Branch Onto Moved Target](pilot-6-update-dirty-branch/README.md): rebuild a dirty feature branch on an advanced target while resolving conflicts and preserving uncommitted work.
 
 ```text
 1. selective commit:   messy worktree -> [one clean validation commit] + leftovers
@@ -16,6 +17,7 @@ These are the five version-control scenarios in the benchmark. They are all VC-o
 3. split commit:       [big mixed commit] -> [validation] [scoring] [docs]
 4. reorder commits:    A B C D E F -> A D E B C F
 5. squash commits:     A B C D E F G -> A [B+C] D [E+F+G]
+6. update dirty branch: main advances; rebase feature + resolve conflicts + keep dirty work
 ```
 
 For the fuller plain-English guide, see [../docs/scenarios.md](../docs/scenarios.md).
