@@ -1,8 +1,10 @@
 #!/usr/bin/env node
-import { closeSync, existsSync, mkdirSync, openSync, readFileSync, writeFileSync } from "node:fs";
+import { closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { parseArgs } from "./lib/args.mjs";
 import { pairedMeanCI, quantile, wilsonInterval } from "./lib/stats.mjs";
 
@@ -17,8 +19,47 @@ const TASKS = [
   { id: "pilot-5-squash-commits", label: "Squash commits" },
   { id: "pilot-6-update-dirty-branch", label: "Update dirty branch" },
 ];
-const AGENTS = ["codex", "claude"];
+const AGENTS = ["codex", "claude", "pool"];
 const ARMS = ["git", "but+skill", "jj+skill"];
+const DEFAULT_MODELS = {
+  codex: "gpt-5.5",
+  claude: "claude-opus-4-8",
+  pool: "poolside/laguna-s-2.1",
+};
+
+function sha256File(filePath) {
+  return createHash("sha256").update(readFileSync(filePath)).digest("hex");
+}
+
+function regularFiles(root) {
+  if (!existsSync(root)) return [];
+  const files = [];
+  const visit = (candidate) => {
+    const stat = statSync(candidate);
+    if (stat.isFile()) {
+      files.push(candidate);
+      return;
+    }
+    if (stat.isDirectory()) {
+      for (const name of readdirSync(candidate).sort()) visit(path.join(candidate, name));
+    }
+  };
+  visit(root);
+  return files;
+}
+
+function sha256Tree(roots) {
+  const hash = createHash("sha256");
+  for (const root of roots) {
+    for (const filePath of regularFiles(root)) {
+      hash.update(path.relative(repoRoot, filePath));
+      hash.update("\0");
+      hash.update(readFileSync(filePath));
+      hash.update("\0");
+    }
+  }
+  return hash.digest("hex");
+}
 
 function timestamp() {
   const d = new Date();
@@ -72,6 +113,12 @@ function runCapture(cmd, args, options = {}) {
   });
 }
 
+function resolveExecutable(name, explicitPath) {
+  if (explicitPath) return path.resolve(explicitPath);
+  const found = runCapture("which", [name], { cwd: repoRoot });
+  return found.status === 0 && found.stdout.trim() ? path.resolve(found.stdout.trim()) : null;
+}
+
 function plannedRuns({ tasks, agents, arms, k, batchName, batchDir }) {
   const runs = [];
   let idx = 1;
@@ -104,6 +151,35 @@ function readJsonIfExists(filePath) {
   return JSON.parse(readFileSync(filePath, "utf8"));
 }
 
+function isPoolRateLimitedRun(plan) {
+  if (plan.agent !== "pool") return false;
+  const result = readJsonIfExists(path.join(plan.run_dir, "result.json"));
+  const stdoutPath = path.join(plan.run_dir, "agent-stdout.txt");
+  const stderrPath = path.join(plan.run_dir, "agent-stderr.txt");
+  if (!result || result.agent_result?.timed_out || result.agent_result?.status === 0) return false;
+  if (result.agent_output?.retryable_error?.kind === "rate_limit") return true;
+  const errorText = [
+    existsSync(stderrPath) ? readFileSync(stderrPath, "utf8") : "",
+    result.agent_output?.output_error ?? "",
+    ...(existsSync(stdoutPath)
+      ? readFileSync(stdoutPath, "utf8").split(/\r?\n/).flatMap((line) => {
+          try {
+            const entry = JSON.parse(line);
+            return entry?.type === "error" || entry?.error || entry?.err ? [JSON.stringify(entry)] : [];
+          } catch {
+            return [];
+          }
+        })
+      : []),
+  ].join("\n");
+  return result.run_failure_class === "AGENT_OUTPUT_ERROR"
+    && /(?:HTTP\s*429|status(?:_|\s)?code\s*[:=]?\s*429|429\s+Too Many Requests)/i.test(errorText);
+}
+
+function sleepMs(durationMs) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, durationMs);
+}
+
 function taskFailedSamples(result) {
   return (result?.measurement?.commands?.failed_command_samples ?? [])
     .filter((entry) => entry.bucket === "task")
@@ -118,7 +194,8 @@ function rowFromPlan(plan) {
   const result = readJsonIfExists(path.join(plan.run_dir, "result.json"));
   const completed = result !== null;
   const passed = result?.verifier?.passed === true;
-  const exit = completed && result.agent_result?.status === 0 && passed ? 0 : completed ? 1 : null;
+  const poolOutputOk = plan.agent !== "pool" || !result?.agent_output?.output_error;
+  const exit = completed && result.agent_result?.status === 0 && passed && poolOutputOk ? 0 : completed ? 1 : null;
   const transcript = result?.measurement?.transcript ?? {};
   const timing = result?.measurement?.timing ?? {};
   const taskRuntime = timing.observed_command_runtime?.task_vc?.duration_ms_sum ?? null;
@@ -700,14 +777,88 @@ function appendProgress(batchDir, plan, status, note) {
   writeFileSync(file, `${plan.idx}\t${plan.run_id}\t${status}\t${note ?? ""}\n`, { flag: "a" });
 }
 
+function archiveRateLimitedAttempt(batchDir, plan) {
+  const retryRoot = path.join(batchDir, "retry-attempts", plan.run_id);
+  mkdirSync(retryRoot, { recursive: true });
+  const attemptNumbers = readdirSync(retryRoot)
+    .map((name) => /^attempt-(\d+)$/.exec(name)?.[1])
+    .filter(Boolean)
+    .map(Number);
+  const attempt = (attemptNumbers.length > 0 ? Math.max(...attemptNumbers) : 0) + 1;
+  const archiveDir = path.join(retryRoot, `attempt-${attempt}`);
+  mkdirSync(archiveDir);
+  if (existsSync(plan.run_dir)) renameSync(plan.run_dir, path.join(archiveDir, "run"));
+  if (existsSync(plan.log_path)) renameSync(plan.log_path, path.join(archiveDir, "runner.log"));
+  return rel(archiveDir);
+}
+
+function assertBatchConfigCompatible(batchDir, batchName, batchConfig) {
+  const batchConfigPath = path.join(batchDir, "batch-config.json");
+  if (existsSync(batchConfigPath)) {
+    const existingConfig = JSON.parse(readFileSync(batchConfigPath, "utf8"));
+    if (JSON.stringify(existingConfig) !== JSON.stringify(batchConfig)) {
+      throw new Error(`Refusing to resume ${batchName}: batch configuration or harness fingerprint changed`);
+    }
+    return true;
+  }
+  const hasExistingResults = regularFiles(batchDir).some((filePath) => path.basename(filePath) === "result.json");
+  if (hasExistingResults) {
+    throw new Error(`Refusing to resume ${batchName}: existing results predate batch-config.json`);
+  }
+  return false;
+}
+
+function runMatrixSelfTest() {
+  const batchDir = mkdtempSync(path.join(tmpdir(), "vcb-matrix-test-"));
+  const plan = {
+    run_id: "rate-limit-run",
+    run_dir: path.join(batchDir, "rate-limit-run"),
+    log_path: path.join(batchDir, "rate-limit-run.log"),
+  };
+  try {
+    for (let attempt = 1; attempt <= 2; attempt += 1) {
+      mkdirSync(plan.run_dir);
+      writeFileSync(path.join(plan.run_dir, "result.json"), JSON.stringify({ attempt }));
+      writeFileSync(plan.log_path, `attempt ${attempt}\n`);
+      archiveRateLimitedAttempt(batchDir, plan);
+      const archiveDir = path.join(batchDir, "retry-attempts", plan.run_id, `attempt-${attempt}`);
+      if (!existsSync(path.join(archiveDir, "run/result.json")) || !existsSync(path.join(archiveDir, "runner.log"))) {
+        throw new Error(`Retry archive self-test failed for attempt ${attempt}`);
+      }
+    }
+    const protectedBatch = path.join(batchDir, "protected-batch");
+    mkdirSync(protectedBatch);
+    writeFileSync(path.join(protectedBatch, "batch-config.json"), JSON.stringify({ model: "expected" }, null, 2));
+    writeFileSync(path.join(protectedBatch, "plan.tsv"), "original plan\n");
+    const beforeMismatch = sha256Tree([protectedBatch]);
+    let mismatchRejected = false;
+    try {
+      assertBatchConfigCompatible(protectedBatch, "protected-batch", { model: "changed" });
+    } catch {
+      mismatchRejected = true;
+    }
+    const afterMismatch = sha256Tree([protectedBatch]);
+    if (!mismatchRejected || beforeMismatch !== afterMismatch) {
+      throw new Error("Mismatched resume mutated the protected batch");
+    }
+    console.log(JSON.stringify({ passed: true, cases: 3 }));
+  } finally {
+    rmSync(batchDir, { recursive: true, force: true });
+  }
+}
+
 const args = parseArgs(process.argv.slice(2));
+if (args.get("self-test") === "true") {
+  runMatrixSelfTest();
+  process.exit(0);
+}
 const k = Number(args.get("k") ?? 5);
 if (!Number.isInteger(k) || k < 1) {
   throw new Error(`--k must be a positive integer, got ${args.get("k")}`);
 }
 
 const tasks = taskListArg(args.get("tasks"));
-const agents = listArg(args.get("agents"), AGENTS, "agent");
+const agents = listArg(args.get("agents") ?? "codex,claude", AGENTS, "agent");
 const arms = listArg(args.get("arms"), ARMS, "arm");
 const dryRun = args.get("dry-run") === "true";
 const resume = args.get("resume") !== "false";
@@ -716,10 +867,20 @@ const failOnFailures = args.get("fail-on-failures") === "true";
 const timeoutMs = args.get("timeout-ms") ?? "900000";
 const codexModel = args.get("codex-model") ?? null;
 const claudeModel = args.get("claude-model") ?? null;
+const poolModel = args.get("pool-model") ?? null;
+const poolRateLimitRetries = Number(args.get("pool-rate-limit-retries") ?? 6);
+const poolRateLimitBackoffMs = Number(args.get("pool-rate-limit-backoff-ms") ?? 60000);
+if (!Number.isInteger(poolRateLimitRetries) || poolRateLimitRetries < 0) {
+  throw new Error(`--pool-rate-limit-retries must be a non-negative integer, got ${args.get("pool-rate-limit-retries")}`);
+}
+if (!Number.isFinite(poolRateLimitBackoffMs) || poolRateLimitBackoffMs < 0) {
+  throw new Error(`--pool-rate-limit-backoff-ms must be non-negative, got ${args.get("pool-rate-limit-backoff-ms")}`);
+}
 const gitbutlerRoot = path.resolve(args.get("gitbutler-root") ?? "/Users/kiril/src/gitbutler");
 const butBin = path.resolve(args.get("but-bin") ?? path.join(gitbutlerRoot, "target/release/but"));
 const skillDir = path.resolve(args.get("skill-dir") ?? path.join(gitbutlerRoot, "crates/but/skill"));
-const jjBin = args.get("jj-bin") ? path.resolve(args.get("jj-bin")) : null;
+const jjBin = arms.includes("jj+skill") ? resolveExecutable("jj", args.get("jj-bin")) : null;
+const poolBin = agents.includes("pool") ? resolveExecutable("pool", args.get("pool-bin")) : null;
 const jjSkillDir = args.get("jj-skill-dir") ? path.resolve(args.get("jj-skill-dir")) : null;
 const jjSkillPackage = args.get("jj-skill-package") ?? null;
 const jjSkillName = args.get("jj-skill-name") ?? null;
@@ -728,32 +889,96 @@ const batchName = args.get("batch-name") ?? `full-k${k}-${timestamp()}`;
 const batchDir = path.resolve(args.get("out") ?? path.join(repoRoot, "tmp/pilot-runs", batchName));
 const commandLine = ["node", "scripts/run-full-matrix.mjs", ...process.argv.slice(2)];
 
-mkdirSync(batchDir, { recursive: true });
-
 const plans = plannedRuns({ tasks, agents, arms, k, batchName, batchDir });
-writePlan(batchDir, plans);
 
 if (dryRun) {
   console.log(`Dry run: ${plans.length} planned runs`);
   console.log(`Batch: ${rel(batchDir)}`);
-  console.log(`Plan: ${rel(path.join(batchDir, "plan.tsv"))}`);
+  console.log(`Plan would be written to: ${rel(path.join(batchDir, "plan.tsv"))}`);
   process.exit(0);
 }
 
+let butBuildLog = null;
 if (buildBut) {
   const build = runCapture("cargo", ["build", "-p", "but", "--release"], { cwd: gitbutlerRoot });
-  writeFileSync(path.join(batchDir, "but-build.log"), `${build.stdout}${build.stderr}`);
+  butBuildLog = `${build.stdout}${build.stderr}`;
   if (build.status !== 0) {
-    console.error(`GitButler build failed; see ${rel(path.join(batchDir, "but-build.log"))}`);
+    console.error("GitButler build failed before the batch was modified:");
+    console.error(butBuildLog);
     process.exit(build.status ?? 1);
   }
 }
 
+if (agents.includes("pool") && !poolBin) throw new Error("Pool agent selected but no pool executable was found; use --pool-bin");
+if (arms.includes("jj+skill") && !jjBin) throw new Error("jj+skill selected but no jj executable was found; use --jj-bin");
+if (arms.includes("but+skill") && !existsSync(butBin)) throw new Error(`GitButler binary not found: ${butBin}`);
+if (arms.includes("but+skill") && !existsSync(skillDir)) throw new Error(`GitButler skill directory not found: ${skillDir}`);
+
+const harnessFingerprint = sha256Tree([
+  path.join(repoRoot, "scripts"),
+  path.join(repoRoot, "tasks"),
+  path.join(repoRoot, "package.json"),
+]);
+const expectedModels = Object.fromEntries(agents.map((agent) => [agent, ({
+  codex: codexModel,
+  claude: claudeModel,
+  pool: poolModel,
+}[agent] ?? DEFAULT_MODELS[agent])]));
+const batchConfig = {
+  schema_version: 1,
+  batch_name: batchName,
+  k,
+  tasks,
+  agents,
+  arms,
+  timeout_ms: Number(timeoutMs),
+  models: expectedModels,
+  harness_fingerprint: harnessFingerprint,
+  pool_rate_limit_retries: poolRateLimitRetries,
+  pool_rate_limit_backoff_ms: poolRateLimitBackoffMs,
+  binaries: {
+    but: existsSync(butBin) ? { path: butBin, sha256: sha256File(butBin) } : null,
+    jj: jjBin && existsSync(jjBin) ? { path: jjBin, sha256: sha256File(jjBin) } : null,
+    pool: poolBin && existsSync(poolBin) ? { path: poolBin, sha256: sha256File(poolBin) } : null,
+  },
+  skills: {
+    gitbutler: existsSync(skillDir) ? { path: skillDir, sha256: sha256Tree([skillDir]) } : null,
+    jj_dir: jjSkillDir,
+    jj_package: jjSkillPackage,
+    jj_name: jjSkillName,
+    jj_url: jjSkillUrl,
+  },
+  runtime: { node: process.version, platform: process.platform, arch: process.arch },
+};
+const batchConfigPath = path.join(batchDir, "batch-config.json");
+const existingBatchConfig = assertBatchConfigCompatible(batchDir, batchName, batchConfig);
+mkdirSync(batchDir, { recursive: true });
+writePlan(batchDir, plans);
+if (!existingBatchConfig) {
+  writeFileSync(batchConfigPath, JSON.stringify(batchConfig, null, 2));
+}
+if (butBuildLog !== null) writeFileSync(path.join(batchDir, "but-build.log"), butBuildLog);
+
 for (const plan of plans) {
   const resultPath = path.join(plan.run_dir, "result.json");
   if (resume && existsSync(resultPath)) {
-    appendProgress(batchDir, plan, 0, "skipped-existing-result");
-    continue;
+    const existingResult = readJsonIfExists(resultPath);
+    const expectedModel = expectedModels[plan.agent];
+    if (
+      existingResult?.harness_fingerprint !== harnessFingerprint
+      || existingResult?.task !== plan.task
+      || existingResult?.agent !== plan.agent
+      || existingResult?.arm !== plan.arm
+      || existingResult?.model !== expectedModel
+    ) {
+      throw new Error(`Refusing to skip mismatched existing result: ${plan.run_id}`);
+    }
+    if (!isPoolRateLimitedRun(plan)) {
+      appendProgress(batchDir, plan, 0, "skipped-existing-result");
+      continue;
+    }
+    const archiveDir = archiveRateLimitedAttempt(batchDir, plan);
+    appendProgress(batchDir, plan, 429, `archived-resumed-rate-limit=${archiveDir}`);
   }
 
   const runArgs = [
@@ -766,10 +991,16 @@ for (const plan of plans) {
     "--timeout-ms", timeoutMs,
     "--run-id", plan.run_id,
     "--out", plan.run_dir,
+    "--harness-fingerprint", harnessFingerprint,
   ];
-  const planModel = plan.agent === "codex" ? codexModel : claudeModel;
+  const planModel = {
+    codex: codexModel,
+    claude: claudeModel,
+    pool: poolModel,
+  }[plan.agent];
   if (planModel) runArgs.push("--model", planModel);
   if (jjBin) runArgs.push("--jj-bin", jjBin);
+  if (poolBin) runArgs.push("--pool-bin", poolBin);
   if (jjSkillDir) runArgs.push("--jj-skill-dir", jjSkillDir);
   if (jjSkillPackage) runArgs.push("--jj-skill-package", jjSkillPackage);
   if (jjSkillName) runArgs.push("--jj-skill-name", jjSkillName);
@@ -777,7 +1008,19 @@ for (const plan of plans) {
 
   console.log(`[${plan.idx}/${plans.length}] ${plan.task} ${plan.agent} ${plan.arm} r${plan.rep}`);
   const started = Date.now();
-  const result = runLogged("node", runArgs, { cwd: repoRoot, logPath: plan.log_path });
+  let result;
+  let rateLimitAttempt = 0;
+  while (true) {
+    result = runLogged("node", runArgs, { cwd: repoRoot, logPath: plan.log_path });
+    if (!isPoolRateLimitedRun(plan) || rateLimitAttempt >= poolRateLimitRetries) break;
+
+    const backoffMs = Math.min(poolRateLimitBackoffMs * (2 ** rateLimitAttempt), 600000);
+    rateLimitAttempt += 1;
+    const archiveDir = archiveRateLimitedAttempt(batchDir, plan);
+    appendProgress(batchDir, plan, 429, `pool-rate-limit-attempt-${rateLimitAttempt}; backoff=${backoffMs}ms; archive=${archiveDir}`);
+    console.log(`[${plan.idx}/${plans.length}] Pool 429; retry ${rateLimitAttempt}/${poolRateLimitRetries} in ${(backoffMs / 1000).toFixed(1)}s`);
+    sleepMs(backoffMs);
+  }
   const elapsed = ((Date.now() - started) / 1000).toFixed(1);
   appendProgress(batchDir, plan, result.status ?? 1, `${elapsed}s`);
   console.log(`[${plan.idx}/${plans.length}] exit ${result.status ?? 1} after ${elapsed}s`);

@@ -1,16 +1,17 @@
 #!/usr/bin/env node
-import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { createHash } from "node:crypto";
 import { homedir, tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { parseArgs } from "./lib/args.mjs";
 import { run } from "./lib/process.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
 const DEFAULT_CODEX_MODEL = "gpt-5.5";
+const DEFAULT_POOL_MODEL = "poolside/laguna-s-2.1";
 // Versioned model ID, not the floating `opus` alias: reruns of a published
 // batch must hit the same model. Current-generation Claude models have no
 // dated snapshots; the versioned ID is the pin. Override with --model.
@@ -25,6 +26,23 @@ const DEFAULT_JJ_SKILL = {
   expected_sha256: "e0364004187a1769adc0b532befe346fd4b372bb1aab2768b9ebb694f2d13687",
   selection_note: "Top direct jj result from `npx skills find jj` on 2026-06-29; the skills CLI showed 279 installs.",
 };
+
+function minimalPoolEnvironment(source = process.env) {
+  const allowed = [
+    "PATH",
+    "LANG",
+    "LC_ALL",
+    "LC_CTYPE",
+    "TERM",
+    "SHELL",
+    "USER",
+    "LOGNAME",
+    "NO_COLOR",
+    "SYSTEM_VERSION_COMPAT",
+    "__CF_USER_TEXT_ENCODING",
+  ];
+  return Object.fromEntries(allowed.filter((key) => source[key] !== undefined).map((key) => [key, source[key]]));
+}
 
 const TASK_CONFIGS = {
   "pilot-1-selective-validation": {
@@ -352,6 +370,203 @@ function prepareClaudeConfig(enabled) {
   };
 }
 
+async function startPoolAuthProxy(runDir, sourceCredentialsPath) {
+  const sourceStat = lstatSync(sourceCredentialsPath);
+  if (!sourceStat.isFile() || sourceStat.isSymbolicLink()) {
+    throw new Error(`Refusing non-regular Pool credential source: ${sourceCredentialsPath}`);
+  }
+  const credentials = JSON.parse(readFileSync(sourceCredentialsPath, "utf8"));
+  const credential = Array.isArray(credentials)
+    ? credentials.find((entry) => typeof entry?.apiUrl === "string" && typeof entry?.token === "string")
+    : null;
+  if (!credential || credential.token.length < 20) {
+    throw new Error(`Could not find standalone Pool credentials in ${sourceCredentialsPath}`);
+  }
+  const upstream = new URL(credential.apiUrl);
+  if (!["http:", "https:"].includes(upstream.protocol)) {
+    throw new Error(`Unsupported Pool API protocol: ${upstream.protocol}`);
+  }
+
+  const portFile = path.join(runDir, "pool-auth-proxy.json");
+  const logFile = path.join(runDir, "pool-auth-proxy.log");
+  const child = spawn(process.execPath, [
+    path.join(__dirname, "lib/pool-auth-proxy.mjs"),
+    "--api-url", upstream.toString(),
+    "--port-file", portFile,
+    "--log-file", logFile,
+    "--parent-pid", String(process.pid),
+  ], {
+    cwd: runDir,
+    env: minimalPoolEnvironment(),
+    stdio: ["pipe", "ignore", "ignore"],
+  });
+  child.stdin.on("error", () => {});
+  child.stdin.end(credential.token);
+
+  await new Promise((resolve) => {
+    let attempts = 0;
+    const check = () => {
+      if (existsSync(portFile) || child.exitCode !== null || attempts >= 100) {
+        resolve();
+        return;
+      }
+      attempts += 1;
+      setTimeout(check, 50);
+    };
+    check();
+  });
+  if (!existsSync(portFile)) {
+    if (child.pid) process.kill(child.pid, "SIGTERM");
+    throw new Error("Timed out starting the Pool authentication proxy");
+  }
+  const { port } = JSON.parse(readFileSync(portFile, "utf8"));
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    if (child.pid) process.kill(child.pid, "SIGTERM");
+    throw new Error("Pool authentication proxy returned an invalid port");
+  }
+  const upstreamBasePath = upstream.pathname.replace(/\/$/, "");
+  const apiUrl = `http://127.0.0.1:${port}${upstreamBasePath}`;
+  let stopPromise = null;
+  return {
+    api_url: apiUrl,
+    source_credentials_path: sourceCredentialsPath,
+    log_path: logFile,
+    upstream_origin: upstream.origin,
+    upstream_base_path: upstreamBasePath,
+    sanitized_credentials: [{
+      type: credential.type,
+      apiUrl,
+      token: "POOL_AUTH_PROXY_DUMMY_TOKEN_NOT_A_SECRET",
+      serviceMode: credential.serviceMode,
+    }],
+    stop: () => {
+      if (stopPromise) return stopPromise;
+      stopPromise = new Promise((resolve) => {
+        if (child.exitCode !== null) {
+          resolve();
+          return;
+        }
+        let finished = false;
+        const finish = () => {
+          if (finished) return;
+          finished = true;
+          resolve();
+        };
+        child.once("exit", finish);
+        child.kill("SIGTERM");
+        setTimeout(() => {
+          if (child.exitCode === null) child.kill("SIGKILL");
+          setTimeout(finish, 250).unref();
+        }, 1000).unref();
+      });
+      return stopPromise;
+    },
+  };
+}
+
+function unlinkIsolatedPoolCredential(poolHome, credentialsPath) {
+  const resolvedHome = path.resolve(poolHome);
+  const expectedPath = path.join(resolvedHome, ".config/poolside/credentials.json");
+  if (path.resolve(credentialsPath) !== expectedPath) {
+    throw new Error(`Refusing unexpected Pool credential path: ${credentialsPath}`);
+  }
+  const components = [resolvedHome, path.join(resolvedHome, ".config"), path.join(resolvedHome, ".config/poolside")];
+  for (const component of components) {
+    const stat = lstatSync(component);
+    if (!stat.isDirectory() || stat.isSymbolicLink() || realpathSync(component) !== component) {
+      throw new Error(`Refusing Pool credential cleanup through unsafe directory: ${component}`);
+    }
+  }
+  if (!existsSync(expectedPath)) return;
+  const credentialStat = lstatSync(expectedPath);
+  if (!credentialStat.isFile() || credentialStat.isSymbolicLink()) {
+    throw new Error(`Refusing to unlink non-regular Pool credential: ${expectedPath}`);
+  }
+  unlinkSync(expectedPath);
+}
+
+async function preparePoolHome(runDir, enabled, requestedModel) {
+  if (!enabled) return null;
+
+  const sourceHome = path.resolve(process.env.HOME ?? homedir());
+  const poolHome = path.join(runDir, "pool-home");
+  const sourceConfigDir = path.join(sourceHome, ".config/poolside");
+  const sourceCredentialsPath = path.join(sourceConfigDir, "credentials.json");
+  const configDir = path.join(poolHome, ".config/poolside");
+  mkdirSync(configDir, { recursive: true, mode: 0o700 });
+  chmodSync(configDir, 0o700);
+  mkdirSync(path.join(configDir, "skills"), { recursive: true, mode: 0o700 });
+
+  const authProxy = await startPoolAuthProxy(runDir, sourceCredentialsPath);
+  const settingsPath = path.join(configDir, "settings.yaml");
+  writeFileSync(settingsPath, `pool:
+    api_url: ${JSON.stringify(authProxy.api_url)}
+agent_servers:
+    Poolside:
+        type: custom
+        command: pool
+        args:
+            - acp
+        default_config_options:
+            model: ${JSON.stringify(requestedModel)}
+`, { mode: 0o600 });
+  const credentialsPath = path.join(configDir, "credentials.json");
+  writeFileSync(credentialsPath, JSON.stringify(authProxy.sanitized_credentials), { mode: 0o600 });
+  const runtimeWriteDirs = [
+    path.join(configDir, "skills"),
+    path.join(poolHome, ".config/jj"),
+    path.join(poolHome, "Library/Application Support/poolside"),
+    path.join(poolHome, "Library/Caches/poolside"),
+    path.join(poolHome, ".cache/poolside"),
+  ];
+  for (const directory of runtimeWriteDirs) mkdirSync(directory, { recursive: true, mode: 0o700 });
+
+  return {
+    path: poolHome,
+    source_home: sourceHome,
+    credentials_copied: false,
+    credentials_sanitized: true,
+    settings_copied: false,
+    settings_sanitized: true,
+    configured_model: requestedModel,
+    auth_proxy: authProxy,
+    runtime_write_dirs: runtimeWriteDirs,
+    credentials_path: credentialsPath,
+    cleanup_credentials: () => {
+      unlinkIsolatedPoolCredential(poolHome, credentialsPath);
+    },
+  };
+}
+
+function installPoolHostSandbox(runDir, enabled, writePaths, readDeniedPaths = []) {
+  if (!enabled) return null;
+
+  const executable = executablePath(null, "sandbox-exec");
+  const profilePath = path.join(runDir, "pool-host-sandbox.sb");
+  const allowedWrites = writePaths.filter(Boolean);
+  const writeRules = allowedWrites
+    .map(({ kind, target }) => `(allow file-write* (${kind} ${JSON.stringify(target)}))`)
+    .join("\n");
+  const deniedReads = [profilePath, ...readDeniedPaths.filter(Boolean)];
+  const readRules = deniedReads
+    .map((target) => `(deny file-read* (literal ${JSON.stringify(target)}))`)
+    .join("\n");
+  writeFileSync(profilePath, `(version 1)
+(allow default)
+${readRules}
+(deny file-write*)
+${writeRules}
+(allow file-write* (literal "/dev/null"))
+`);
+  return {
+    executable,
+    profile_path: profilePath,
+    write_roots: allowedWrites.filter((entry) => entry.kind === "subpath").map((entry) => entry.target),
+    write_files: allowedWrites.filter((entry) => entry.kind === "literal").map((entry) => entry.target),
+    read_denied_files: deniedReads,
+  };
+}
+
 function writeWrapper(binDir, tool, realPath, tracePath, arm) {
   const wrapperPath = path.join(binDir, tool);
   const blockGitWrites = tool === "git" && ["but+skill", "jj+skill"].includes(arm);
@@ -361,6 +576,7 @@ function writeWrapper(binDir, tool, realPath, tracePath, arm) {
 
   const body = `#!/usr/bin/env bash
 set +e
+export PATH="$(dirname "$0"):$PATH"
 REAL=${shellQuote(realPath)}
 TRACE=${shellQuote(tracePath)}
 TOOL=${shellQuote(tool)}
@@ -421,7 +637,7 @@ if [[ ${blockGitWrites ? "true" : "false"} == true && "$INTERNAL" != true ]]; th
       fi
       for ((ARG_INDEX = IDX + 1; ARG_INDEX < $#; ARG_INDEX++)); do
         case "\${ARGS[$ARG_INDEX]}" in
-          --list|--show-current) BRANCH_READ=true ;;
+          -a|--all|--list|--show-current) BRANCH_READ=true ;;
         esac
       done
       if [[ "$BRANCH_READ" != true ]]; then
@@ -476,7 +692,7 @@ function parseSkillName(skillFile) {
   return match?.[1] ?? null;
 }
 
-function renderGitButlerInstructions(workspace, realBut, codexSkillPath, claudeSkillPath, butEnv) {
+function renderGitButlerInstructions(workspace, realBut, codexSkillPath, claudeSkillPath, poolSkillPath, butEnv) {
   const setupBlock = run(realBut, ["agent", "setup", "--print"], { cwd: workspace, env: butEnv }).stdout.trimEnd();
   const content = `# AGENTS.md
 
@@ -489,7 +705,7 @@ Work only in the current repository. Do not inspect parent benchmark directories
 The official GitButler CLI skill is installed for this benchmark trial at:
 
 - ${codexSkillPath}
-- ${claudeSkillPath}
+- ${claudeSkillPath}${poolSkillPath ? `\n- ${poolSkillPath}` : ""}
 
 Use the installed skill if your agent runtime loads local skills or you need GitButler command details.
 
@@ -503,7 +719,7 @@ ${setupBlock}
   };
 }
 
-function renderJjInstructions(workspace, realJj, codexSkillPath, claudeSkillPath, sourceMetadata) {
+function renderJjInstructions(workspace, realJj, codexSkillPath, claudeSkillPath, poolSkillPath, sourceMetadata) {
   const version = run(realJj, ["--version"], { cwd: workspace }).stdout.trimEnd();
   const policyBlock = `## Version control
 
@@ -528,7 +744,7 @@ Work only in the current repository. Do not inspect parent benchmark directories
 The local Jujutsu CLI skill is installed for this benchmark trial at:
 
 - ${codexSkillPath}
-- ${claudeSkillPath}
+- ${claudeSkillPath}${poolSkillPath ? `\n- ${poolSkillPath}` : ""}
 
 Skill source: ${sourceMetadata.package ?? sourceMetadata.source_url ?? "external source"}.
 
@@ -545,10 +761,10 @@ ${policyBlock}
   };
 }
 
-function appendHarnessExclude(workspace) {
+function appendHarnessExclude(workspace, includePoolSkill = false) {
   writeFileSync(
     path.join(workspace, ".git/info/exclude"),
-    "\n# version-control-bench harness files\n.codex/\n.claude/\nAGENTS.md\nCLAUDE.md\n",
+    `\n# version-control-bench harness files\n.codex/\n.claude/\n${includePoolSkill ? ".agents/\n" : ""}AGENTS.md\nCLAUDE.md\n`,
     { flag: "a" },
   );
 }
@@ -578,7 +794,55 @@ function installPlainGitInstructions(workspace) {
   };
 }
 
-function installGitButlerSkill(workspace, skillDir, realBut, butEnv) {
+function installPoolToolPolicy(workspace, binDir) {
+  const settingsDir = path.join(workspace, ".poolside");
+  const settingsPath = path.join(settingsDir, "settings.local.yaml");
+  mkdirSync(settingsDir, { recursive: true });
+  writeFileSync(settingsPath, `tools:
+  shell:
+    deny:
+      - "git"
+      - "git *"
+      - "but"
+      - "but *"
+      - "jj"
+      - "jj *"
+      - "*&& git *"
+      - "*&& but *"
+      - "*&& jj *"
+      - "*; git *"
+      - "*; but *"
+      - "*; jj *"
+      - "*| git *"
+      - "*| but *"
+      - "*| jj *"
+      - "* /tmp/*"
+      - "*>/tmp/*"
+      - "*=/tmp/*"
+      - "/tmp/*"
+      - "* /private/tmp/*"
+      - "*>/private/tmp/*"
+      - "*=/private/tmp/*"
+      - "/private/tmp/*"
+paths:
+  allow:
+    - path: ${JSON.stringify(`${workspace}/**`)}
+      write: true
+  deny:
+    - path: "/tmp/**"
+    - path: "/private/tmp/**"
+`);
+  writeFileSync(path.join(workspace, ".git/info/exclude"), ".poolside/\n", { flag: "a" });
+
+  return {
+    settings_path: settingsPath,
+    git_wrapper: path.join(binDir, "git"),
+    but_wrapper: path.join(binDir, "but"),
+    jj_wrapper: path.join(binDir, "jj"),
+  };
+}
+
+function installGitButlerSkill(workspace, skillDir, realBut, butEnv, installPoolSkill = false) {
   const skillFile = path.join(skillDir, "SKILL.md");
   if (!existsSync(skillFile)) {
     throw new Error(`GitButler skill file not found: ${skillFile}`);
@@ -605,7 +869,9 @@ function installGitButlerSkill(workspace, skillDir, realBut, butEnv) {
   }
   const installedSkillContent = installedFrontmatter + sourceSkillContent.slice(frontmatter.length);
 
-  for (const root of [".codex/skills/gitbutler", ".claude/skills/gitbutler"]) {
+  const installRoots = [".codex/skills/gitbutler", ".claude/skills/gitbutler"];
+  if (installPoolSkill) installRoots.push(".agents/skills/gitbutler");
+  for (const root of installRoots) {
     const dest = path.join(workspace, root);
     mkdirSync(dest, { recursive: true });
     writeFileSync(path.join(dest, "SKILL.md"), installedSkillContent);
@@ -617,10 +883,11 @@ function installGitButlerSkill(workspace, skillDir, realBut, butEnv) {
 
   const codexSkillPath = path.join(workspace, ".codex/skills/gitbutler/SKILL.md");
   const claudeSkillPath = path.join(workspace, ".claude/skills/gitbutler/SKILL.md");
-  const instructions = renderGitButlerInstructions(workspace, realBut, codexSkillPath, claudeSkillPath, butEnv);
+  const poolSkillPath = installPoolSkill ? path.join(workspace, ".agents/skills/gitbutler/SKILL.md") : null;
+  const instructions = renderGitButlerInstructions(workspace, realBut, codexSkillPath, claudeSkillPath, poolSkillPath, butEnv);
   writeAgentInstructionFiles(workspace, instructions.content);
 
-  appendHarnessExclude(workspace);
+  appendHarnessExclude(workspace, installPoolSkill);
 
   return {
     name: parseSkillName(skillFile) ?? "but",
@@ -631,6 +898,7 @@ function installGitButlerSkill(workspace, skillDir, realBut, butEnv) {
     instructions: {
       installed_codex: path.join(workspace, "AGENTS.md"),
       installed_claude: path.join(workspace, "CLAUDE.md"),
+      ...(installPoolSkill ? { installed_pool: path.join(workspace, "AGENTS.md") } : {}),
       source_url: "https://docs.gitbutler.com/ai-agents/getting-started#add-optional-agent-instructions",
       source_command: "but agent setup --print",
       setup_block_sha256: instructions.setup_block_sha256,
@@ -684,7 +952,7 @@ function resolveJjSkillSource(runDir, configuredDir, sourceMetadata) {
   return fetchJjSkillSource(runDir, sourceMetadata);
 }
 
-function installJjSkill(workspace, skillDir, realJj, sourceMetadata) {
+function installJjSkill(workspace, skillDir, realJj, sourceMetadata, installPoolSkill = false) {
   const skillFile = path.join(skillDir, "SKILL.md");
   if (!existsSync(skillFile)) {
     throw new Error(`Jujutsu skill file not found: ${skillFile}`);
@@ -694,7 +962,9 @@ function installJjSkill(workspace, skillDir, realJj, sourceMetadata) {
   const installed = [];
   const skillName = parseSkillName(skillFile) ?? sourceMetadata.name ?? path.basename(skillDir);
 
-  for (const root of [`.codex/skills/${skillName}`, `.claude/skills/${skillName}`]) {
+  const installRoots = [`.codex/skills/${skillName}`, `.claude/skills/${skillName}`];
+  if (installPoolSkill) installRoots.push(`.agents/skills/${skillName}`);
+  for (const root of installRoots) {
     const dest = path.join(workspace, root);
     mkdirSync(dest, { recursive: true });
     cpSync(skillFile, path.join(dest, "SKILL.md"));
@@ -706,10 +976,11 @@ function installJjSkill(workspace, skillDir, realJj, sourceMetadata) {
 
   const codexSkillPath = path.join(workspace, `.codex/skills/${skillName}/SKILL.md`);
   const claudeSkillPath = path.join(workspace, `.claude/skills/${skillName}/SKILL.md`);
-  const instructions = renderJjInstructions(workspace, realJj, codexSkillPath, claudeSkillPath, sourceMetadata);
+  const poolSkillPath = installPoolSkill ? path.join(workspace, `.agents/skills/${skillName}/SKILL.md`) : null;
+  const instructions = renderJjInstructions(workspace, realJj, codexSkillPath, claudeSkillPath, poolSkillPath, sourceMetadata);
   writeAgentInstructionFiles(workspace, instructions.content);
 
-  appendHarnessExclude(workspace);
+  appendHarnessExclude(workspace, installPoolSkill);
 
   return {
     name: skillName,
@@ -720,6 +991,7 @@ function installJjSkill(workspace, skillDir, realJj, sourceMetadata) {
     instructions: {
       installed_codex: path.join(workspace, "AGENTS.md"),
       installed_claude: path.join(workspace, "CLAUDE.md"),
+      ...(installPoolSkill ? { installed_pool: path.join(workspace, "AGENTS.md") } : {}),
       source_package: sourceMetadata.package ?? null,
       source_url: sourceMetadata.source_url ?? null,
       source_command: "jj --version",
@@ -729,7 +1001,7 @@ function installJjSkill(workspace, skillDir, realJj, sourceMetadata) {
   };
 }
 
-function prepareWorkspace(runDir, arm, realBut, butSkillDir, realJj, jjSkill, butEnv) {
+function prepareWorkspace(runDir, arm, agent, realBut, butSkillDir, realJj, jjSkill, butEnv) {
   const workspace = path.join(runDir, "workspace");
   const dirty = arm === "git" && taskConfig.fixtureDirty !== false;
   run("node", [path.join(repoRoot, taskConfig.createFixtureScript), "--out", workspace, "--force", "true", "--dirty", String(dirty)], {
@@ -744,7 +1016,7 @@ function prepareWorkspace(runDir, arm, realBut, butSkillDir, realJj, jjSkill, bu
     if (taskConfig.gitbutlerPrep === "setup-and-apply-branch") {
       run(realBut, ["apply", taskConfig.applyBranch], { cwd: workspace, stdio: "pipe", env: butEnv });
     }
-    const setup = installGitButlerSkill(workspace, butSkillDir, realBut, butEnv);
+    const setup = installGitButlerSkill(workspace, butSkillDir, realBut, butEnv, agent === "pool");
     if (taskConfig.applyDirtyState !== false) {
       run("node", [path.join(repoRoot, taskConfig.applyStateScript), "dirty", workspace], { cwd: repoRoot });
     }
@@ -754,7 +1026,7 @@ function prepareWorkspace(runDir, arm, realBut, butSkillDir, realJj, jjSkill, bu
   if (arm === "jj+skill") {
     run(realJj, ["git", "init", "--colocate"], { cwd: workspace, stdio: "pipe" });
     run(realJj, ["config", "set", "--repo", "ui.paginate", "never"], { cwd: workspace, stdio: "pipe" });
-    const setup = installJjSkill(workspace, jjSkill.dir, realJj, jjSkill.source);
+    const setup = installJjSkill(workspace, jjSkill.dir, realJj, jjSkill.source, agent === "pool");
     if (taskConfig.applyDirtyState !== false) {
       run("node", [path.join(repoRoot, taskConfig.applyStateScript), "dirty", workspace], { cwd: repoRoot });
     }
@@ -764,22 +1036,43 @@ function prepareWorkspace(runDir, arm, realBut, butSkillDir, realJj, jjSkill, bu
   return { workspace, setup: { instructions: installPlainGitInstructions(workspace) } };
 }
 
-function buildPrompt() {
+function buildPrompt(agent, poolToolPolicy, poolSkillName) {
   const instruction = readFileSync(path.join(taskDir, "instruction.md"), "utf8").trim();
+  const poolSkill = agent === "pool" && poolSkillName
+    ? [`Before any version-control work, load and follow the \`$${poolSkillName}\` skill installed for this trial.`, ""]
+    : [];
+  const poolPolicy = agent === "pool" && poolToolPolicy
+    ? [
+        "Harness requirement: invoke version-control CLIs only through these absolute executables:",
+        `- Git: ${poolToolPolicy.git_wrapper}`,
+        `- GitButler: ${poolToolPolicy.but_wrapper}`,
+        `- Jujutsu: ${poolToolPolicy.jj_wrapper}`,
+        "Do not invoke raw `git`, `but`, or `jj` command names; unwrapped invocations are blocked or invalidate the trial so the harness can enforce the selected arm and record measurements.",
+        "Keep every temporary file inside the run-specific `$TMPDIR`; never create or modify files under system `/tmp` or `/private/tmp`.",
+        "",
+      ]
+    : [];
 
   return [
     "You are running inside a version-control benchmark sandbox.",
     "All requested file changes already exist. Do not implement new code; only perform the requested version-control operation.",
     "Work only in the current repository. Do not inspect parent benchmark directories, hidden oracle files, or solution scripts.",
     "",
+    ...poolSkill,
+    ...poolPolicy,
     `Task: ${instruction}`,
     "",
     "When the repository state is correct, stop.",
   ].join("\n");
 }
 
-function agentCliVersion(agent) {
-  const cmd = agent === "codex" ? "codex" : "claude";
+function agentCliVersion(agent, configuredExecutable = null) {
+  const cmd = configuredExecutable ?? {
+    codex: "codex",
+    claude: "claude",
+    pool: "pool",
+  }[agent];
+  if (!cmd) return null;
   const probe = run(cmd, ["--version"], { check: false });
   if (probe.status !== 0) return null;
   return `${probe.stdout}${probe.stderr}`.trim().split("\n")[0] || null;
@@ -820,6 +1113,23 @@ function runAgent(agent, workspace, prompt, env, model, timeoutMs) {
     }
     if (model) args.push("--model", model);
     args.push(prompt);
+  } else if (agent === "pool") {
+    const poolArgs = [
+      "exec",
+      "--unsafe-auto-allow",
+      "--sandbox", "disabled",
+      "-d", workspace,
+      "-o", "json",
+      "--verbose",
+      "-p", prompt,
+    ];
+    if (env.VCB_POOL_HOST_SANDBOX_PROFILE) {
+      cmd = env.VCB_POOL_HOST_SANDBOX_EXECUTABLE;
+      args = ["-f", env.VCB_POOL_HOST_SANDBOX_PROFILE, env.VCB_POOL_EXECUTABLE, ...poolArgs];
+    } else {
+      cmd = env.VCB_POOL_EXECUTABLE ?? "pool";
+      args = poolArgs;
+    }
   } else {
     throw new Error(`Unknown agent: ${agent}`);
   }
@@ -861,6 +1171,76 @@ function parseJsonObject(text) {
   }
 }
 
+function parseNdjson(text) {
+  const entries = [];
+  const errors = [];
+  for (const [index, line] of text.split(/\r?\n/).entries()) {
+    if (!line.trim()) continue;
+    const parsed = parseJsonObject(line);
+    if (parsed) {
+      entries.push(parsed);
+    } else {
+      errors.push(`line ${index + 1} is not a JSON object`);
+    }
+  }
+  return { entries, errors };
+}
+
+function poolTrajectoryDirectory(env, poolExecutable = "pool") {
+  const config = run(poolExecutable, ["config"], { env, check: false });
+  if (config.status !== 0) {
+    throw new Error(`pool config failed (${config.status}): ${config.stderr.trim()}`);
+  }
+  const directory = /^trajectory directory:\s*(.+)$/m.exec(config.stdout)?.[1]?.trim();
+  if (!directory) {
+    throw new Error(`Could not parse Pool trajectory directory from: ${JSON.stringify(config.stdout)}`);
+  }
+  return path.resolve(directory);
+}
+
+function locatePoolTrajectory(workspace, agentResult, runDir, env, poolExecutable = "pool") {
+  const trajectoryDir = poolTrajectoryDirectory(env, poolExecutable);
+  if (!existsSync(trajectoryDir)) {
+    throw new Error(`Pool trajectory directory not found: ${trajectoryDir}`);
+  }
+
+  const normalizedWorkspace = path.resolve(workspace);
+  const toleranceMs = 5000;
+  const matches = [];
+  for (const name of readdirSync(trajectoryDir).filter((entry) => entry.endsWith(".ndjson"))) {
+    const sourcePath = path.join(trajectoryDir, name);
+    const text = readFileSync(sourcePath, "utf8");
+    const parsed = parseNdjson(text);
+    if (parsed.errors.length > 0) continue;
+    const start = parsed.entries.find((entry) => entry.type === "session.start");
+    const workingDirectories = start?.session_start?.working_directories;
+    const timestampMs = Date.parse(start?.timestamp ?? "");
+    const workspaceMatches = Array.isArray(workingDirectories)
+      && workingDirectories.some((directory) => path.resolve(directory) === normalizedWorkspace);
+    const timeMatches = Number.isFinite(timestampMs)
+      && timestampMs >= agentResult.start_ms - toleranceMs
+      && timestampMs <= agentResult.end_ms + toleranceMs;
+    if (workspaceMatches && timeMatches) {
+      matches.push({ sourcePath, text, entries: parsed.entries, timestampMs });
+    }
+  }
+
+  if (matches.length !== 1) {
+    throw new Error(
+      `Expected exactly one Pool trajectory for ${workspace} during the agent run; found ${matches.length}`,
+    );
+  }
+
+  const match = matches[0];
+  const installedPath = path.join(runDir, "pool-trajectory.ndjson");
+  cpSync(match.sourcePath, installedPath);
+  return {
+    source_path: match.sourcePath,
+    installed_path: installedPath,
+    entries: match.entries,
+  };
+}
+
 function usageTokenTotal(usage) {
   if (!usage || typeof usage !== "object") return 0;
   return [
@@ -888,6 +1268,229 @@ function primaryModelFromUsage(modelUsage) {
   return entries[0]?.model ?? null;
 }
 
+function splitShellClauses(command) {
+  const clauses = [];
+  let text = "";
+  let quote = null;
+  let escaped = false;
+  let precedingOperator = null;
+  const push = (nextOperator) => {
+    if (text.trim()) clauses.push({ text: text.trim().replace(/^[({]\s*/, ""), preceding_operator: precedingOperator });
+    text = "";
+    precedingOperator = nextOperator;
+  };
+
+  for (let index = 0; index < command.length; index += 1) {
+    const char = command[index];
+    if (escaped) {
+      text += char;
+      escaped = false;
+      continue;
+    }
+    if (char === "\\" && quote !== "'") {
+      text += char;
+      escaped = true;
+      continue;
+    }
+    if (quote) {
+      text += char;
+      if (char === quote) quote = null;
+      continue;
+    }
+    if (char === "'" || char === '"') {
+      quote = char;
+      text += char;
+      continue;
+    }
+    const pair = command.slice(index, index + 2);
+    if (pair === "&&" || pair === "||") {
+      push(pair);
+      index += 1;
+      continue;
+    }
+    if (char === ";" || char === "|" || char === "\n") {
+      push(char);
+      continue;
+    }
+    text += char;
+  }
+  push(null);
+  return clauses;
+}
+
+function shellTokens(clause) {
+  const tokens = [];
+  let token = "";
+  let quote = null;
+  let escaped = false;
+  let started = false;
+  const push = () => {
+    if (started) tokens.push(token);
+    token = "";
+    started = false;
+  };
+
+  for (const char of clause) {
+    if (escaped) {
+      token += char;
+      started = true;
+      escaped = false;
+      continue;
+    }
+    if (char === "\\" && quote !== "'") {
+      escaped = true;
+      started = true;
+      continue;
+    }
+    if (quote) {
+      if (char === quote) quote = null;
+      else token += char;
+      started = true;
+      continue;
+    }
+    if (char === "'" || char === '"') {
+      quote = char;
+      started = true;
+      continue;
+    }
+    if (/\s/.test(char)) {
+      push();
+      continue;
+    }
+    token += char;
+    started = true;
+  }
+  if (escaped) token += "\\";
+  push();
+  return tokens;
+}
+
+function shellAssignment(token) {
+  const match = /^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/.exec(token);
+  return match ? { name: match[1], value: match[2] } : null;
+}
+
+function shellRedirection(token) {
+  const match = /^(?:(?:\d+)?(?:>>?|<<<?|<>|>&|<&)|&>>?)(.*)$/.exec(token ?? "");
+  return match ? { hasTarget: match[1].length > 0 } : null;
+}
+
+function expandShellExecutable(token, variables) {
+  const match = /^\$(?:\{([A-Za-z_][A-Za-z0-9_]*)\}|([A-Za-z_][A-Za-z0-9_]*))$/.exec(token ?? "");
+  return match ? (variables.get(match[1] ?? match[2]) ?? token) : token;
+}
+
+function vcInvocation(executable, args, clause, precedingOperator, wrapperPaths) {
+  const tool = executable ? path.basename(executable) : null;
+  if (!["git", "but", "jj"].includes(tool)) return null;
+  const expectedWrapper = wrapperPaths?.[tool] ? path.resolve(wrapperPaths[tool]) : null;
+  const normalizedExecutable = path.isAbsolute(executable) ? path.resolve(executable) : executable;
+  return {
+    tool,
+    executable,
+    kind: expectedWrapper && normalizedExecutable === expectedWrapper ? "wrapper" : "raw",
+    argv: args.join(" "),
+    command: clause,
+    preceding_operator: precedingOperator,
+  };
+}
+
+function shellVcInvocations(command, wrapperPaths = {}, initialVariables = new Map()) {
+  if (typeof command !== "string") return [];
+  const invocations = [];
+  const variables = new Map(initialVariables);
+
+  for (const clause of splitShellClauses(command)) {
+    const tokens = shellTokens(clause.text);
+    let index = 0;
+    const consumePrefixes = () => {
+      let consumed = true;
+      while (consumed && index < tokens.length) {
+        consumed = false;
+        if (["do", "then", "else", "if", "while", "until", "!"].includes(tokens[index])) {
+          index += 1;
+          consumed = true;
+          continue;
+        }
+        const assignment = shellAssignment(tokens[index]);
+        if (assignment) {
+          variables.set(assignment.name, assignment.value);
+          index += 1;
+          consumed = true;
+          continue;
+        }
+        const redirection = shellRedirection(tokens[index]);
+        if (redirection) {
+          index += redirection.hasTarget ? 1 : 2;
+          consumed = true;
+        }
+      }
+    };
+    consumePrefixes();
+    if (index >= tokens.length) continue;
+
+    let launcher = path.basename(tokens[index]);
+    while (["command", "exec", "nohup", "sudo", "time", "env"].includes(launcher)) {
+      if (launcher === "command" && ["-v", "-V"].includes(tokens[index + 1])) {
+        index = tokens.length;
+        break;
+      }
+      const activeLauncher = launcher;
+      index += 1;
+      while (index < tokens.length && tokens[index].startsWith("-")) {
+        const option = tokens[index];
+        index += 1;
+        const takesValue = (activeLauncher === "env" && ["-u", "--unset", "-C", "--chdir"].includes(option))
+          || (activeLauncher === "sudo" && ["-u", "--user", "-g", "--group", "-h", "--host", "-p", "--prompt", "-C", "--chdir"].includes(option))
+          || (activeLauncher === "time" && ["-f", "--format", "-o", "--output"].includes(option));
+        if (takesValue) index += 1;
+      }
+      while (index < tokens.length) {
+        const assignment = shellAssignment(tokens[index]);
+        if (!assignment) break;
+        variables.set(assignment.name, assignment.value);
+        index += 1;
+      }
+      consumePrefixes();
+      launcher = path.basename(tokens[index] ?? "");
+    }
+    if (index >= tokens.length) continue;
+
+    const executable = expandShellExecutable(tokens[index], variables);
+    const basename = path.basename(executable ?? "");
+    const args = tokens.slice(index + 1);
+    if (["sh", "bash", "zsh"].includes(basename)) {
+      const commandIndex = args.findIndex((arg) => arg === "-c");
+      if (commandIndex >= 0 && typeof args[commandIndex + 1] === "string") {
+        invocations.push(...shellVcInvocations(args[commandIndex + 1], wrapperPaths, variables));
+      }
+      continue;
+    }
+    if (basename === "xargs") {
+      const nestedIndex = args.findIndex((arg) => ["git", "but", "jj"].includes(path.basename(expandShellExecutable(arg, variables) ?? "")));
+      if (nestedIndex >= 0) {
+        const nestedExecutable = expandShellExecutable(args[nestedIndex], variables);
+        const invocation = vcInvocation(nestedExecutable, args.slice(nestedIndex + 1), clause.text, clause.preceding_operator, wrapperPaths);
+        if (invocation) invocations.push(invocation);
+      }
+      continue;
+    }
+    if (basename === "find") {
+      const execIndex = args.findIndex((arg) => arg === "-exec" || arg === "-execdir");
+      if (execIndex >= 0) {
+        const nestedExecutable = expandShellExecutable(args[execIndex + 1], variables);
+        const invocation = vcInvocation(nestedExecutable, args.slice(execIndex + 2), clause.text, clause.preceding_operator, wrapperPaths);
+        if (invocation) invocations.push(invocation);
+      }
+      continue;
+    }
+
+    const invocation = vcInvocation(executable, args, clause.text, clause.preceding_operator, wrapperPaths);
+    if (invocation) invocations.push(invocation);
+  }
+  return invocations;
+}
+
 // Codex prints a trailing "tokens used\n<n,nnn>" block on stderr.
 function parseCodexTokensUsed(stderr) {
   const matches = [...stderr.matchAll(/tokens used\s*[\r\n]+\s*([\d,]+)/gi)];
@@ -913,7 +1516,346 @@ function claudeTokensUsed(parsed) {
   return total > 0 ? total : null;
 }
 
-function parseAgentOutput(agent, agentResult) {
+function poolRateLimitError(agentResult, entries) {
+  if (agentResult.status === 0 || agentResult.timed_out) return null;
+  const statusKeys = new Set(["status", "statusCode", "status_code", "httpStatus"]);
+  const hasStructured429 = (value) => {
+    if (!value || typeof value !== "object") return false;
+    return Object.entries(value).some(([key, nested]) =>
+      (statusKeys.has(key) && Number(nested) === 429) || hasStructured429(nested));
+  };
+  if (entries.some((entry) => hasStructured429(entry))) {
+    return { kind: "rate_limit", status_code: 429, detector_version: 1, source: "structured-error" };
+  }
+  const errorText = [
+    agentResult.stderr,
+    ...entries
+      .filter((entry) => entry.type === "error" || entry.error || entry.err)
+      .map((entry) => JSON.stringify(entry)),
+  ].filter(Boolean).join("\n");
+  const explicit429 = /(?:HTTP\s*429|status(?:_|\s)?code\s*[:=]?\s*429|429\s+Too Many Requests)/i.test(errorText);
+  const rateLimited429 = /\b429\b/.test(errorText) && /(?:rate.?limit|too many requests)/i.test(errorText);
+  return explicit429 || rateLimited429
+    ? { kind: "rate_limit", status_code: 429, detector_version: 1, source: "error-channel" }
+    : null;
+}
+
+function nestedStringValues(value) {
+  if (typeof value === "string") return [value];
+  if (Array.isArray(value)) return value.flatMap(nestedStringValues);
+  if (value && typeof value === "object") return Object.values(value).flatMap(nestedStringValues);
+  return [];
+}
+
+function indirectRawVcReferences(value) {
+  const references = [];
+  const pattern = /(?:^|[\s;|&!>(`"'])\s*(?:exec\s+)?(?:\/(?:[^\s/;|&()`"']+)\/)*(git|but|jj)\s+(?:add|am|apply|branch|checkout|cherry-pick|clean|commit|merge|mv|rebase|reset|restore|revert|rm|stash|switch|tag|update-index|update-ref|status|diff|show|log|rev-parse|for-each-ref|ls-files|squash|move|uncommit|amend|pull|push|new|split|describe|edit|abandon)\b/gim;
+  for (const text of nestedStringValues(value)) {
+    for (const match of text.matchAll(pattern)) references.push({ tool: match[1].toLowerCase(), sample: match[0].trim() });
+  }
+  return references;
+}
+
+function indirectExecutableRawVcReferences(value) {
+  return indirectRawVcReferences(
+    nestedStringValues(value)
+      .map((text) => text.split("\n").filter((line) => !/^\s*#/.test(line)).join("\n")),
+  );
+}
+
+function parsePoolOutput(agentResult, trajectory, requestedModel, options = {}) {
+  const parsedStdout = parseNdjson(agentResult.stdout);
+  const transcriptEntries = parsedStdout.entries.filter(
+    (entry) => ["assistantMessage", "toolCall", "toolCallResult"].includes(entry.type),
+  );
+  const transcriptStdout = transcriptEntries.length > 0
+    ? `${transcriptEntries.map((entry) => JSON.stringify(entry)).join("\n")}\n`
+    : "";
+  const errors = parsedStdout.errors.map((error) => `Pool stdout ${error}`);
+  let pendingToolCall = null;
+  const policyDenials = [];
+  const shellVcCalls = [];
+  const shellEvents = [];
+  const externalPathAttempts = [];
+  const indirectRawVcCalls = [];
+  const unsupportedShellVcCalls = [];
+  let skillReferenceOutputBytes = 0;
+  for (let eventIndex = 0; eventIndex < parsedStdout.entries.length; eventIndex += 1) {
+    const entry = parsedStdout.entries[eventIndex];
+    if (entry.type === "toolCall") {
+      if (pendingToolCall) errors.push(`Pool emitted a tool call before the prior ${pendingToolCall.name ?? "unknown"} call returned`);
+      const serializedArgs = JSON.stringify(entry.args ?? {});
+      if (/(?:^|[\s"'=><;|&(])\/(?:private\/)?tmp\//.test(serializedArgs)) {
+        externalPathAttempts.push({ tool: entry.name ?? null, args: entry.args ?? null });
+      }
+      if (entry.name !== "shell") indirectRawVcCalls.push(...indirectExecutableRawVcReferences(entry.args ?? {}));
+      const shellEvent = entry.name === "shell" && typeof entry.args?.cmd === "string"
+        ? {
+            event_index: eventIndex,
+            command: entry.args.cmd,
+            result_seen: false,
+            result_error: null,
+            policy_denial: false,
+            vc_invocations: shellVcInvocations(entry.args.cmd, options.wrapper_paths),
+          }
+        : null;
+      if (shellEvent) {
+        const command = entry.args.cmd;
+        const invokesOpaqueLoader = /(?:^|[;&|]\s*)(?:eval|source|\.)\s+\S+/.test(command);
+        const hasOpaqueSyntaxAroundVc = /(?:`|\$\(|[<>]\()/.test(command)
+          && /\b(?:git|but|jj)\b/.test(command);
+        const hasIndirectRawVcText = indirectExecutableRawVcReferences(command).length > 0;
+        const writesUnparsedVcText = hasIndirectRawVcText
+          && (/<</.test(command) || (/>/.test(command) && shellEvent.vc_invocations.length === 0));
+        if (invokesOpaqueLoader || hasOpaqueSyntaxAroundVc || writesUnparsedVcText) {
+          unsupportedShellVcCalls.push(command.trim());
+        }
+        shellEvents.push(shellEvent);
+        shellVcCalls.push(...shellEvent.vc_invocations);
+      }
+      pendingToolCall = { name: entry.name ?? null, args: entry.args ?? {}, shell_event: shellEvent };
+      continue;
+    }
+    if (entry.type === "toolCallResult") {
+      if (!pendingToolCall) {
+        errors.push("Pool emitted a tool result without a pending tool call");
+        continue;
+      }
+      if (pendingToolCall.shell_event) {
+        pendingToolCall.shell_event.result_seen = true;
+        pendingToolCall.shell_event.result_error = typeof entry.err === "string" ? entry.err : null;
+        const denyMatch = typeof entry.err === "string"
+          ? entry.err.match(/matched shell deny setting:\s*(git|but|jj)(?:\s+\*|\b)/i)
+          : null;
+        if (denyMatch) {
+          pendingToolCall.shell_event.policy_denial = true;
+          const deniedInvocations = pendingToolCall.shell_event.vc_invocations.length > 0
+            ? pendingToolCall.shell_event.vc_invocations
+            : [{ tool: denyMatch[1].toLowerCase(), argv: "", command: pendingToolCall.shell_event.command }];
+          for (const invocation of deniedInvocations) {
+            policyDenials.push({
+              bucket: "task",
+              tool: invocation.tool,
+              status: 42,
+              argv: invocation.argv || invocation.command,
+            });
+          }
+        }
+      }
+      if (
+        pendingToolCall.name === "skill"
+        && (!options.expected_skill_name || pendingToolCall.args?.name === options.expected_skill_name)
+        && typeof entry.result === "string"
+      ) {
+        const serializedWithResult = JSON.stringify(entry);
+        const serializedWithoutResult = JSON.stringify({ ...entry, result: "" });
+        skillReferenceOutputBytes += Buffer.byteLength(serializedWithResult) - Buffer.byteLength(serializedWithoutResult);
+      }
+      pendingToolCall = null;
+    }
+  }
+  if (pendingToolCall && (!agentResult.timed_out || pendingToolCall.name !== "shell")) {
+    errors.push(`Pool transcript ended with an unresolved ${pendingToolCall.name ?? "unknown"} tool call`);
+  }
+  if (externalPathAttempts.length > 0) {
+    errors.push(`Pool shell command referenced a system temp path outside the run sandbox (${externalPathAttempts.length} attempt(s))`);
+  }
+  if (indirectRawVcCalls.length > 0) {
+    errors.push(`Pool tool content contained ${indirectRawVcCalls.length} indirect raw VC invocation(s)`);
+  }
+  if (unsupportedShellVcCalls.length > 0) {
+    errors.push(`Pool shell command used unsupported syntax around VC invocation(s) (${unsupportedShellVcCalls.length} call(s))`);
+  }
+  if (transcriptEntries.length === 0) errors.push("Pool stdout contained no transcript events");
+  if (trajectory.error) errors.push(`Pool trajectory: ${trajectory.error}`);
+
+  const trajectoryEntries = trajectory.entries ?? [];
+  const inferenceModels = trajectoryEntries
+    .filter((entry) => entry.type === "tool_call.inference.start")
+    .map((entry) => entry.tool_call_inference_start?.chat_completion_request?.model)
+    .filter((value) => typeof value === "string" && value.length > 0);
+  const observedModels = [...new Set(inferenceModels)];
+  const observedModel = observedModels.length === 1 ? observedModels[0] : null;
+  if (inferenceModels.length === 0) {
+    errors.push("Pool trajectory contained no inference-start model");
+  } else if (observedModels.length !== 1) {
+    errors.push(`Pool trajectory used multiple models: ${observedModels.join(", ")}`);
+  } else if (observedModel !== requestedModel) {
+    errors.push(`Pool model mismatch: requested ${requestedModel}, observed ${observedModel}`);
+  }
+
+  const tokenKeys = [
+    "input_tokens",
+    "output_tokens",
+    "cache_read_input_tokens",
+    "cache_write_input_tokens",
+  ];
+  let inferenceEndCount = 0;
+  let tokensUsedTotal = 0;
+  for (const entry of trajectoryEntries.filter((candidate) => candidate.type === "tool_call.inference.end")) {
+    inferenceEndCount += 1;
+    const usage = entry.tool_call_inference_end ?? {};
+    tokensUsedTotal += tokenKeys.reduce(
+      (sum, key) => sum + (Number.isFinite(usage[key]) ? usage[key] : 0),
+      0,
+    );
+  }
+
+  return {
+    output_format: "nljson",
+    parse_error: errors.length > 0,
+    output_error: errors.length > 0 ? errors.join("; ") : null,
+    observed_model: observedModel,
+    observed_model_source: "trajectory.inference.start",
+    observed_models: observedModels,
+    inference_start_count: inferenceModels.length,
+    inference_end_count: inferenceEndCount,
+    tokens_used_total: inferenceEndCount > 0 ? tokensUsedTotal : null,
+    retryable_error: poolRateLimitError(agentResult, parsedStdout.entries),
+    policy_denials: policyDenials,
+    shell_vc_attempt_count: shellVcCalls.length,
+    shell_vc_calls: shellVcCalls,
+    shell_events: shellEvents,
+    external_path_attempt_count: externalPathAttempts.length,
+    external_path_attempts: externalPathAttempts,
+    indirect_raw_vc_invocation_count: indirectRawVcCalls.length,
+    indirect_raw_vc_invocations: indirectRawVcCalls,
+    unsupported_shell_vc_call_count: unsupportedShellVcCalls.length,
+    unsupported_shell_vc_calls: unsupportedShellVcCalls,
+    pending_tool_call: pendingToolCall ? { name: pendingToolCall.name, args: pendingToolCall.args } : null,
+    skill_reference_output_bytes: skillReferenceOutputBytes,
+    transcript_stdout: transcriptStdout,
+    trajectory_source_path: trajectory.source_path ?? null,
+    trajectory_path: trajectory.installed_path ?? null,
+  };
+}
+
+function applyUntracedPolicyDenials(metrics, measurement, denials) {
+  if (!Array.isArray(denials) || denials.length === 0) return;
+
+  metrics.total_logged_commands += denials.length;
+  metrics.shell_logged_commands += denials.length;
+  metrics.shell_vc_command_count += denials.length;
+  metrics.vc_command_count += denials.length;
+  metrics.task_vc_command_count += denials.length;
+  metrics.failed_vc_commands += denials.length;
+  metrics.task_failed_vc_commands += denials.length;
+  metrics.untraced_policy_denial_count = denials.length;
+  measurement.commands.total_logged_commands += denials.length;
+
+  for (const bucketName of ["visible", "task"]) {
+    const bucket = measurement.commands[bucketName];
+    bucket.command_count += denials.length;
+    bucket.vc_command_count += denials.length;
+    bucket.failed_vc_command_count += denials.length;
+    bucket.policy_block_count += denials.length;
+    for (const denial of denials) {
+      bucket[`${denial.tool}_command_count`] += 1;
+      const syntheticEntry = { tool: denial.tool, argv: denial.argv, status: denial.status };
+      if (isInspection(syntheticEntry)) bucket.inspection_count += 1;
+      if (isMutation(syntheticEntry)) bucket.mutation_count += 1;
+    }
+    bucket.read_to_write_ratio = bucket.mutation_count > 0 ? bucket.inspection_count / bucket.mutation_count : null;
+  }
+  for (const denial of denials) {
+    const syntheticEntry = { tool: denial.tool, argv: denial.argv, status: denial.status };
+    if (isInspection(syntheticEntry)) {
+      metrics.vc_inspection_count += 1;
+      metrics.task_vc_inspection_count += 1;
+    }
+    if (isMutation(syntheticEntry)) {
+      metrics.vc_mutation_count += 1;
+      metrics.task_vc_mutation_count += 1;
+    }
+  }
+  metrics.read_to_write_ratio = metrics.vc_mutation_count > 0
+    ? metrics.vc_inspection_count / metrics.vc_mutation_count
+    : null;
+  metrics.task_read_to_write_ratio = metrics.task_vc_mutation_count > 0
+    ? metrics.task_vc_inspection_count / metrics.task_vc_mutation_count
+    : null;
+  measurement.commands.untraced_policy_denial_count = denials.length;
+  measurement.commands.synthetic_policy_denial_count = denials.length;
+  measurement.commands.failed_command_samples = [
+    ...measurement.commands.failed_command_samples,
+    ...denials,
+  ].slice(0, 10);
+}
+
+function reconcilePoolVcInvocations(agentOutput, trace, timedOut) {
+  const visibleTrace = trace.filter((entry) => !entry.internal && isVcEntry(entry));
+  const events = Array.isArray(agentOutput.shell_events) ? agentOutput.shell_events : [];
+  const inFlight = [];
+  const unmatchedRaw = [];
+  const missingWrappers = [];
+  let traceCursor = 0;
+  const comparableParts = (argv) => commandParts(argv)
+    .filter((part) => !/^\d*(?:>|<)/.test(part) && part !== "&")
+    .map((part) => part.replace(/^['"]|['"]$/g, ""));
+  const invocationMatchesTrace = (invocation, entry) => {
+    if (invocation.tool !== entry.tool) return false;
+    const expected = comparableParts(invocation.argv);
+    const actual = comparableParts(entry.argv);
+    if (expected.length !== actual.length) return false;
+    return expected.every((part, index) => /^\$\{?[A-Za-z_][A-Za-z0-9_]*\}?$/.test(part) || part === actual[index]);
+  };
+
+  for (const event of events.filter((candidate) => candidate.result_seen && !candidate.policy_denial)) {
+    for (const invocation of event.vc_invocations) {
+      const relativeIndex = visibleTrace.slice(traceCursor).findIndex((entry) => invocationMatchesTrace(invocation, entry));
+      if (relativeIndex >= 0) {
+        traceCursor += relativeIndex + 1;
+      } else if (invocation.kind === "wrapper") {
+        missingWrappers.push(invocation);
+      } else {
+        unmatchedRaw.push({ event, invocation });
+      }
+    }
+  }
+
+  const pendingEvents = events.filter((event) => !event.result_seen);
+  if (timedOut && pendingEvents.length === 1 && agentOutput.pending_tool_call?.name === "shell") {
+    const pendingWrappers = pendingEvents[0].vc_invocations.filter((invocation) => invocation.kind === "wrapper");
+    if (pendingWrappers.length === 1 && pendingWrappers.length === pendingEvents[0].vc_invocations.length) {
+      inFlight.push(...pendingWrappers);
+    }
+  }
+
+  agentOutput.in_flight_vc_invocations = inFlight;
+  if (pendingEvents.length > 0 && inFlight.length === 0) {
+    agentOutput.output_error = [agentOutput.output_error, "Pool transcript ended with an invalid unresolved shell VC call"]
+      .filter(Boolean)
+      .join("; ");
+    agentOutput.parse_error = true;
+  }
+  if (missingWrappers.length > 0) {
+    agentOutput.missing_wrapper_trace_count = missingWrappers.length;
+    agentOutput.missing_wrapper_traces = missingWrappers;
+    agentOutput.output_error = [
+      agentOutput.output_error,
+      `Pool transcript contained ${missingWrappers.length} completed wrapper VC invocation(s) without a compatible trace`,
+    ].filter(Boolean).join("; ");
+    agentOutput.parse_error = true;
+  }
+  if (unmatchedRaw.length > 0) {
+    agentOutput.untraced_vc_invocation_count = unmatchedRaw.length;
+    agentOutput.untraced_vc_invocations = unmatchedRaw.map(({ invocation }) => invocation);
+    agentOutput.output_error = [
+      agentOutput.output_error,
+      `Pool transcript contained ${unmatchedRaw.length} raw VC invocation(s) not resolved through a wrapper or policy denial`,
+    ].filter(Boolean).join("; ");
+    agentOutput.parse_error = true;
+  }
+}
+
+function parseAgentOutput(agent, agentResult, options = {}) {
+  if (agent === "pool") {
+    return parsePoolOutput(agentResult, options.pool_trajectory ?? {}, options.requested_model, {
+      wrapper_paths: options.wrapper_paths ?? {},
+      expected_skill_name: options.expected_skill_name ?? null,
+    });
+  }
+
   if (agent !== "claude") {
     return {
       output_format: "text",
@@ -1137,7 +2079,7 @@ function isGitInspection(entry) {
   const { command, args } = vcSubcommand(entry);
   if (args.includes("--help") || args.includes("-h")) return true;
   if (command === "branch") {
-    return args.includes("--list") || args.includes("--show-current") || args.length === 0;
+    return args.includes("-a") || args.includes("--all") || args.includes("--list") || args.includes("--show-current") || args.length === 0;
   }
   return GIT_INSPECTIONS.has(command);
 }
@@ -1146,7 +2088,7 @@ function isGitMutation(entry) {
   const { command, args } = vcSubcommand(entry);
   if (args.includes("--help") || args.includes("-h")) return false;
   if (command === "branch") {
-    return !(args.includes("--list") || args.includes("--show-current") || args.length === 0);
+    return !(args.includes("-a") || args.includes("--all") || args.includes("--list") || args.includes("--show-current") || args.length === 0);
   }
   return GIT_MUTATIONS.has(command);
 }
@@ -1389,6 +2331,395 @@ function runMetricsSelfTest() {
     .map(([expected, entry], index) => ({ index, expected, actual: traceBucket(entry), entry }))
     .filter((result) => result.actual !== result.expected);
 
+  const poolOutput = parsePoolOutput(
+    {
+      stdout: [
+        JSON.stringify({ message: "Done", type: "assistantMessage" }),
+        JSON.stringify({ args: { cmd: "git status" }, name: "shell", type: "toolCall" }),
+        JSON.stringify({ err: "matched shell deny setting: git *", type: "toolCallResult" }),
+      ].join("\n"),
+    },
+    {
+      source_path: "/tmp/source.ndjson",
+      installed_path: "/tmp/pool-trajectory.ndjson",
+      entries: [
+        {
+          type: "tool_call.inference.start",
+          tool_call_inference_start: { chat_completion_request: { model: DEFAULT_POOL_MODEL } },
+        },
+        {
+          type: "tool_call.inference.end",
+          tool_call_inference_end: {
+            input_tokens: 10,
+            output_tokens: 2,
+            cache_read_input_tokens: 3,
+            cache_write_input_tokens: 4,
+          },
+        },
+      ],
+    },
+    DEFAULT_POOL_MODEL,
+  );
+  if (
+    poolOutput.parse_error
+    || poolOutput.observed_model !== DEFAULT_POOL_MODEL
+    || poolOutput.tokens_used_total !== 19
+    || poolOutput.policy_denials.length !== 1
+    || poolOutput.policy_denials[0].tool !== "git"
+    || poolOutput.policy_denials[0].argv !== "status"
+    || poolOutput.shell_vc_attempt_count !== 1
+    || !poolOutput.transcript_stdout.includes('"type":"toolCallResult"')
+  ) {
+    failures.push({
+      index: "pool-output",
+      expected: "valid Pool output, model, transcript, 19 tokens, and one git policy denial",
+      actual: poolOutput,
+    });
+  }
+
+  const poolMismatch = parsePoolOutput(
+    { stdout: JSON.stringify({ message: "Done", type: "assistantMessage" }) },
+    {
+      entries: [{
+        type: "tool_call.inference.start",
+        tool_call_inference_start: { chat_completion_request: { model: "poolside/other" } },
+      }],
+    },
+    DEFAULT_POOL_MODEL,
+  );
+  if (!poolMismatch.parse_error || !poolMismatch.output_error?.includes("model mismatch")) {
+    failures.push({
+      index: "pool-model-mismatch",
+      expected: "explicit model mismatch error",
+      actual: poolMismatch,
+    });
+  }
+
+  const poolExternalPath = parsePoolOutput(
+    {
+      stdout: [
+        JSON.stringify({ args: { cmd: "cat > /tmp/editor.sh <<'EOF'\nexit 0\nEOF" }, name: "shell", type: "toolCall" }),
+        JSON.stringify({ message: "Done", type: "assistantMessage" }),
+      ].join("\n"),
+    },
+    {
+      entries: [
+        {
+          type: "tool_call.inference.start",
+          tool_call_inference_start: { chat_completion_request: { model: DEFAULT_POOL_MODEL } },
+        },
+        {
+          type: "tool_call.inference.end",
+          tool_call_inference_end: { input_tokens: 1, output_tokens: 1 },
+        },
+      ],
+    },
+    DEFAULT_POOL_MODEL,
+  );
+  if (
+    !poolExternalPath.parse_error
+    || poolExternalPath.external_path_attempt_count !== 1
+    || !poolExternalPath.output_error?.includes("outside the run sandbox")
+  ) {
+    failures.push({
+      index: "pool-external-path-attempt",
+      expected: "system temp references invalidate the Pool run",
+      actual: poolExternalPath,
+    });
+  }
+
+  const poolIndirectRawVc = parsePoolOutput(
+    {
+      stdout: [
+        JSON.stringify({
+          args: { path: "sequence-editor.sh", content: "#!/bin/sh\nexec git commit --amend -m rewritten\n" },
+          name: "write",
+          type: "toolCall",
+        }),
+        JSON.stringify({ result: "ok", type: "toolCallResult" }),
+        JSON.stringify({ message: "Done", type: "assistantMessage" }),
+      ].join("\n"),
+    },
+    {
+      entries: [{
+        type: "tool_call.inference.start",
+        tool_call_inference_start: { chat_completion_request: { model: DEFAULT_POOL_MODEL } },
+      }],
+    },
+    DEFAULT_POOL_MODEL,
+  );
+  if (
+    !poolIndirectRawVc.parse_error
+    || poolIndirectRawVc.indirect_raw_vc_invocation_count !== 1
+    || !poolIndirectRawVc.output_error?.includes("indirect raw VC")
+  ) {
+    failures.push({
+      index: "pool-indirect-raw-vc",
+      expected: "raw VC commands embedded in tool-written content invalidate the run",
+      actual: poolIndirectRawVc,
+    });
+  }
+
+  const poolUnsupportedShell = parsePoolOutput(
+    {
+      stdout: [
+        JSON.stringify({ args: { cmd: "cat > editor.sh <<'EOF'\n#!/bin/sh\nexec git commit --amend\nEOF" }, name: "shell", type: "toolCall" }),
+        JSON.stringify({ result: "ok", type: "toolCallResult" }),
+        JSON.stringify({ message: "Done", type: "assistantMessage" }),
+      ].join("\n"),
+    },
+    {
+      entries: [{
+        type: "tool_call.inference.start",
+        tool_call_inference_start: { chat_completion_request: { model: DEFAULT_POOL_MODEL } },
+      }],
+    },
+    DEFAULT_POOL_MODEL,
+  );
+  if (
+    !poolUnsupportedShell.parse_error
+    || poolUnsupportedShell.unsupported_shell_vc_call_count !== 1
+    || !poolUnsupportedShell.output_error?.includes("unsupported syntax")
+  ) {
+    failures.push({
+      index: "pool-unsupported-shell-vc",
+      expected: "unsupported shell syntax around VC commands invalidates the run",
+      actual: poolUnsupportedShell,
+    });
+  }
+
+  const poolHarmlessEditorHeredoc = parsePoolOutput(
+    {
+      stdout: [
+        JSON.stringify({
+          args: { cmd: "cat > editor.sh <<'EOF'\n#!/bin/sh\n# Editor for git rebase -i\nsed -i '' 's/pick/fixup/' \"$1\"\nEOF" },
+          name: "shell",
+          type: "toolCall",
+        }),
+        JSON.stringify({ result: "ok", type: "toolCallResult" }),
+        JSON.stringify({ message: "Done", type: "assistantMessage" }),
+      ].join("\n"),
+    },
+    {
+      entries: [{
+        type: "tool_call.inference.start",
+        tool_call_inference_start: { chat_completion_request: { model: DEFAULT_POOL_MODEL } },
+      }],
+    },
+    DEFAULT_POOL_MODEL,
+  );
+  if (poolHarmlessEditorHeredoc.parse_error || poolHarmlessEditorHeredoc.unsupported_shell_vc_call_count !== 0) {
+    failures.push({
+      index: "pool-harmless-editor-heredoc",
+      expected: "VC words in comments do not invalidate a harmless editor script",
+      actual: poolHarmlessEditorHeredoc,
+    });
+  }
+
+  const denialMetrics = {
+    total_logged_commands: 2,
+    shell_logged_commands: 2,
+    shell_vc_command_count: 2,
+    vc_command_count: 2,
+    vc_inspection_count: 2,
+    vc_mutation_count: 0,
+    task_vc_command_count: 2,
+    task_vc_inspection_count: 2,
+    task_vc_mutation_count: 0,
+    failed_vc_commands: 0,
+    task_failed_vc_commands: 0,
+  };
+  const denialMeasurement = {
+    commands: {
+      total_logged_commands: 2,
+      visible: {
+        command_count: 2,
+        vc_command_count: 2,
+        git_command_count: 0,
+        but_command_count: 2,
+        jj_command_count: 0,
+        failed_vc_command_count: 0,
+        policy_block_count: 0,
+        inspection_count: 2,
+        mutation_count: 0,
+      },
+      task: {
+        command_count: 2,
+        vc_command_count: 2,
+        git_command_count: 0,
+        but_command_count: 2,
+        jj_command_count: 0,
+        failed_vc_command_count: 0,
+        policy_block_count: 0,
+        inspection_count: 2,
+        mutation_count: 0,
+      },
+      failed_command_samples: [],
+    },
+  };
+  applyUntracedPolicyDenials(denialMetrics, denialMeasurement, poolOutput.policy_denials);
+  if (
+    denialMetrics.task_vc_command_count !== 3
+    || denialMetrics.total_logged_commands !== 3
+    || denialMetrics.shell_logged_commands !== 3
+    || denialMetrics.task_failed_vc_commands !== 1
+    || denialMeasurement.commands.task.vc_command_count !== 3
+    || denialMeasurement.commands.task.failed_vc_command_count !== 1
+    || denialMeasurement.commands.task.policy_block_count !== 1
+    || denialMeasurement.commands.total_logged_commands !== 3
+    || denialMeasurement.commands.synthetic_policy_denial_count !== 1
+    || denialMeasurement.commands.failed_command_samples[0]?.status !== 42
+  ) {
+    failures.push({
+      index: "pool-policy-denial-accounting",
+      expected: "one untraced policy denial counted as one failed task VC command",
+      actual: { denialMetrics, denialMeasurement },
+    });
+  }
+
+  const compositeVcCalls = shellVcInvocations(
+    "cd /tmp/work && jj --no-pager log --all 2>&1 | head -60; /tmp/bin/git status",
+  );
+  if (
+    compositeVcCalls.length !== 2
+    || compositeVcCalls[0].tool !== "jj"
+    || compositeVcCalls[1].tool !== "git"
+  ) {
+    failures.push({
+      index: "pool-composite-vc-detection",
+      expected: "detect embedded jj and absolute git invocations",
+      actual: compositeVcCalls,
+    });
+  }
+
+  const wrapperPaths = {
+    git: "/bench/bin/git",
+    but: "/bench/bin/but",
+    jj: "/bench/bin/jj",
+  };
+  const shellExtractionCases = [
+    {
+      command: 'GIT_SEQUENCE_EDITOR="python3 reorder todo.py" /bench/bin/git rebase -i HEAD~2',
+      expected: [["git", "wrapper"]],
+    },
+    {
+      command: 'env FOO=1 /bench/bin/jj log',
+      expected: [["jj", "wrapper"]],
+    },
+    {
+      command: 'G=/bench/bin/git; "$G" status',
+      expected: [["git", "wrapper"]],
+    },
+    {
+      command: 'G=/usr/bin/git; $G status',
+      expected: [["git", "raw"]],
+    },
+    {
+      command: `printf '%s\\n' "git status; jj log"`,
+      expected: [],
+    },
+    {
+      command: `sh -c '/bench/bin/git status'`,
+      expected: [["git", "wrapper"]],
+    },
+    {
+      command: `command -v git`,
+      expected: [],
+    },
+    {
+      command: `/bench/bin/git status && jj log`,
+      expected: [["git", "wrapper"], ["jj", "raw"]],
+    },
+    {
+      command: `GIT=/bench/bin/git; for c in a b; do $GIT log -1 $c; done`,
+      expected: [["git", "wrapper"]],
+    },
+    {
+      command: `if /bench/bin/git status; then echo clean; fi`,
+      expected: [["git", "wrapper"]],
+    },
+    {
+      command: `while git status; do break; done`,
+      expected: [["git", "raw"]],
+    },
+    {
+      command: `time -p /bench/bin/git status`,
+      expected: [["git", "wrapper"]],
+    },
+    {
+      command: `! /usr/bin/git reset --hard HEAD^`,
+      expected: [["git", "raw"]],
+    },
+    {
+      command: `2>/dev/null /usr/bin/git reset --hard HEAD^`,
+      expected: [["git", "raw"]],
+    },
+    {
+      command: `2> /dev/null /bench/bin/git status`,
+      expected: [["git", "wrapper"]],
+    },
+  ];
+  for (const [index, testCase] of shellExtractionCases.entries()) {
+    const actual = shellVcInvocations(testCase.command, wrapperPaths).map(({ tool, kind }) => [tool, kind]);
+    if (JSON.stringify(actual) !== JSON.stringify(testCase.expected)) {
+      failures.push({ index: `pool-shell-extraction-${index}`, expected: testCase.expected, actual });
+    }
+  }
+
+  const reconciliationTrace = [{ ...base, tool: "git", argv: "status", internal: false }];
+  const rawAfterWrapper = {
+    shell_events: [{
+      result_seen: true,
+      policy_denial: false,
+      vc_invocations: [
+        { tool: "git", kind: "wrapper", argv: "status" },
+        { tool: "git", kind: "raw", argv: "log" },
+      ],
+    }],
+  };
+  reconcilePoolVcInvocations(rawAfterWrapper, reconciliationTrace, false);
+  if (rawAfterWrapper.untraced_vc_invocation_count !== 1) {
+    failures.push({ index: "pool-reconcile-raw-after-wrapper", expected: 1, actual: rawAfterWrapper });
+  }
+  const bareResolvedToWrapper = {
+    shell_events: [{
+      result_seen: true,
+      policy_denial: false,
+      vc_invocations: [{ tool: "git", kind: "raw", argv: "status" }],
+    }],
+  };
+  reconcilePoolVcInvocations(bareResolvedToWrapper, reconciliationTrace, false);
+  if (bareResolvedToWrapper.untraced_vc_invocation_count) {
+    failures.push({ index: "pool-reconcile-bare-path-wrapper", expected: "accounted", actual: bareResolvedToWrapper });
+  }
+  const timedOutWrapper = {
+    pending_tool_call: { name: "shell", args: { cmd: "/bench/bin/git rebase --continue" } },
+    shell_events: [{
+      result_seen: false,
+      policy_denial: false,
+      vc_invocations: [{ tool: "git", kind: "wrapper", argv: "rebase --continue" }],
+    }],
+  };
+  reconcilePoolVcInvocations(timedOutWrapper, [], true);
+  if (timedOutWrapper.in_flight_vc_invocations?.length !== 1 || timedOutWrapper.output_error) {
+    failures.push({ index: "pool-reconcile-timeout-in-flight", expected: "one allowed in-flight wrapper", actual: timedOutWrapper });
+  }
+  const completedWrapperWithoutTrace = {
+    shell_events: [{
+      result_seen: true,
+      policy_denial: false,
+      vc_invocations: [{ tool: "git", kind: "wrapper", argv: "status" }],
+    }],
+  };
+  reconcilePoolVcInvocations(completedWrapperWithoutTrace, [], false);
+  if (completedWrapperWithoutTrace.missing_wrapper_trace_count !== 1 || !completedWrapperWithoutTrace.output_error) {
+    failures.push({
+      index: "pool-reconcile-missing-wrapper-trace",
+      expected: "completed wrapper without a compatible trace is invalid",
+      actual: completedWrapperWithoutTrace,
+    });
+  }
+
   const implicitTrace = markImplicitToolInternal([
     {
       ...base,
@@ -1425,7 +2756,7 @@ function runMetricsSelfTest() {
     process.exit(1);
   }
 
-  console.log(JSON.stringify({ passed: true, cases: cases.length + 1 }, null, 2));
+  console.log(JSON.stringify({ passed: true, cases: cases.length + 20 }, null, 2));
 }
 
 function summarizeCommands(entries) {
@@ -1552,13 +2883,15 @@ function directoryByteLength(dir) {
   return readdirSync(dir).reduce((sum, entry) => sum + directoryByteLength(path.join(dir, entry)), 0);
 }
 
-function transcriptBreakdown(prompt, agentResult, skillDir, skillName) {
+function transcriptBreakdown(prompt, agentResult, skillDir, skillName, skillReferenceOutputBytesOverride = null) {
   const promptBytes = Buffer.byteLength(prompt);
   const stdoutBytes = Buffer.byteLength(agentResult.stdout);
   const stderrBytes = Buffer.byteLength(agentResult.stderr);
   const totalBytes = promptBytes + stdoutBytes + stderrBytes;
   const platformWarningBytes = countMatchingLineBytes(agentResult.stderr, (line) => line.includes(" WARN codex_"));
-  const skillReferenceOutputBytes = estimateSkillReferenceOutputBytes(agentResult.stderr, skillName);
+  const skillReferenceOutputBytes = Number.isFinite(skillReferenceOutputBytesOverride)
+    ? skillReferenceOutputBytesOverride
+    : estimateSkillReferenceOutputBytes(agentResult.stderr, skillName);
   const nonWarningTranscriptBytes = totalBytes - platformWarningBytes;
   const warmEstimatedTotalBytes = Math.max(0, totalBytes - skillReferenceOutputBytes);
   const warmEstimatedNonWarningBytes = Math.max(0, nonWarningTranscriptBytes - skillReferenceOutputBytes);
@@ -1630,11 +2963,11 @@ function timingBreakdown(trace, agentResult) {
   };
 }
 
-function measurementBreakdown(trace, prompt, agentResult, skillDir, skillName) {
+function measurementBreakdown(trace, prompt, agentResult, skillDir, skillName, skillReferenceOutputBytesOverride = null) {
   return {
     schema_version: 1,
     timing: timingBreakdown(trace, agentResult),
-    transcript: transcriptBreakdown(prompt, agentResult, skillDir, skillName),
+    transcript: transcriptBreakdown(prompt, agentResult, skillDir, skillName, skillReferenceOutputBytesOverride),
     commands: commandBreakdown(trace),
   };
 }
@@ -1696,22 +3029,127 @@ function traceMetrics(trace, prompt, agentResult) {
   };
 }
 
+function recomputeRunMeasurements(runDir) {
+  const resultPath = path.join(runDir, "result.json");
+  const result = JSON.parse(readFileSync(resultPath, "utf8"));
+  const prompt = readFileSync(path.join(runDir, "prompt.txt"), "utf8");
+  const rawAgentResult = {
+    ...result.agent_result,
+    stdout: readFileSync(path.join(runDir, "agent-stdout.txt"), "utf8"),
+    stderr: readFileSync(path.join(runDir, "agent-stderr.txt"), "utf8"),
+  };
+  const transcriptAgentResult = agentResultForTranscript(rawAgentResult, result.agent_output ?? {});
+  const trace = markImplicitToolInternal(parseTrace(path.join(runDir, "command-trace.tsv")));
+  const skillDir = result.skill?.source_dir ?? null;
+  const skillName = result.skill?.name ?? null;
+  if (result.agent === "pool" && existsSync(path.join(runDir, "pool-trajectory.ndjson"))) {
+    const trajectoryText = readFileSync(path.join(runDir, "pool-trajectory.ndjson"), "utf8");
+    const expectedSkillName = result.skill?.install_name
+      ?? (result.skill?.installed_pool ? path.basename(path.dirname(result.skill.installed_pool)) : null);
+    const policy = result.agent_instructions?.pool_tool_policy ?? {};
+    const reparsedPoolOutput = parsePoolOutput(
+      rawAgentResult,
+      { entries: parseNdjson(trajectoryText).entries },
+      result.model,
+      {
+        wrapper_paths: { git: policy.git_wrapper, but: policy.but_wrapper, jj: policy.jj_wrapper },
+        expected_skill_name: expectedSkillName,
+      },
+    );
+    result.agent_output.skill_reference_output_bytes = reparsedPoolOutput.skill_reference_output_bytes;
+  }
+
+  result.metrics = traceMetrics(trace, prompt, transcriptAgentResult);
+  result.measurement = measurementBreakdown(
+    trace,
+    prompt,
+    transcriptAgentResult,
+    skillDir,
+    skillName,
+    result.agent === "pool" ? result.agent_output?.skill_reference_output_bytes : null,
+  );
+  applyUntracedPolicyDenials(result.metrics, result.measurement, result.agent_output?.policy_denials);
+  result.measurements_recomputed_at = new Date().toISOString();
+  writeFileSync(resultPath, JSON.stringify(result, null, 2));
+  return {
+    run_id: result.run_id,
+    task_vc_command_count: result.metrics.task_vc_command_count,
+    task_vc_inspection_count: result.metrics.task_vc_inspection_count,
+    task_vc_mutation_count: result.metrics.task_vc_mutation_count,
+  };
+}
+
+function scrubPoolCredentials(rootDir) {
+  const resolvedRoot = path.resolve(rootDir);
+  let scrubbed = 0;
+  const visit = (directory) => {
+    for (const name of readdirSync(directory)) {
+      const candidate = path.join(directory, name);
+      const stat = lstatSync(candidate);
+      if (stat.isSymbolicLink()) continue;
+      if (!stat.isDirectory()) continue;
+      if (name === "pool-home") {
+        const credentialsPath = path.resolve(candidate, ".config/poolside/credentials.json");
+        const expectedPath = path.join(path.resolve(candidate), ".config/poolside/credentials.json");
+        if (credentialsPath !== expectedPath || !credentialsPath.startsWith(`${resolvedRoot}${path.sep}`)) {
+          throw new Error(`Refusing unexpected Pool credential path: ${credentialsPath}`);
+        }
+        if (existsSync(credentialsPath)) {
+          unlinkIsolatedPoolCredential(candidate, credentialsPath);
+          scrubbed += 1;
+        }
+        const resultPath = path.join(path.dirname(candidate), "result.json");
+        if (existsSync(resultPath)) {
+          const result = JSON.parse(readFileSync(resultPath, "utf8"));
+          result.agent_config = {
+            ...result.agent_config,
+            pool_credentials_cleaned: true,
+            pool_credentials_retained: false,
+            pool_credentials_cleanup_error: null,
+          };
+          result.pool_credentials_scrubbed_at = new Date().toISOString();
+          writeFileSync(resultPath, JSON.stringify(result, null, 2));
+        }
+        continue;
+      }
+      visit(candidate);
+    }
+  };
+  visit(resolvedRoot);
+  return { root: resolvedRoot, scrubbed };
+}
+
 const args = parseArgs(process.argv.slice(2));
 if (args.get("self-test-metrics") === "true") {
   runMetricsSelfTest();
+  process.exit(0);
+}
+if (args.get("recompute-result")) {
+  const runDir = path.resolve(args.get("recompute-result"));
+  console.log(JSON.stringify(recomputeRunMeasurements(runDir), null, 2));
+  process.exit(0);
+}
+if (args.get("scrub-pool-credentials")) {
+  console.log(JSON.stringify(scrubPoolCredentials(args.get("scrub-pool-credentials")), null, 2));
   process.exit(0);
 }
 
 const taskId = args.get("task") ?? "pilot-1-selective-validation";
 const agent = args.get("agent") ?? "codex";
 const arm = args.get("arm") ?? "git";
-const model = args.get("model") ?? (agent === "codex" ? DEFAULT_CODEX_MODEL : DEFAULT_CLAUDE_MODEL);
+const defaultModels = {
+  codex: DEFAULT_CODEX_MODEL,
+  claude: DEFAULT_CLAUDE_MODEL,
+  pool: DEFAULT_POOL_MODEL,
+};
+const model = args.get("model") ?? defaultModels[agent];
 if (agent === "claude" && !/\d/.test(model)) {
   console.warn(`Warning: Claude model "${model}" is a floating alias, not a versioned model ID; the run will not be reproducible across model updates.`);
 }
 const timeoutMs = Number(args.get("timeout-ms") ?? 900000);
 const realBut = executablePath(args.get("but-bin"), "but");
 const realJj = executablePath(args.get("jj-bin"), "jj");
+const realPool = agent === "pool" ? executablePath(args.get("pool-bin"), "pool") : null;
 const skillDir = path.resolve(args.get("skill-dir") ?? "/Users/kiril/src/gitbutler/crates/but/skill");
 const configuredJjSkillDir = args.get("jj-skill-dir") ? path.resolve(args.get("jj-skill-dir")) : null;
 const jjSkillUrlArg = args.get("jj-skill-url") ?? null;
@@ -1734,6 +3172,11 @@ const codexIsolatedHome = agent === "codex" && codexCleanConfig && args.get("cod
 const codexDisablePlugins = agent === "codex" && codexCleanConfig && args.get("codex-disable-plugins") !== "false";
 const claudeCleanConfig = agent === "claude" ? args.get("claude-clean-config") !== "false" : false;
 const claudeEffortLevel = agent === "claude" && claudeCleanConfig ? (args.get("claude-effort-level") ?? "medium") : null;
+const poolCleanConfig = agent === "pool" ? args.get("pool-clean-config") !== "false" : false;
+const poolHostSandboxEnabled = agent === "pool" ? args.get("pool-host-sandbox") !== "false" : false;
+if (agent === "pool" && !poolCleanConfig) {
+  throw new Error("Pool runs require isolated config; --pool-clean-config false is unsupported");
+}
 const runId = args.get("run-id") ?? `${Date.now()}-${agent}-${arm.replaceAll("+", "-")}`;
 const runDir = path.resolve(args.get("out") ?? path.join("tmp/pilot-runs", runId));
 
@@ -1745,13 +3188,23 @@ if (!taskConfig) {
 }
 taskDir = path.join(repoRoot, taskConfig.taskDir);
 
+if (!Object.hasOwn(defaultModels, agent)) {
+  console.error(`Unknown agent: ${agent}`);
+  console.error(`Known agents: ${Object.keys(defaultModels).join(", ")}`);
+  process.exit(2);
+}
+
 if (!["git", "but+skill", "jj+skill"].includes(arm)) {
-  console.error("Usage: node scripts/run-pilot-agent.mjs --task <task-id> --agent <codex|claude> --arm <git|but+skill|jj+skill>");
+  console.error("Usage: node scripts/run-pilot-agent.mjs --task <task-id> --agent <codex|claude|pool> --arm <git|but+skill|jj+skill>");
   process.exit(2);
 }
 
 rmSync(runDir, { recursive: true, force: true });
 mkdirSync(runDir, { recursive: true });
+const poolTempDir = agent === "pool" ? path.join(runDir, "tmp") : null;
+if (poolTempDir) {
+  mkdirSync(poolTempDir, { recursive: true, mode: 0o700 });
+}
 
 const butAppDataDir = arm === "but+skill" ? path.join(runDir, "but-app-data") : null;
 const butEnv = butAppDataDir
@@ -1761,16 +3214,43 @@ if (butAppDataDir) {
   mkdirSync(butAppDataDir, { recursive: true });
 }
 const resolvedJjSkill = arm === "jj+skill" ? resolveJjSkillSource(runDir, configuredJjSkillDir, jjSkillSource) : null;
-const { workspace, setup } = prepareWorkspace(runDir, arm, realBut, skillDir, realJj, resolvedJjSkill, butEnv);
+const { workspace, setup } = prepareWorkspace(runDir, arm, agent, realBut, skillDir, realJj, resolvedJjSkill, butEnv);
 const { binDir, tracePath } = createWrappers(runDir, arm, realBut, realJj);
+const poolToolPolicy = agent === "pool" ? installPoolToolPolicy(workspace, binDir) : null;
 const codexHome = prepareCodexHome(runDir, codexIsolatedHome);
 const claudeSettings = prepareClaudeSettings(runDir, claudeCleanConfig, claudeEffortLevel);
 const claudeConfig = prepareClaudeConfig(claudeCleanConfig);
-const prompt = buildPrompt();
+const poolHome = await preparePoolHome(runDir, poolCleanConfig, model);
+let poolCredentialsCleanupError = null;
+let poolCredentialsCleaned = poolHome === null;
+const cleanupPoolAuthProxy = () => poolHome?.auth_proxy?.stop();
+const cleanupPoolCredentials = () => {
+  if (!poolHome) return;
+  try {
+    poolHome.cleanup_credentials();
+    poolCredentialsCleaned = !existsSync(poolHome.credentials_path);
+  } catch (error) {
+    poolCredentialsCleanupError = String(error);
+    poolCredentialsCleaned = false;
+  }
+};
+if (poolHome) process.once("exit", cleanupPoolCredentials);
+if (poolHome?.auth_proxy) process.once("exit", cleanupPoolAuthProxy);
+const poolHostSandbox = installPoolHostSandbox(runDir, poolHostSandboxEnabled, [
+  { kind: "subpath", target: workspace },
+  ...(poolHome?.runtime_write_dirs ?? []).map((target) => ({ kind: "subpath", target })),
+  poolTempDir ? { kind: "subpath", target: poolTempDir } : null,
+  butAppDataDir ? { kind: "subpath", target: butAppDataDir } : null,
+  { kind: "literal", target: tracePath },
+], [poolHome?.auth_proxy?.source_credentials_path]);
+const poolSkillName = agent === "pool" && arm.endsWith("+skill")
+  ? (setup.install_name ?? setup.name)
+  : null;
+const prompt = buildPrompt(agent, poolToolPolicy, poolSkillName);
 writeFileSync(path.join(runDir, "prompt.txt"), prompt);
 
 const env = {
-  ...process.env,
+  ...(agent === "pool" ? minimalPoolEnvironment() : process.env),
   PATH: `${binDir}:${process.env.PATH}`,
   VCB_TRACE: tracePath,
   VCB_CODEX_CLEAN_CONFIG: String(codexCleanConfig),
@@ -1789,6 +3269,23 @@ if (claudeConfig) {
   env.CLAUDE_CODE_OAUTH_TOKEN = claudeConfig.oauth_token;
   delete env.CLAUDE_SECURESTORAGE_CONFIG_DIR;
 }
+if (poolHome) {
+  env.HOME = poolHome.path;
+  env.XDG_CONFIG_HOME = path.join(poolHome.path, ".config");
+  env.POOLSIDE_API_URL = poolHome.auth_proxy.api_url;
+  env.POOLSIDE_API_KEY = "POOL_AUTH_PROXY_DUMMY_TOKEN_NOT_A_SECRET";
+  env.POOLSIDE_TOKEN = "POOL_AUTH_PROXY_DUMMY_TOKEN_NOT_A_SECRET";
+}
+if (poolTempDir) {
+  env.TMPDIR = poolTempDir;
+}
+if (realPool) {
+  env.VCB_POOL_EXECUTABLE = realPool;
+}
+if (poolHostSandbox) {
+  env.VCB_POOL_HOST_SANDBOX_EXECUTABLE = poolHostSandbox.executable;
+  env.VCB_POOL_HOST_SANDBOX_PROFILE = poolHostSandbox.profile_path;
+}
 if (butAppDataDir) {
   env.E2E_TEST_APP_DATA_DIR = butAppDataDir;
 }
@@ -1802,11 +3299,42 @@ try {
     claudeConfig.cleanup();
     process.off("exit", claudeConfig.cleanup);
   }
+  if (poolHome?.auth_proxy) {
+    await cleanupPoolAuthProxy();
+    process.off("exit", cleanupPoolAuthProxy);
+  }
 }
 writeFileSync(path.join(runDir, "agent-stdout.txt"), agentResult.stdout);
 writeFileSync(path.join(runDir, "agent-stderr.txt"), agentResult.stderr);
-const agentOutput = parseAgentOutput(agent, agentResult);
-if (agentOutput.output_format === "json" && !agentOutput.parse_error) {
+let poolTrajectory = null;
+if (agent === "pool") {
+  try {
+    poolTrajectory = locatePoolTrajectory(workspace, agentResult, runDir, env, realPool);
+  } catch (error) {
+    poolTrajectory = { error: String(error) };
+  } finally {
+    cleanupPoolCredentials();
+    process.off("exit", cleanupPoolCredentials);
+  }
+}
+const agentOutput = parseAgentOutput(agent, agentResult, {
+  pool_trajectory: poolTrajectory,
+  requested_model: model,
+  wrapper_paths: poolToolPolicy ? {
+    git: poolToolPolicy.git_wrapper,
+    but: poolToolPolicy.but_wrapper,
+    jj: poolToolPolicy.jj_wrapper,
+  } : {},
+  expected_skill_name: poolSkillName,
+});
+if (agent === "pool" && !poolCredentialsCleaned) {
+  agentOutput.parse_error = true;
+  agentOutput.output_error = [
+    agentOutput.output_error,
+    `Pool credential cleanup failed${poolCredentialsCleanupError ? `: ${poolCredentialsCleanupError}` : ""}`,
+  ].filter(Boolean).join("; ");
+}
+if (agent === "claude" && agentOutput.output_format === "json" && !agentOutput.parse_error) {
   writeFileSync(path.join(runDir, "agent-output.json"), agentResult.stdout);
 }
 const observedModel = agentOutput.observed_model;
@@ -1814,17 +3342,37 @@ const transcriptAgentResult = agentResultForTranscript(agentResult, agentOutput)
 
 const verifierResult = verify(workspace);
 const trace = markImplicitToolInternal(parseTrace(tracePath));
+if (agent === "pool") {
+  reconcilePoolVcInvocations(agentOutput, trace, agentResult.timed_out);
+  if (trace.length === 0 && !agentResult.timed_out) {
+    agentOutput.parse_error = true;
+    agentOutput.output_error = [agentOutput.output_error, "Pool run produced no wrapped command trace"]
+      .filter(Boolean)
+      .join("; ");
+  }
+}
 const metrics = traceMetrics(trace, prompt, transcriptAgentResult);
 const activeSkillDir = arm === "but+skill" ? skillDir : arm === "jj+skill" ? resolvedJjSkill.dir : null;
 const activeSkillName = arm.endsWith("+skill") ? setup.name : null;
 const activeSkillInstallName = arm.endsWith("+skill") ? (setup.install_name ?? activeSkillName) : null;
-const measurement = measurementBreakdown(trace, prompt, transcriptAgentResult, activeSkillDir, activeSkillInstallName);
+const measurement = measurementBreakdown(
+  trace,
+  prompt,
+  transcriptAgentResult,
+  activeSkillDir,
+  activeSkillInstallName,
+  agent === "pool" ? agentOutput.skill_reference_output_bytes : null,
+);
+applyUntracedPolicyDenials(metrics, measurement, agentOutput.policy_denials);
 const skillFile = path.join(activeSkillDir ?? skillDir, "SKILL.md");
 const installedCodexSkill = activeSkillInstallName
   ? path.join(workspace, `.codex/skills/${activeSkillInstallName}/SKILL.md`)
   : null;
 const installedClaudeSkill = activeSkillInstallName
   ? path.join(workspace, `.claude/skills/${activeSkillInstallName}/SKILL.md`)
+  : null;
+const installedPoolSkill = agent === "pool" && activeSkillInstallName
+  ? path.join(workspace, `.agents/skills/${activeSkillInstallName}/SKILL.md`)
   : null;
 const butBinaryMetadata = arm === "but+skill"
   ? {
@@ -1848,6 +3396,7 @@ const skillSourceGit = activeSkillDir
 const skillMetadata = activeSkillDir
   ? {
       name: activeSkillName,
+      install_name: activeSkillInstallName,
       source_dir: activeSkillDir,
       source_package: setup.source?.package ?? null,
       source_url: setup.source?.source_url ?? null,
@@ -1869,21 +3418,35 @@ const skillMetadata = activeSkillDir
       source_git: skillSourceGit,
       installed_codex: installedCodexSkill,
       installed_claude: installedClaudeSkill,
+      ...(agent === "pool" ? { installed_pool: installedPoolSkill } : {}),
     }
   : null;
-const runFailureClass = agentResult.timed_out
-  ? "AGENT_TIMEOUT"
+const poolBoundaryError = agent === "pool"
+  && (
+    (agentOutput.external_path_attempt_count ?? 0) > 0
+    || (agentOutput.untraced_vc_invocation_count ?? 0) > 0
+    || (agentOutput.indirect_raw_vc_invocation_count ?? 0) > 0
+    || (agentOutput.unsupported_shell_vc_call_count ?? 0) > 0
+    || !poolCredentialsCleaned
+  );
+const runFailureClass = poolBoundaryError
+  ? "AGENT_OUTPUT_ERROR"
+  : agentResult.timed_out
+    ? "AGENT_TIMEOUT"
+  : agentOutput.output_error
+    ? "AGENT_OUTPUT_ERROR"
   : agentResult.status === 0
     ? verifierResult.failure_class
     : "AGENT_RUNTIME_ERROR";
 
 const result = {
   run_id: runId,
+  harness_fingerprint: args.get("harness-fingerprint") ?? null,
   agent,
   arm,
   model: model || null,
   observed_model: observedModel,
-  agent_cli_version: agentCliVersion(agent),
+  agent_cli_version: agentCliVersion(agent, realPool),
   agent_config: {
     codex_clean_config: agent === "codex" ? codexCleanConfig : null,
     codex_ephemeral: agent === "codex" ? codexCleanConfig : null,
@@ -1901,6 +3464,28 @@ const result = {
     claude_setting_sources: agent === "claude" && claudeCleanConfig ? ["project", "local"] : null,
     claude_config_dir: claudeConfig?.path ?? null,
     claude_auth_source: claudeConfig?.auth_source ?? null,
+    ...(agent === "pool" ? {
+      pool_clean_config: poolCleanConfig,
+      pool_home: poolHome?.path ?? null,
+      pool_tmpdir: poolTempDir,
+      pool_configured_model: poolHome?.configured_model ?? null,
+      pool_host_sandbox: poolHostSandbox !== null,
+      pool_host_sandbox_profile: poolHostSandbox?.profile_path ?? null,
+      pool_host_write_roots: poolHostSandbox?.write_roots ?? null,
+      pool_host_write_files: poolHostSandbox?.write_files ?? null,
+      pool_host_read_denied_files: poolHostSandbox?.read_denied_files ?? null,
+      pool_auth_copied: poolHome?.credentials_copied ?? null,
+      pool_auth_sanitized: poolHome?.credentials_sanitized ?? null,
+      pool_auth_proxy: poolHome?.auth_proxy !== undefined,
+      pool_auth_proxy_log: poolHome?.auth_proxy?.log_path ?? null,
+      pool_auth_proxy_upstream_origin: poolHome?.auth_proxy?.upstream_origin ?? null,
+      pool_auth_proxy_upstream_base_path: poolHome?.auth_proxy?.upstream_base_path ?? null,
+      pool_credentials_cleaned: agent === "pool" ? poolCredentialsCleaned : null,
+      pool_credentials_retained: agent === "pool" && poolHome ? existsSync(poolHome.credentials_path) : null,
+      pool_credentials_cleanup_error: agent === "pool" ? poolCredentialsCleanupError : null,
+      pool_settings_copied: poolHome?.settings_copied ?? null,
+      pool_settings_sanitized: poolHome?.settings_sanitized ?? null,
+    } : {}),
   },
   workspace,
   task: taskConfig.id,
@@ -1914,11 +3499,14 @@ const result = {
     jj_colocated_before_agent: arm === "jj+skill",
     skill_installed_before_agent: arm.endsWith("+skill"),
     agent_instructions_before_agent: true,
+    pool_tool_policy_before_agent: poolToolPolicy !== null,
     but_app_data_dir: butAppDataDir,
     dirty_state_applied_before_agent: taskConfig.applyDirtyState !== false || taskConfig.fixtureDirty !== false,
     included_in_agent_duration_or_metrics: false,
   },
-  agent_instructions: setup.instructions,
+  agent_instructions: poolToolPolicy
+    ? { ...setup.instructions, pool_tool_policy: poolToolPolicy }
+    : setup.instructions,
   tool_binary: toolBinaryMetadata,
   but_binary: butBinaryMetadata,
   jj_binary: jjBinaryMetadata,
@@ -1943,4 +3531,4 @@ const result = {
 
 writeFileSync(path.join(runDir, "result.json"), JSON.stringify(result, null, 2));
 console.log(JSON.stringify(result, null, 2));
-process.exit(agentResult.status === 0 && verifierResult.passed ? 0 : 1);
+process.exit(agentResult.status === 0 && !agentOutput.output_error && verifierResult.passed ? 0 : 1);
