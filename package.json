@@ -26,6 +26,7 @@
     "pilot6:check": "node scripts/run-pilot6-checks.mjs",
     "matrix:run": "node scripts/run-full-matrix.mjs",
     "matrix:merge": "node scripts/merge-matrix-batches.mjs",
+    "pool:check": "node scripts/test-pool-auth-proxy.mjs && node scripts/run-pilot-agent.mjs --self-test-metrics && node scripts/run-full-matrix.mjs --self-test true",
     "runs:export": "node scripts/export-batch-artifacts.mjs",
     "web:data": "node scripts/build-web-data.mjs"
   },
