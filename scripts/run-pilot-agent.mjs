@@ -464,6 +464,21 @@ function createWrappers(runDir, arm, realBut, realJj) {
   return { binDir, tracePath };
 }
 
+function prepareShellConfig(runDir, binDir) {
+  const shellConfigDir = path.join(runDir, "shell-config");
+  mkdirSync(shellConfigDir, { recursive: true });
+  const prependWrapperPath = `export PATH=${shellQuote(binDir)}:"$PATH"\n`;
+
+  // Reassert wrapper PATH precedence through startup files in this ZDOTDIR.
+  // Other shells inherit PATH from env but get no startup-file isolation here.
+  // .zprofile prepends again after macOS /etc/zprofile runs path_helper for
+  // login shells and may reorder the inherited PATH.
+  writeFileSync(path.join(shellConfigDir, ".zshenv"), prependWrapperPath);
+  writeFileSync(path.join(shellConfigDir, ".zprofile"), prependWrapperPath);
+
+  return { path: shellConfigDir };
+}
+
 function parseSkillVersion(skillFile) {
   const content = readFileSync(skillFile, "utf8");
   const match = content.match(/^version:\s*"?([^"\n]+)"?\s*$/m);
@@ -1763,6 +1778,7 @@ if (butAppDataDir) {
 const resolvedJjSkill = arm === "jj+skill" ? resolveJjSkillSource(runDir, configuredJjSkillDir, jjSkillSource) : null;
 const { workspace, setup } = prepareWorkspace(runDir, arm, realBut, skillDir, realJj, resolvedJjSkill, butEnv);
 const { binDir, tracePath } = createWrappers(runDir, arm, realBut, realJj);
+const shellConfig = prepareShellConfig(runDir, binDir);
 const codexHome = prepareCodexHome(runDir, codexIsolatedHome);
 const claudeSettings = prepareClaudeSettings(runDir, claudeCleanConfig, claudeEffortLevel);
 const claudeConfig = prepareClaudeConfig(claudeCleanConfig);
@@ -1772,6 +1788,7 @@ writeFileSync(path.join(runDir, "prompt.txt"), prompt);
 const env = {
   ...process.env,
   PATH: `${binDir}:${process.env.PATH}`,
+  ZDOTDIR: shellConfig.path,
   VCB_TRACE: tracePath,
   VCB_CODEX_CLEAN_CONFIG: String(codexCleanConfig),
   VCB_CODEX_DISABLE_PLUGINS: String(codexDisablePlugins),
