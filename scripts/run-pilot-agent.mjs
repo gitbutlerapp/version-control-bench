@@ -10,11 +10,11 @@ import { run } from "./lib/process.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
-const DEFAULT_CODEX_MODEL = "gpt-5.5";
+const DEFAULT_CODEX_MODEL = "gpt-5.6-sol";
 // Versioned model ID, not the floating `opus` alias: reruns of a published
 // batch must hit the same model. Current-generation Claude models have no
 // dated snapshots; the versioned ID is the pin. Override with --model.
-const DEFAULT_CLAUDE_MODEL = "claude-opus-4-8";
+const DEFAULT_CLAUDE_MODEL = "claude-opus-5";
 const DEFAULT_JJ_SKILL = {
   package: "onevcat/skills@onevcat-jj",
   name: "onevcat-jj",
