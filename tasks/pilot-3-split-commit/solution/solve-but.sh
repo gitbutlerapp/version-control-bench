@@ -33,25 +33,16 @@ commit_id() {
 hunk_id() {
   local file_path="$1"
   local snippet="$2"
-  "$BUT_BIN" diff | node -e '
+  "$BUT_BIN" diff --json | node -e '
     const fs = require("node:fs");
     const filePath = process.argv[1];
     const snippet = process.argv[2];
-    const lines = fs.readFileSync(0, "utf8").split(/\n/);
-    const blocks = [];
-    let current = null;
-    for (const line of lines) {
-      const match = line.match(/^([a-z0-9]+(?::[a-z0-9]+)?)\s+(.+?)│$/);
-      if (match) {
-        current = { id: match[1], path: match[2].trim(), body: "" };
-        blocks.push(current);
-        continue;
-      }
-      if (current) current.body += `${line}\n`;
-    }
-    const found = blocks.find((block) => block.path === filePath && block.body.includes(snippet));
+    const diff = JSON.parse(fs.readFileSync(0, "utf8"));
+    const found = (diff.changes ?? []).find(
+      (change) => change.path === filePath && JSON.stringify(change.diff ?? {}).includes(snippet),
+    );
     if (!found) process.exit(1);
-    process.stdout.write(found.id);
+    process.stdout.write(String(found.id));
   ' "$file_path" "$snippet"
 }
 
