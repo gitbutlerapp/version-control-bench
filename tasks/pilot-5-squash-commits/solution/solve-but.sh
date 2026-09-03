@@ -33,9 +33,9 @@ commit_id() {
 
 helpers="$(commit_id "extract parser helpers")"
 wire="$(commit_id "wire parser helpers")"
-"$BUT_BIN" squash "$helpers" "$wire" -m "add parser pipeline" >/dev/null
+"$BUT_BIN" squash "$helpers" --target "$wire" -m "add parser pipeline" >/dev/null
 
 retry_option="$(commit_id "add retry option")"
 retry_test="$(commit_id "test retry option")"
 retry_doc="$(commit_id "document retry option")"
-"$BUT_BIN" squash "$retry_option" "$retry_test" "$retry_doc" -m "add retry support" >/dev/null
+"$BUT_BIN" squash "$retry_option" "$retry_test" --target "$retry_doc" -m "add retry support" >/dev/null
