@@ -12,7 +12,7 @@ fi
 
 commit_id() {
   local subject="$1"
-  "$BUT_BIN" status --format json | node -e '
+  "$BUT_BIN" status --json | node -e '
     const fs = require("node:fs");
     const subject = process.argv[1];
     const status = JSON.parse(fs.readFileSync(0, "utf8"));
@@ -63,9 +63,7 @@ commit_snippets() {
     ids+=("$(hunk_id "$1" "$2")")
     shift 2
   done
-  local changes
-  changes="$(IFS=,; echo "${ids[*]}")"
-  "$BUT_BIN" commit split-workflow -m "$message" --changes "$changes" >/dev/null
+  "$BUT_BIN" commit -b split-workflow -m "$message" "${ids[@]}" >/dev/null
 }
 
 move_before_preserved_top() {
@@ -74,7 +72,7 @@ move_before_preserved_top() {
   local preserved_top
   commit="$(commit_id "$message")"
   preserved_top="$(commit_id "add handler routing metadata")"
-  "$BUT_BIN" move "$commit" "$preserved_top" >/dev/null
+  "$BUT_BIN" move --below "$preserved_top" "$commit" >/dev/null
 }
 
 broad_commit="$(commit_id "add lead workflow")"

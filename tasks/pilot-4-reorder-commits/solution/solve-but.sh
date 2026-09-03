@@ -12,7 +12,7 @@ fi
 
 commit_id() {
   local subject="$1"
-  "$BUT_BIN" status --format json | node -e '
+  "$BUT_BIN" status --json | node -e '
     const fs = require("node:fs");
     const subject = process.argv[1];
     const status = JSON.parse(fs.readFileSync(0, "utf8"));
@@ -33,4 +33,4 @@ commit_id() {
 retry="$(commit_id "add retry policy")"
 sender="$(commit_id "add notification sender")"
 customer="$(commit_id "add customer model")"
-"$BUT_BIN" move "$retry,$sender" "$customer" >/dev/null
+"$BUT_BIN" move --below "$customer" "$retry" "$sender" >/dev/null

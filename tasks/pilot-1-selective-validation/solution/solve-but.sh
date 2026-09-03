@@ -24,5 +24,5 @@ if [[ -z "$README_ID" || -z "$HANDLER_ID" || -z "$TEST_ID" ]]; then
   exit 1
 fi
 
-"$BUT_BIN" commit input-validation -m "Add input validation" --changes "$README_ID,$HANDLER_ID,$TEST_ID"
+"$BUT_BIN" commit -b input-validation -m "Add input validation" "$README_ID" "$HANDLER_ID" "$TEST_ID"
 node "$BENCH_ROOT/scripts/apply-pilot-state.mjs" dirty "$PWD"
