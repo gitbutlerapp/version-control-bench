@@ -10,7 +10,6 @@ if [[ "$(git branch --show-current)" != "gitbutler/workspace" ]]; then
   node "$BENCH_ROOT/scripts/apply-pilot-state.mjs" dirty "$PWD"
 fi
 
-"$BUT_BIN" branch new input-validation
 node "$BENCH_ROOT/scripts/apply-pilot-state.mjs" target-only "$PWD"
 
 STATUS="$("$BUT_BIN" status -fv)"
